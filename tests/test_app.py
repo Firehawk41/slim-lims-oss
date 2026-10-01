@@ -47,7 +47,7 @@ class _FakeCustomerService:
     metals_prep_options = ()  # unused, present for interface parity
 
     def __init__(self) -> None:
-        self.customers = [_FakeCustomer(1, "Customer 130"), _FakeCustomer(2, "Beta Inc")]
+        self.customers = [_FakeCustomer(1, "Customer ea6f9"), _FakeCustomer(2, "Beta Inc")]
         self.created_calls: list[tuple] = []
         self.form_key_calls: list[tuple] = []
 
@@ -215,7 +215,7 @@ def test_generate_report_accepts_path_under_testing_requests_root(tmp_path, monk
     real_root.mkdir()
     monkeypatch.setattr(app_module, "TESTING_REQUESTS_ROOT", real_root)
 
-    inside = real_root / "Customer 130" / "form.xlsx"
+    inside = real_root / "Customer ea6f9" / "form.xlsx"
     inside.parent.mkdir()
     inside.write_text("stub")
 
@@ -235,7 +235,7 @@ def test_generate_report_logs_hook_version_when_provided(tmp_path, monkeypatch, 
     real_root.mkdir()
     monkeypatch.setattr(app_module, "TESTING_REQUESTS_ROOT", real_root)
 
-    inside = real_root / "Customer 130" / "form.xlsx"
+    inside = real_root / "Customer ea6f9" / "form.xlsx"
     inside.parent.mkdir()
     inside.write_text("stub")
 
@@ -259,7 +259,7 @@ def test_generate_report_missing_hook_version_logs_unknown_not_an_error(tmp_path
     real_root.mkdir()
     monkeypatch.setattr(app_module, "TESTING_REQUESTS_ROOT", real_root)
 
-    inside = real_root / "Customer 130" / "form.xlsx"
+    inside = real_root / "Customer ea6f9" / "form.xlsx"
     inside.parent.mkdir()
     inside.write_text("stub")
 
@@ -286,7 +286,7 @@ def test_generate_report_translates_mapped_drive_before_containment_check(tmp_pa
     monkeypatch.setattr(app_module, "TESTING_REQUESTS_ROOT", real_root)
     monkeypatch.setenv("MAPPED_DRIVE_X_UNC", str(real_root))
 
-    inside = real_root / "Customer 130" / "form.xlsx"
+    inside = real_root / "Customer ea6f9" / "form.xlsx"
     inside.parent.mkdir()
     inside.write_text("stub")
 
@@ -296,7 +296,7 @@ def test_generate_report_translates_mapped_drive_before_containment_check(tmp_pa
 
     monkeypatch.setattr(app_module, "run", fake_run)
 
-    response = client.post("/generate-report", json={"input_path": r"X:\Customer 130\form.xlsx"})
+    response = client.post("/generate-report", json={"input_path": r"X:\Customer ea6f9\form.xlsx"})
     assert response.status_code == 200
 
 
@@ -339,7 +339,7 @@ def test_generate_report_success_merges_run_infos_gates_into_the_response(tmp_pa
     def fake_run(input_path: Path, output_path: Path | None, db_url=None, services=None, info=None) -> Path:
         if info is not None:
             info.update(
-                customer_name="Customer 130", request_type="CHEMICAL", sample_count=2,
+                customer_name="Customer ea6f9", request_type="CHEMICAL", sample_count=2,
                 sheet_count=2, parse_seconds=0.01, build_seconds=0.02, write_seconds=0.03,
                 engine_version="1.2.3", domain_version="4.5.6",
             )
@@ -350,7 +350,7 @@ def test_generate_report_success_merges_run_infos_gates_into_the_response(tmp_pa
     response = client.post("/generate-report", json={"input_path": str(input_file)})
     assert response.status_code == 200
     body = response.json()
-    assert body["customer_name"] == "Customer 130"
+    assert body["customer_name"] == "Customer ea6f9"
     assert body["request_type"] == "CHEMICAL"
     assert body["sample_count"] == 2
     assert body["sheet_count"] == 2
@@ -491,7 +491,7 @@ def test_generate_report_unresolved_customer_returns_resolve_url(tmp_path, monke
     input_file.write_text("stub")
 
     def fake_run(input_path: Path, output_path: Path, db_url=None, services=None, info=None) -> Path:
-        raise UnresolvedCustomerReportError("Customer 130", "123 Main St", "Springfield, IL")
+        raise UnresolvedCustomerReportError("Customer ea6f9", "123 Main St", "Springfield, IL")
 
     monkeypatch.setattr(app_module, "run", fake_run)
 
@@ -505,7 +505,7 @@ def test_generate_report_unresolved_customer_returns_resolve_url(tmp_path, monke
     pending = app_module._pending_resolutions[body["token"]]
     assert pending["kind"] == "customer"
     assert pending["fields"] == {
-        "form_customer": "Customer 130", "form_address": "123 Main St", "form_address2": "Springfield, IL",
+        "form_customer": "Customer ea6f9", "form_address": "123 Main St", "form_address2": "Springfield, IL",
     }
     assert pending["resolved"] is False
 
@@ -533,7 +533,7 @@ def test_generate_report_unresolved_report_folder_returns_resolve_url(tmp_path, 
     input_file.write_text("stub")
 
     def fake_run(input_path: Path, output_path: Path | None, db_url=None, services=None, info=None) -> Path:
-        raise UnresolvedReportFolderReportError(1, "Customer 130")
+        raise UnresolvedReportFolderReportError(1, "Customer ea6f9")
 
     monkeypatch.setattr(app_module, "run", fake_run)
 
@@ -544,7 +544,7 @@ def test_generate_report_unresolved_report_folder_returns_resolve_url(tmp_path, 
     assert body["resolve_url"].endswith(f"resolve/folder?token={body['token']}")
     pending = app_module._pending_resolutions[body["token"]]
     assert pending["kind"] == "folder"
-    assert pending["fields"] == {"customer_id": 1, "customer_name": "Customer 130", "location": ""}
+    assert pending["fields"] == {"customer_id": 1, "customer_name": "Customer ea6f9", "location": ""}
     assert pending["resolved"] is False
 
 
@@ -556,17 +556,17 @@ def test_resolve_customer_page_invalid_token():
 
 def test_resolve_customer_page_lists_existing_customers(fake_services):
     token = app_module._new_pending_resolution(
-        "customer", {"form_customer": "Customer 130", "form_address": "123 Main St", "form_address2": ""}
+        "customer", {"form_customer": "Customer ea6f9", "form_address": "123 Main St", "form_address2": ""}
     )
     response = client.get("/resolve/customer", params={"token": token})
     assert response.status_code == 200
-    assert "Customer 130" in response.text
+    assert "Customer ea6f9" in response.text
     assert "Beta Inc" in response.text
 
 
 def test_resolve_customer_submit_existing_maps_form_key(fake_services):
     token = app_module._new_pending_resolution(
-        "customer", {"form_customer": "Customer 130 Ltd", "form_address": "123 Main St", "form_address2": ""}
+        "customer", {"form_customer": "Customer ea6f9 Ltd", "form_address": "123 Main St", "form_address2": ""}
     )
     response = client.post(
         "/resolve/customer",
@@ -574,7 +574,7 @@ def test_resolve_customer_submit_existing_maps_form_key(fake_services):
     )
     assert response.status_code == 200
     assert "Done" in response.text
-    assert fake_services.customer_svc.form_key_calls == [("Customer 130 Ltd", "123 Main St", "", 1, "JT")]
+    assert fake_services.customer_svc.form_key_calls == [("Customer ea6f9 Ltd", "123 Main St", "", 1, "JT")]
     assert app_module._pending_resolutions[token]["resolved"] is True
 
 
@@ -601,17 +601,17 @@ def test_resolve_customer_submit_new_creates_and_maps(fake_services):
 def test_resolve_customer_submit_new_self_heals_to_existing_case_insensitive_match(fake_services):
     """Confirmed real ask (2026-09-24): a technician moving quickly can type
     a name that's an exact case-insensitive match for a customer that
-    already exists ("Customer 130" is seeded by the fake). Previously this
+    already exists ("Customer ea6f9" is seeded by the fake). Previously this
     would have hit create_customer()'s own uniqueness error and dead-ended
     on a "Could not resolve" page. Now it links to the existing record
     instead of erroring, and says so plainly rather than silently."""
     token = app_module._new_pending_resolution(
-        "customer", {"form_customer": "Customer 130", "form_address": "1 New St", "form_address2": ""}
+        "customer", {"form_customer": "Customer ea6f9", "form_address": "1 New St", "form_address2": ""}
     )
     response = client.post(
         "/resolve/customer",
         data={
-            "token": token, "mode": "new", "name": "Customer 130", "street_address": "1 New St",
+            "token": token, "mode": "new", "name": "Customer ea6f9", "street_address": "1 New St",
             "city": "Metropolis", "state": "IL", "postal_code": "60000", "country": "USA",
             "created_by": "JT",
         },
@@ -619,10 +619,10 @@ def test_resolve_customer_submit_new_self_heals_to_existing_case_insensitive_mat
     assert response.status_code == 200
     assert fake_services.customer_svc.created_calls == []  # no duplicate created
     assert fake_services.customer_svc.form_key_calls == [
-        ("Customer 130", "1 New St", "", 1, "JT")  # linked to the existing customer_id=1
+        ("Customer ea6f9", "1 New St", "", 1, "JT")  # linked to the existing customer_id=1
     ]
     assert "already existed in the system" in response.text
-    assert "Customer 130" in response.text  # the EXISTING record's real name, not the raw typed input
+    assert "Customer ea6f9" in response.text  # the EXISTING record's real name, not the raw typed input
 
 
 def test_resolve_customer_submit_replay_after_resolved_is_a_no_op(fake_services):
@@ -631,7 +631,7 @@ def test_resolve_customer_submit_replay_after_resolved_is_a_no_op(fake_services)
     # replaying it must not call create_customer()/add_form_key() a
     # second time for the same mapping.
     token = app_module._new_pending_resolution(
-        "customer", {"form_customer": "Customer 130 Ltd", "form_address": "123 Main St", "form_address2": ""}
+        "customer", {"form_customer": "Customer ea6f9 Ltd", "form_address": "123 Main St", "form_address2": ""}
     )
     client.post(
         "/resolve/customer",
@@ -645,7 +645,7 @@ def test_resolve_customer_submit_replay_after_resolved_is_a_no_op(fake_services)
 
     assert response.status_code == 200
     assert "Already resolved" in response.text
-    assert fake_services.customer_svc.form_key_calls == [("Customer 130 Ltd", "123 Main St", "", 1, "JT")]
+    assert fake_services.customer_svc.form_key_calls == [("Customer ea6f9 Ltd", "123 Main St", "", 1, "JT")]
 
 
 def test_resolve_customer_submit_concurrent_double_submit_creates_exactly_once(fake_services):
@@ -734,7 +734,7 @@ def test_resolve_customer_submit_existing_requires_initials(fake_services):
     # EXISTING customer is just as consequential as creating a new one --
     # initials are required either way now, not just for "add new".
     token = app_module._new_pending_resolution(
-        "customer", {"form_customer": "Customer 130 Ltd", "form_address": "123 Main St", "form_address2": ""}
+        "customer", {"form_customer": "Customer ea6f9 Ltd", "form_address": "123 Main St", "form_address2": ""}
     )
     response = client.post(
         "/resolve/customer",
@@ -747,7 +747,7 @@ def test_resolve_customer_submit_existing_requires_initials(fake_services):
 
 def test_resolve_customer_submit_missing_existing_selection_shows_error(fake_services):
     token = app_module._new_pending_resolution(
-        "customer", {"form_customer": "Customer 130", "form_address": "", "form_address2": ""}
+        "customer", {"form_customer": "Customer ea6f9", "form_address": "", "form_address2": ""}
     )
     response = client.post("/resolve/customer", data={"token": token, "mode": "existing", "existing_customer_id": ""})
     assert response.status_code == 200
@@ -868,25 +868,25 @@ def test_resolve_folder_page_invalid_token():
 
 
 def test_resolve_folder_page_shows_customer_name(fake_services):
-    token = app_module._new_pending_resolution("folder", {"customer_id": 1, "customer_name": "Customer 130"})
+    token = app_module._new_pending_resolution("folder", {"customer_id": 1, "customer_name": "Customer ea6f9"})
     response = client.get("/resolve/folder", params={"token": token})
     assert response.status_code == 200
-    assert "Customer 130" in response.text
+    assert "Customer ea6f9" in response.text
 
 
 def test_resolve_folder_page_no_banner_outside_test_mode(fake_services):
-    token = app_module._new_pending_resolution("folder", {"customer_id": 1, "customer_name": "Customer 130"})
+    token = app_module._new_pending_resolution("folder", {"customer_id": 1, "customer_name": "Customer ea6f9"})
     response = client.get("/resolve/folder", params={"token": token})
     assert "TEST MODE" not in response.text
-    assert "S:\\Reports\\Customer 130" in response.text
+    assert "S:\\Reports\\Customer ea6f9" in response.text
 
 
 def test_resolve_folder_page_shows_banner_and_sandboxed_default_in_test_mode(fake_services, tmp_path):
     fake_services.report_folder_svc.test_root = tmp_path
-    token = app_module._new_pending_resolution("folder", {"customer_id": 1, "customer_name": "Customer 130"})
+    token = app_module._new_pending_resolution("folder", {"customer_id": 1, "customer_name": "Customer ea6f9"})
     response = client.get("/resolve/folder", params={"token": token})
     assert "TEST MODE" in response.text
-    assert str(tmp_path / "Customer 130") in response.text
+    assert str(tmp_path / "Customer ea6f9") in response.text
     assert "S:\\Reports" not in response.text
 
 
@@ -897,7 +897,7 @@ def test_resolve_customer_page_banner_warns_catalog_writes_are_real(fake_service
     # generic "Reports" wording that implies broader protection.
     fake_services.report_folder_svc.test_root = tmp_path
     token = app_module._new_pending_resolution(
-        "customer", {"form_customer": "Customer 130", "form_address": "123 Main St", "form_address2": ""}
+        "customer", {"form_customer": "Customer ea6f9", "form_address": "123 Main St", "form_address2": ""}
     )
     response = client.get("/resolve/customer", params={"token": token})
     assert "TEST MODE" in response.text
@@ -924,7 +924,7 @@ def test_resolve_folder_page_banner_unchanged(fake_services, tmp_path):
     # The folder page's original wording is accurate as-is -- no extra
     # sentence should be added there.
     fake_services.report_folder_svc.test_root = tmp_path
-    token = app_module._new_pending_resolution("folder", {"customer_id": 1, "customer_name": "Customer 130"})
+    token = app_module._new_pending_resolution("folder", {"customer_id": 1, "customer_name": "Customer ea6f9"})
     response = client.get("/resolve/folder", params={"token": token})
     assert "does not apply to what you do on this page" not in response.text
 
@@ -959,7 +959,7 @@ def test_resolve_folder_submit_sets_the_right_sx5_location(fake_services, tmp_pa
 
 
 def test_resolve_folder_submit_sets_folder(fake_services, tmp_path):
-    token = app_module._new_pending_resolution("folder", {"customer_id": 1, "customer_name": "Customer 130"})
+    token = app_module._new_pending_resolution("folder", {"customer_id": 1, "customer_name": "Customer ea6f9"})
     response = client.post(
         "/resolve/folder", data={"token": token, "folder_path": str(tmp_path), "created_by": "JT"}
     )
@@ -978,19 +978,19 @@ def test_resolve_folder_submit_translates_mapped_drive_before_set_folder(fake_se
     it's spelled differently than test_root itself."""
     monkeypatch.setenv("MAPPED_DRIVE_Q_UNC", str(tmp_path))
 
-    token = app_module._new_pending_resolution("folder", {"customer_id": 1, "customer_name": "Customer 130"})
+    token = app_module._new_pending_resolution("folder", {"customer_id": 1, "customer_name": "Customer ea6f9"})
     response = client.post(
         "/resolve/folder",
-        data={"token": token, "folder_path": r"Q:\Customer 130", "created_by": "JT"},
+        data={"token": token, "folder_path": r"Q:\Customer ea6f9", "created_by": "JT"},
     )
 
     assert response.status_code == 200
     assert "Done" in response.text
-    assert fake_services.report_folder_svc.set_folder_calls == [(1, str(tmp_path / "Customer 130"), "JT", "")]
+    assert fake_services.report_folder_svc.set_folder_calls == [(1, str(tmp_path / "Customer ea6f9"), "JT", "")]
 
 
 def test_resolve_folder_submit_invalid_path_shows_error(fake_services):
-    token = app_module._new_pending_resolution("folder", {"customer_id": 1, "customer_name": "Customer 130"})
+    token = app_module._new_pending_resolution("folder", {"customer_id": 1, "customer_name": "Customer ea6f9"})
     response = client.post(
         "/resolve/folder", data={"token": token, "folder_path": "   ", "created_by": "JT"}
     )
@@ -1000,7 +1000,7 @@ def test_resolve_folder_submit_invalid_path_shows_error(fake_services):
 
 
 def test_resolve_folder_submit_blank_initials_shows_error(fake_services, tmp_path):
-    token = app_module._new_pending_resolution("folder", {"customer_id": 1, "customer_name": "Customer 130"})
+    token = app_module._new_pending_resolution("folder", {"customer_id": 1, "customer_name": "Customer ea6f9"})
     response = client.post(
         "/resolve/folder", data={"token": token, "folder_path": str(tmp_path), "created_by": "   "}
     )
@@ -1010,7 +1010,7 @@ def test_resolve_folder_submit_blank_initials_shows_error(fake_services, tmp_pat
 
 
 def test_resolve_folder_submit_replay_after_resolved_is_a_no_op(fake_services, tmp_path):
-    token = app_module._new_pending_resolution("folder", {"customer_id": 1, "customer_name": "Customer 130"})
+    token = app_module._new_pending_resolution("folder", {"customer_id": 1, "customer_name": "Customer ea6f9"})
     client.post("/resolve/folder", data={"token": token, "folder_path": str(tmp_path), "created_by": "JT"})
 
     response = client.post(
