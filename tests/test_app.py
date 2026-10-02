@@ -1139,3 +1139,10 @@ def test_resolve_submit_after_cancelled_is_blocked(fake_services):
     assert response.status_code == 200
     assert "Already resolved" in response.text
     assert fake_services.chemical_svc.form_name_calls == []
+
+
+def test_folder_page_is_wide_enough_for_a_full_path_other_pages_stay_narrow():
+    """The report-folder page's full UNC path didn't fit the 32rem box
+    (user request 2026-10-02); other resolve pages keep the narrow shell."""
+    assert "max-width: 64rem" in app_module._page("t", "", wide=True).body.decode()
+    assert "max-width: 32rem" in app_module._page("t", "").body.decode()

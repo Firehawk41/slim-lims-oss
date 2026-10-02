@@ -161,7 +161,7 @@ logger = logging.getLogger(__name__)
 # in /health so a report generated at a given time can be tied back to
 # which version of this API was actually running, not just which version
 # of the underlying report-generation packages it called into.
-APP_VERSION = "0.6.13"
+APP_VERSION = "0.6.14"
 
 # Read once at import time -- by the time this line runs, `from
 # slim_report_engine.cli import ...` above has already triggered
@@ -549,7 +549,7 @@ def _heartbeat_script(token: str) -> str:
 </script>"""
 
 
-def _page(title: str, body: str, kind: str | None = None, token: str | None = None) -> HTMLResponse:
+def _page(title: str, body: str, kind: str | None = None, token: str | None = None, wide: bool = False) -> HTMLResponse:
     """Minimal shared page shell -- plain HTML, no JS framework, matching
     the rest of this project's "simple and functional" style. This is an
     internal lab tool opened a handful of times, not a product.
@@ -560,10 +560,14 @@ def _page(title: str, body: str, kind: str | None = None, token: str | None = No
     includes the heartbeat script so abandonment can be detected faster
     than VBA's own 10-minute poll timeout (see _ABANDONED_AFTER_SECONDS)."""
     heartbeat = _heartbeat_script(token) if token else ""
+    # wide: the report-folder page, whose full UNC path (~100 characters)
+    # didn't fit the 32rem box and had to be scrolled (user request
+    # 2026-10-02).
+    max_width = "64rem" if wide else "32rem"
     return HTMLResponse(f"""<!doctype html>
 <html><head><meta charset="utf-8"><title>{html.escape(title)}</title>
 <style>
-  body {{ font-family: system-ui, sans-serif; max-width: 32rem; margin: 2rem auto; padding: 0 1rem; }}
+  body {{ font-family: system-ui, sans-serif; max-width: {max_width}; margin: 2rem auto; padding: 0 1rem; }}
   fieldset {{ margin-bottom: 1.5rem; }}
   label {{ display: block; margin-top: 0.5rem; font-size: 0.9rem; }}
   input, select {{ width: 100%; padding: 0.4rem; margin-top: 0.15rem; box-sizing: border-box; }}
@@ -960,7 +964,7 @@ def resolve_folder_page(token: str):
   </p>
   <button type="submit">Cancel</button>
 </form>
-""", token=token)
+""", token=token, wide=True)
 
 
 @app.post("/resolve/folder", response_class=HTMLResponse)
