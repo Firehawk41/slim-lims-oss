@@ -14,6 +14,8 @@
 > private slim-lims (production) — this app must fit them, not the other way round. Ideas worth having later go in the spec's
 > "Parked ideas" list (docs/SLIM_DOMAIN_V2.md §11) and get raised with the user, not built.
 
+**Roadmap:** `docs/ROADMAP.md` (departments Admin · Lab · Quality · IT, phases, portfolio). Read it first.
+
 ## What This Is
 
 The sample submission portal for the SLIM LIMS ecosystem (slim-domain, slim-report-engine,
