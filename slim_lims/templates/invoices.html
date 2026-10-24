@@ -1,6 +1,29 @@
 {% extends "base.html" %}
 
-{% block title %}Invoices — YourLab{% endblock %}
+{% block title %}Invoices — YourLab
+  <h2>Price lists</h2>
+  <p class="hint">A customer's own quote prices what it covers first; the default price list prices the rest.
+    Prices shown are five-day turnaround, per sample (bulk from the line's minimum).</p>
+  {% for q in quotes %}
+    <details class="form-section">
+      <summary><strong>{% if q.is_default %}Default price list{% else %}{% for c in q.customer_ids %}{{ (reference.customer(c).name if reference.customer(c) else c) }}{{ ", " if not loop.last }}{% endfor %}{% endif %}</strong>
+        · {{ q.effective_date }} to {{ q.expire_date }} · terms {{ q.payment_terms or 30 }} days · {{ q.line_items|length }} line{{ "" if q.line_items|length == 1 else "s" }}</summary>
+      <table class="table">
+        <thead><tr><th scope="col">Analyses</th><th scope="col">Five days</th><th scope="col">Bulk</th></tr></thead>
+        <tbody>
+          {% for li in q.line_items %}
+            {% set p = li.price_for(five_days) %}
+            <tr><td>{% for a in li.analysis_ids %}{{ reference.analysis(a).name if reference.analysis(a) else a }}{{ " + " if not loop.last }}{% endfor %}</td>
+              <td>{{ "$%.2f"|format(p.regular_price) if p else "" }}</td>
+              <td>{% if p and p.bulk_price is not none and li.bulk_price_min %}${{ "%.2f"|format(p.bulk_price) }} for {{ li.bulk_price_min }}+{% endif %}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </details>
+  {% else %}
+    <p class="muted">No quotes yet.</p>
+  {% endfor %}
+{% endblock %}
 
 {% block content %}
   <div class="page-head">
@@ -22,4 +45,27 @@
   {% else %}
     <p class="muted">Nothing invoiced yet. Invoice a request from the board's To invoice column.</p>
   {% endif %}
+
+  <h2>Price lists</h2>
+  <p class="hint">A customer's own quote prices what it covers first; the default price list prices the rest.
+    Prices shown are five-day turnaround, per sample (bulk from the line's minimum).</p>
+  {% for q in quotes %}
+    <details class="form-section">
+      <summary><strong>{% if q.is_default %}Default price list{% else %}{% for c in q.customer_ids %}{{ (reference.customer(c).name if reference.customer(c) else c) }}{{ ", " if not loop.last }}{% endfor %}{% endif %}</strong>
+        · {{ q.effective_date }} to {{ q.expire_date }} · terms {{ q.payment_terms or 30 }} days · {{ q.line_items|length }} line{{ "" if q.line_items|length == 1 else "s" }}</summary>
+      <table class="table">
+        <thead><tr><th scope="col">Analyses</th><th scope="col">Five days</th><th scope="col">Bulk</th></tr></thead>
+        <tbody>
+          {% for li in q.line_items %}
+            {% set p = li.price_for(five_days) %}
+            <tr><td>{% for a in li.analysis_ids %}{{ reference.analysis(a).name if reference.analysis(a) else a }}{{ " + " if not loop.last }}{% endfor %}</td>
+              <td>{{ "$%.2f"|format(p.regular_price) if p else "" }}</td>
+              <td>{% if p and p.bulk_price is not none and li.bulk_price_min %}${{ "%.2f"|format(p.bulk_price) }} for {{ li.bulk_price_min }}+{% endif %}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </details>
+  {% else %}
+    <p class="muted">No quotes yet.</p>
+  {% endfor %}
 {% endblock %}

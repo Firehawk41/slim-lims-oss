@@ -115,8 +115,10 @@ def invoice_page(request: Request, tr_number: str, user: RequireUser, service: S
 
 
 @router.get("/invoices", name="invoices_home")
-def invoices_home(request: Request, user: RequireStaff, db: DB):
-    return render(request, "invoices.html", {"orders": slim_invoicing.sales_orders(db)})
+def invoices_home(request: Request, user: RequireStaff, db: DB, reference: Reference):
+    return render(request, "invoices.html", {"orders": slim_invoicing.sales_orders(db),
+                                             "quotes": invoices.price_lists(db, reference), "reference": reference,
+                                             "five_days": slim_invoicing.ProcessingTime.FIVE_DAYS})
 
 
 @router.get("/invoices.csv", name="invoices_csv")

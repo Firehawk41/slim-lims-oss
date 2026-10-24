@@ -8,6 +8,7 @@ all in the caller's one transaction. Payment is invoice data (`tr_invoices`), ne
 import slim_invoicing
 from slim_data.persistence.results import issues_for_tr
 from slim_invoicing.persistence import migrate as invoicing_migrate
+from slim_invoicing.persistence.repositories import default_quotes, quotes_for_customer
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
@@ -93,3 +94,11 @@ def mark_paid(session: Session, service: SubmissionService, tr_number: str, user
     invoice.paid_on, invoice.paid_by = service.lab_today(), user.initials or user.email
     session.flush()
     return invoice
+
+
+def price_lists(session: Session, reference: ReferenceData) -> list[slim_invoicing.Quote]:
+    """Every quote: the default price list(s) first, then each customer's own (the Invoices page)."""
+    quotes = {q.id: q for q in default_quotes(session)}
+    for customer in reference.customer_choices():
+        quotes.update((q.id, q) for q in quotes_for_customer(session, customer.id))
+    return list(quotes.values())

@@ -18,7 +18,7 @@ from slim_lims.reports import plain_renderer
 from slim_lims.repositories import TRSubmissionRepository
 from slim_lims.services import Conflict, SubmissionService
 from tests.conftest import make_settings
-from tests.test_demo_scenarios import reference, seeded, specs  # noqa: F401 (fixtures)
+from tests.test_demo_scenarios import THIRTY_SIX, reference, seeded, specs  # noqa: F401 (fixtures)
 
 
 def sue(db):
@@ -27,10 +27,10 @@ def sue(db):
 
 def test_the_demo_invoices_are_sales_orders_priced_from_the_price_list(db, seeded):
     order = slim_invoicing.sales_order_for(db, seeded["clean_pass"])  # 36 Elements, one sample
-    assert order is not None and order.created_by == sue(db).initials and order.payment_terms == 30
+    assert order is not None and order.created_by == sue(db).initials
     [line] = order.line_items
     assert line.quantity == 1 and line.item.startswith("36 Elements - ")
-    assert line.rate >= BASE["Metals"]  # the five-day base, scaled up for a faster turnaround
+    assert line.rate >= BASE["Metals"] * Decimal("0.9")  # customer A's price: 10 % off the five-day base or more
     assert {o.tr_number for o in slim_invoicing.sales_orders(db)} == {seeded["clean_pass"], seeded["rerun_exception"]}
     assert not seed_demo_quotes(db, None, None)  # the price list is published once
 
@@ -78,6 +78,7 @@ def test_invoice_pages_and_the_accounting_csv(engine, db, seeded, reference):
         assert seeded["clean_pass"] in listing and "Download CSV" in listing
         page = client.get(f"/requests/{seeded['clean_pass']}/invoice").text
         assert "Invoice for" in page and "36 Elements" in page and "Paid " in page
+        assert "Default price list" in listing and "Price lists" in listing
         assert client.get(f"/requests/{seeded['amended']}/invoice").status_code == 404  # not invoiced
         response = client.get("/invoices.csv")
         assert response.headers["content-type"].startswith("text/csv")
@@ -89,3 +90,16 @@ def test_invoice_pages_and_the_accounting_csv(engine, db, seeded, reference):
         assert client.get(f"/requests/{seeded['cups_disagree']}/invoice").status_code == 404  # customer B's
         assert client.get("/invoices", follow_redirects=False).status_code == 403
         assert client.get("/invoices.csv", follow_redirects=False).status_code == 403
+
+
+
+def test_customer_as_own_quote_comes_first_and_sets_its_terms(db, seeded, reference):
+    """Slice 3: customer A's negotiated price (10 % off) and 45-day terms beat the default price list."""
+    order = slim_invoicing.sales_order_for(db, seeded["clean_pass"])  # customer A, 36 Elements
+    [line] = order.line_items
+    assert order.payment_terms == 45
+    default, *own = invoices.price_lists(db, reference)
+    assert default.is_default and [q.customer_ids for q in own] == [(order.customer_id,)]
+    listed = next(p.regular_price for li in default.line_items if li.analysis_ids == (THIRTY_SIX,)
+                  for p in li.prices if p.processing_time == line.processing_time)
+    assert line.rate < listed  # its own price, not the list's
