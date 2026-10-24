@@ -6,14 +6,14 @@ from fastapi.testclient import TestClient
 
 from slim_data.persistence import migrate as slim_data_migrate
 
-from slim_lab_portal.config import Settings
-from slim_lab_portal.db import Base, make_engine, make_session_factory
-from slim_lab_portal.main import create_app
-from slim_lab_portal.domain import RequestType
-from slim_lab_portal.models import LAB_ROLE_SUPERVISOR, ROLE_CUSTOMER, ROLE_STAFF, User
-from slim_lab_portal.reference import AnalysisRef, ChemicalRef, CustomerRef, ElementRef, StaticReferenceData
-from slim_lab_portal.security import hash_password
-from slim_lab_portal.slim_tables import slim_metadata
+from slim_lims.config import Settings
+from slim_lims.db import Base, make_engine, make_session_factory
+from slim_lims.main import create_app
+from slim_lims.domain import RequestType
+from slim_lims.models import LAB_ROLE_SUPERVISOR, ROLE_CUSTOMER, ROLE_STAFF, User
+from slim_lims.reference import AnalysisRef, ChemicalRef, CustomerRef, ElementRef, StaticReferenceData
+from slim_lims.security import hash_password
+from slim_lims.slim_tables import slim_metadata
 
 PASSWORD = "correct horse battery staple"
 

@@ -1,13 +1,13 @@
 # SLIM domain v2 — Testing Request (TR) spec
 
-Status: **draft, agreed in principle** (2026-10-08). Owner of the change: slim-lab-portal.
-Applies to: slim-lab-portal now; slim-domain / slim-report-engine / slim-lims later.
+Status: **draft, agreed in principle** (2026-10-08). Owner of the change: slim-lims.
+Applies to: slim-lims now; slim-domain / slim-report-engine / slim-lims later.
 
 ## 1. Why this exists
 
 slim-domain's `TRSubmission` / `TRSample` were shaped around the Excel Testing Request
 form: cell positions, a file name as identity, sentinel dates, free-text payment cells.
-slim-lab-portal becomes the **primary** way submissions reach the lab; emailed `.xlsx`
+slim-lims becomes the **primary** way submissions reach the lab; emailed `.xlsx`
 forms stay supported for back-compatibility only.
 
 This document defines the **v2** shape. The portal implements it now, with no runtime
@@ -15,7 +15,7 @@ dependency on slim-domain. Later, slim-domain adopts the same classes and tables
 xlsx parsers are adapted to produce v2 objects, and the report engine consumes them.
 Nothing in slim-domain, slim-report-engine or slim-lims changes as part of the portal work.
 
-Design rule for the portal: everything under `slim_lab_portal/domain/` imports only the
+Design rule for the portal: everything under `slim_lims/domain/` imports only the
 standard library and pydantic, so it can be lifted into slim-domain unchanged.
 
 ## 2. Ecosystem and data ownership
@@ -354,8 +354,8 @@ SLIM's `analyses` table has no stable code, and which analyses suit which reques
 lives in the report engine (`wafer_submission_builder._RECOGNIZED_SELECTIONS`). v2 adds
 both to the domain as `analyses.code` and an `analysis_request_types` table. Until
 slim-domain has them, the portal keeps them in its own `analysis_catalog` table, keyed by
-SLIM `analyses.ID`. The table below lives in `slim_lab_portal/data/analysis_catalog.csv` and is
-loaded with `python -m slim_lab_portal.cli sync-analysis-catalog`, matching rows to SLIM by
+SLIM `analyses.ID`. The table below lives in `slim_lims/data/analysis_catalog.csv` and is
+loaded with `python -m slim_lims.cli sync-analysis-catalog`, matching rows to SLIM by
 `analysis_name` (case-insensitive). Catalog rows SLIM doesn't have are skipped; SLIM analyses with
 no catalog row are never offered.
 
@@ -436,7 +436,7 @@ Notes:
 
 ## 9. How slim-domain adopts this later (not part of the portal work)
 
-1. Move `slim_lab_portal/domain/*` into `slim_domain/domain/tr/` (v2), alongside v1 until
+1. Move `slim_lims/domain/*` into `slim_domain/domain/tr/` (v2), alongside v1 until
    the report engine is switched. slim-domain then needs `pydantic[email]` (for `EmailStr`).
 2. Move the tables in §7 (except `users`) under slim-domain's repositories; the portal
    switches to slim-domain's repository classes.
@@ -509,14 +509,14 @@ following §3's transitions. Receiving (check-in), cancelling and invoicing stay
 A disallowed or out-of-order change is 409 — re-read the TR and carry on. Put the report
 reference in `note`.
 
-**Converting to slim-domain v1** (until §9): `slim_lab_portal/bridge.py` `to_slim_v1` shows the
+**Converting to slim-domain v1** (until §9): `slim_lims/bridge.py` `to_slim_v1` shows the
 mapping; it moves to slim-domain or slim-lims when they are connected.
 
 ## 13. Lab board (Jamie, 2026-10-23)
 
 The home page for everyone: each live TR is a card in the column of where it has got to, so the lab
 sees at a glance what is expected, what is in but not analysed, what is being decided, what can be
-reported and what is waiting to be invoiced. `slim_lab_portal/board.py`, `templates/board.html`.
+reported and what is waiting to be invoiced. `slim_lims/board.py`, `templates/board.html`.
 
 - **Columns follow what happened** (cards don't drag): Expected (submitted) · Received (checked in,
   no readings) · In analysis · Ready to report (released results not on an issued report) · Partial

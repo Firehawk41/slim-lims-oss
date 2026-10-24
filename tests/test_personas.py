@@ -6,11 +6,11 @@ from sqlalchemy import select
 
 from slim_data.domain.enums import IdentitySource, Role
 
-from slim_lab_portal.main import create_app
-from slim_lab_portal.models import ROLE_CUSTOMER, User
-from slim_lab_portal.personas import Persona, load_personas, persona_choices, sync_personas
-from slim_lab_portal.results import actor_for
-from slim_lab_portal.security import hash_password
+from slim_lims.main import create_app
+from slim_lims.models import ROLE_CUSTOMER, User
+from slim_lims.personas import Persona, load_personas, persona_choices, sync_personas
+from slim_lims.results import actor_for
+from slim_lims.security import hash_password
 from tests.conftest import PASSWORD, csrf_from, login, make_settings
 
 

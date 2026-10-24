@@ -1,17 +1,17 @@
-# slim-lab-portal — Claude Context
+# slim-lims-oss — Claude Context
 
 > ## ⚠️ OSS ONLY — read first
-> This portal is a **portfolio demo** that attaches to the **open-source** SLIM repos only:
-> `slim-domain-oss`, `slim-report-engine-oss`, `slim-lims-oss` and their fictional demo data.
+> This app is a **portfolio demo** that uses the **open-source** SLIM repos only:
+> `slim-domain-oss`, `slim-report-engine-oss`, `slim-data-oss` and their fictional demo data.
 > **Never connect it to PreciLab (or any real lab) production databases, shares or services.**
-> Enforced in code: `slim_lab_portal/oss_guard.py` refuses any database URL containing
+> Enforced in code: `slim_lims/oss_guard.py` refuses any database URL containing
 > "precilab" (no override) and any host other than localhost / 127.0.0.1 / `db` / `postgres`
 > unless listed in `PORTAL_ALLOWED_DB_HOSTS`. Every connection goes through `db.make_engine`;
 > `tests/test_oss_guard.py` fails if anything calls `create_engine` elsewhere. `.env` is read
 > from the current directory only. Do not weaken any of this.
 >
-> **Scope:** modular but narrow. Don't modify slim-domain / slim-report-engine / slim-lims yet —
-> the portal must fit them, not the other way round. Ideas worth having later go in the spec's
+> **Scope:** modular but narrow. Don't modify slim-domain / slim-report-engine yet, and never the
+> private slim-lims (production) — this app must fit them, not the other way round. Ideas worth having later go in the spec's
 > "Parked ideas" list (docs/SLIM_DOMAIN_V2.md §11) and get raised with the user, not built.
 
 ## What This Is
@@ -24,12 +24,15 @@ forms stay supported by slim-domain's parsers for back-compatibility. The portal
 Excel — it produces TR domain objects.
 
 **The domain spec is `docs/SLIM_DOMAIN_V2.md`. Read it before changing anything under
-`slim_lab_portal/domain/`, the TR tables, enums or statuses.**
+`slim_lims/domain/`, the TR tables, enums or statuses.**
 
-## Rebuild status (branch `claude/slim-lab-portal-rebuild`)
+## Rebuild status
 
-The repo was a Flask app ("LabPortal"); it is being rebuilt on FastAPI. Old code is in git
-history (`main` before the rebuild) — e.g. `git show main:app/templates/form.html`.
+This repo is SLIM's host app, open-source demo (Jamie, 2026-10-24): LabPortal (a Flask form, rebuilt
+on FastAPI) was folded into `slim-lims-oss`, and its package renamed `slim_lims`. LabPortal's history is
+merged in. The VBA-facing report API this repo used to mirror from the lab's **private, production**
+slim-lims is retired here (git history only); never sync production code into this repo again, and
+never change the private slim-lims from here. Env vars keep their `PORTAL_` names (Render's settings use them).
 
 1. ✅ Spec: `docs/SLIM_DOMAIN_V2.md`
 2. ✅ FastAPI skeleton: config, SQLAlchemy 2, Alembic, session auth, CSRF, security headers, pytest
@@ -37,7 +40,7 @@ history (`main` before the rebuild) — e.g. `git show main:app/templates/form.h
 4. ✅ Reference-data cache over SLIM tables, analysis catalog, `scripts/seed_demo.py` (OSS demo data)
 5. ✅ (A) Bridge: portal-side adapter TRSubmission v2 -> slim-domain-oss v1 TRSubmission, plus a
    test feeding it to slim-report-engine-oss's report builder on OSS demo data. Portal only.
-   `slim_lab_portal/bridge.py` (`to_slim_v1`, received TRs only); `tests/test_bridge.py` renders
+   `slim_lims/bridge.py` (`to_slim_v1`, received TRs only); `tests/test_bridge.py` renders
    Chemical/Water/Wafer reports with the engine's own writer (skipped without the OSS packages).
 6. ✅ (B) Screens, reviewed with the user: customer form (per-request-type fields, choices from
    /api/reference), request list/detail, staff receive + status changes + chemical matching, users,
@@ -94,12 +97,12 @@ short replies.
 ```bash
 python -m venv .venv && . .venv/bin/activate
 pip install -e ".[dev]"
-cp .env.example .env                     # DATABASE_URL defaults to sqlite:///slim_lab_portal.db
+cp .env.example .env                     # DATABASE_URL defaults to sqlite:///slim_lims.db
 pip install -e ../slim-domain-oss[postgres] -e ../slim-report-engine-oss   # OSS repos, for the demo seed
 python scripts/seed_demo.py              # migrations (portal + slim-data) + OSS demo SLIM data + catalog + demo ruleset
-PORTAL_PASSWORD='at-least-12-chars' python -m slim_lab_portal.cli create-staff --email you@lab.example --initials JM --lab-role supervisor
-uvicorn --factory slim_lab_portal.main:create_app --reload   # http://127.0.0.1:8000, API docs at /api/docs
-python -m slim_lab_portal.cli verify     # replay every result + check the audit chain (Postgres)
+PORTAL_PASSWORD='at-least-12-chars' python -m slim_lims.cli create-staff --email you@lab.example --initials JM --lab-role supervisor
+uvicorn --factory slim_lims.main:create_app --reload   # http://127.0.0.1:8000, API docs at /api/docs
+python -m slim_lims.cli verify     # replay every result + check the audit chain (Postgres)
 pytest                                   # TEST_DATABASE_URL=postgresql+psycopg2://... pytest  to run on Postgres
 ```
 
@@ -112,7 +115,7 @@ Cloud demo: `render.yaml` (Blueprint; the seed runs on every start and is idempo
 ## File Map
 
 ```
-slim_lab_portal/
+slim_lims/
 ├── main.py          # create_app(settings, engine): middleware, routers, exception handlers, /health
 ├── config.py        # Settings from env (APP_ENV, SECRET_KEY, DATABASE_URL, ...)
 ├── db.py            # Base (portal-owned tables only), make_engine (the only way to connect), get_db

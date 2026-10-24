@@ -4,7 +4,7 @@ from datetime import date
 
 import pytest
 
-from slim_lab_portal.reports import plain_renderer
+from slim_lims.reports import plain_renderer
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
@@ -13,11 +13,11 @@ from slim_data.domain.values import AnalyteRef, SampleRef
 from slim_data.persistence import migrate
 from slim_data.persistence.rulesets import current_policy, ruleset_for
 
-from slim_lab_portal.domain import RequestType, TRStatus, transition
-from slim_lab_portal.models import LAB_ROLE_ANALYST, LAB_ROLE_REVIEWER, ROLE_STAFF, User
-from slim_lab_portal.reference import AnalysisRef, ChemicalRef, CustomerRef, ElementRef, StaticReferenceData
-from slim_lab_portal.repositories import TRSubmissionRepository
-from slim_lab_portal.results import (
+from slim_lims.domain import RequestType, TRStatus, transition
+from slim_lims.models import LAB_ROLE_ANALYST, LAB_ROLE_REVIEWER, ROLE_STAFF, User
+from slim_lims.reference import AnalysisRef, ChemicalRef, CustomerRef, ElementRef, StaticReferenceData
+from slim_lims.repositories import TRSubmissionRepository
+from slim_lims.results import (
     SpecReader,
     StaffDirectory,
     TrSampleTables,
@@ -25,8 +25,8 @@ from slim_lab_portal.results import (
     publish_demo_rules,
     reference_lookup,
 )
-from slim_lab_portal.security import hash_password
-from slim_lab_portal import slim_tables as t
+from slim_lims.security import hash_password
+from slim_lims import slim_tables as t
 from tests.conftest import PASSWORD, csrf_from, login, login_api
 from tests.factories import NOW, STAFF_ACTOR, sample, submission
 from tests.slim_fixtures import create_slim_tables
@@ -59,7 +59,7 @@ SPECS = {(1, 2, ""): {"Fe": 50.0}}
 
 @pytest.fixture
 def app(engine, reference):
-    from slim_lab_portal.main import create_app
+    from slim_lims.main import create_app
     from tests.conftest import make_settings
 
     with engine.begin() as connection:  # slim-data's own tables, fresh (Postgres keeps them otherwise)

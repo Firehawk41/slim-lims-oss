@@ -5,7 +5,7 @@ Runs when slim-domain (the OSS package) is installed; skipped otherwise.
 
 import pytest
 
-from slim_lab_portal import slim_tables
+from slim_lims import slim_tables
 
 analysis_repo = pytest.importorskip("slim_domain.domain.analysis.analysis_repository")
 from slim_domain.domain.chemical.chemical_repository import _ChemicalRow  # noqa: E402
@@ -37,6 +37,6 @@ def test_portal_reads_only_columns_slim_domain_has(name):
 
 
 def test_portal_never_declares_slim_tables_on_its_own_metadata():
-    from slim_lab_portal.db import Base
+    from slim_lims.db import Base
 
     assert not set(SLIM_TABLES) & set(Base.metadata.tables)

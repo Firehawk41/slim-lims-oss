@@ -1,6 +1,6 @@
 # The public demo on Render (free plan): Postgres + the portal, seeded with the OSS demo data.
 # OSS ONLY: PORTAL_ALLOWED_DB_HOSTS is set to this blueprint's own demo database host, nothing else
-# (see slim_lab_portal/oss_guard.py). The service is named for the host this portal becomes
+# (see slim_lims/oss_guard.py). The service is named for the host this portal becomes
 # (slim-lims-oss.onrender.com). The database keeps its old name on purpose: renaming it here would
 # make Render create a second one, and the free plan allows only one.
 databases:
@@ -22,7 +22,7 @@ services:
     # (SLIM data, ruleset, personas and scenarios are each skipped once present).
     startCommand: >-
       python scripts/seed_demo.py --oss-report-engine vendor/slim-report-engine-oss
-      && uvicorn --factory slim_lab_portal.main:create_app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips='*'
+      && uvicorn --factory slim_lims.main:create_app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips='*'
     healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION

@@ -4,11 +4,11 @@ what each sample × analysis needs, and each role sees less than the supervisor.
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
-from slim_lab_portal import board as b
-from slim_lab_portal.domain import TRStatus
-from slim_lab_portal.models import User
-from slim_lab_portal.reports import plain_renderer
-from slim_lab_portal.repositories import TRSubmissionRepository
+from slim_lims import board as b
+from slim_lims.domain import TRStatus
+from slim_lims.models import User
+from slim_lims.reports import plain_renderer
+from slim_lims.repositories import TRSubmissionRepository
 from tests.conftest import make_settings
 from tests.factories import sample, submission
 from tests.test_demo_scenarios import TEN, reference, seeded, specs  # noqa: F401 (fixtures)
@@ -55,7 +55,7 @@ def test_needs_me_narrows_by_lab_role(db, seeded, reference):
 
 
 def test_supervisor_board_has_every_action_and_records_invoice_and_payment(engine, db, seeded, reference):
-    from slim_lab_portal.main import create_app
+    from slim_lims.main import create_app
 
     app = create_app(make_settings(str(engine.url), demo_personas=True), engine=engine, reference=reference,
                      specs=specs, report_renderer=plain_renderer)
@@ -81,7 +81,7 @@ def test_supervisor_board_has_every_action_and_records_invoice_and_payment(engin
 
 
 def test_customers_see_their_own_requests_in_plain_columns(engine, db, seeded, reference):
-    from slim_lab_portal.main import create_app
+    from slim_lims.main import create_app
 
     app = create_app(make_settings(str(engine.url), demo_personas=True), engine=engine, reference=reference,
                      specs=specs, report_renderer=plain_renderer)

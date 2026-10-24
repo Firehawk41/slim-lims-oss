@@ -1,16 +1,16 @@
-"""The portal attaches to the OSS demo ecosystem only (slim_lab_portal/oss_guard.py)."""
+"""The portal attaches to the OSS demo ecosystem only (slim_lims/oss_guard.py)."""
 
 import re
 from pathlib import Path
 
 import pytest
 
-import slim_lab_portal
-from slim_lab_portal.config import load_settings
-from slim_lab_portal.db import make_engine
-from slim_lab_portal.oss_guard import NotAnOssDatabase, assert_oss_database
+import slim_lims
+from slim_lims.config import load_settings
+from slim_lims.db import make_engine
+from slim_lims.oss_guard import NotAnOssDatabase, assert_oss_database
 
-REPO = Path(slim_lab_portal.__file__).resolve().parent.parent
+REPO = Path(slim_lims.__file__).resolve().parent.parent
 
 
 @pytest.mark.parametrize("url", [
@@ -52,7 +52,7 @@ def test_make_engine_enforces_the_guard():
 def test_nothing_bypasses_make_engine():
     """Every connection must go through db.make_engine (where the guard lives)."""
     offenders = []
-    for path in [*REPO.joinpath("slim_lab_portal").rglob("*.py"), *REPO.joinpath("scripts").rglob("*.py")]:
+    for path in [*REPO.joinpath("slim_lims").rglob("*.py"), *REPO.joinpath("scripts").rglob("*.py")]:
         if path.name == "db.py":
             continue
         if re.search(r"\bcreate_engine\s*\(", path.read_text()):

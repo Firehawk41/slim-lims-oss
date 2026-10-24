@@ -9,7 +9,7 @@ What it does, in order:
      IPA, HNO3, Acetone, H2O2, PGMEA, "Water", the periodic table and the supported analyses. If they
      already hold data they are LEFT UNTOUCHED: this script never writes into a populated
      SLIM database.
-  3. Syncs the portal-owned analysis_catalog from slim_lab_portal/data/analysis_catalog.csv.
+  3. Syncs the portal-owned analysis_catalog from slim_lims/data/analysis_catalog.csv.
   4. Runs slim-data's migrations and publishes its demo metals ruleset (bound to 10 Elements by
      catalog code, D-70) and demo policy. Both are content-hashed: re-running changes nothing.
   5. Creates the demo personas (data/demo_personas.csv); offered only when DEMO_PERSONAS is on.
@@ -32,17 +32,17 @@ from alembic.config import Config
 from sqlalchemy import func, inspect, select, text
 from sqlalchemy.engine import make_url
 
-import slim_lab_portal
-from slim_lab_portal import slim_tables as t
-from slim_lab_portal.audit import install_audit_log
-from slim_lab_portal.catalog import sync_analysis_catalog
-from slim_lab_portal.config import load_settings
-from slim_lab_portal.db import make_engine, make_session_factory
-from slim_lab_portal.oss_guard import assert_oss_database
-from slim_lab_portal.demo_scenarios import seed_scenarios
-from slim_lab_portal.personas import sync_personas
-from slim_lab_portal.reference_cache import load_reference
-from slim_lab_portal.results import SpecReader, migrate_slim_data, publish_demo_rules
+import slim_lims
+from slim_lims import slim_tables as t
+from slim_lims.audit import install_audit_log
+from slim_lims.catalog import sync_analysis_catalog
+from slim_lims.config import load_settings
+from slim_lims.db import make_engine, make_session_factory
+from slim_lims.oss_guard import assert_oss_database
+from slim_lims.demo_scenarios import seed_scenarios
+from slim_lims.personas import sync_personas
+from slim_lims.reference_cache import load_reference
+from slim_lims.results import SpecReader, migrate_slim_data, publish_demo_rules
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_OSS_DIR = REPO_ROOT.parent / "slim-report-engine-oss"
@@ -85,7 +85,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Portal database: {make_url(settings.database_url).render_as_string(hide_password=True)}")
     print(f"SLIM database:   {make_url(slim_url).render_as_string(hide_password=True)}")
 
-    config = Config(str(Path(slim_lab_portal.__file__).parent / "alembic.ini"))
+    config = Config(str(Path(slim_lims.__file__).parent / "alembic.ini"))
     config.attributes["database_url"] = settings.database_url
     command.upgrade(config, "head")
 

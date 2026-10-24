@@ -3,9 +3,9 @@ requires = ["setuptools>=69"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "slim-lab-portal"
+name = "slim-lims"
 version = "0.1.0"
-description = "Sample submission portal for the SLIM LIMS ecosystem"
+description = "SLIM LIMS (OSS demo): sample submission, analytical results, reports and the lab board"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115,<1.0",
@@ -32,10 +32,10 @@ dev = ["pytest>=8", "httpx>=0.27"]
 # checkout: pip install -e ../slim-report-engine-oss
 
 [tool.setuptools.packages.find]
-include = ["slim_lab_portal*"]
+include = ["slim_lims*"]
 
 [tool.setuptools.package-data]
-slim_lab_portal = ["templates/**/*", "static/**/*", "migrations/**/*", "alembic.ini", "data/*.csv"]
+slim_lims = ["templates/**/*", "static/**/*", "migrations/**/*", "alembic.ini", "data/*.csv"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

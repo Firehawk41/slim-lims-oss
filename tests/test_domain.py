@@ -3,7 +3,7 @@ from datetime import date, time
 import pytest
 from pydantic import ValidationError
 
-from slim_lab_portal.domain import (
+from slim_lims.domain import (
     ALLOWED_PROCESSING_TIMES,
     PaymentMethod,
     ProcessingTime,

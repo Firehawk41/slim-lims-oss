@@ -1,11 +1,11 @@
 import pytest
 from sqlalchemy import delete
 
-from slim_lab_portal import slim_tables as t
-from slim_lab_portal.catalog import CATALOG_CSV, read_catalog, sync_analysis_catalog
-from slim_lab_portal.domain import RequestType
-from slim_lab_portal.reference import StaticReferenceData
-from slim_lab_portal.reference_cache import ReferenceCache, load_reference
+from slim_lims import slim_tables as t
+from slim_lims.catalog import CATALOG_CSV, read_catalog, sync_analysis_catalog
+from slim_lims.domain import RequestType
+from slim_lims.reference import StaticReferenceData
+from slim_lims.reference_cache import ReferenceCache, load_reference
 from tests.slim_fixtures import create_slim_tables
 
 

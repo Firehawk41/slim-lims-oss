@@ -123,8 +123,8 @@ def test_api_me(client, customer_user):
 def test_admin_shows_reference_status_and_refreshes(engine, db, staff_user):
     from fastapi.testclient import TestClient
 
-    from slim_lab_portal.catalog import sync_analysis_catalog
-    from slim_lab_portal.main import create_app
+    from slim_lims.catalog import sync_analysis_catalog
+    from slim_lims.main import create_app
     from tests.conftest import make_settings
     from tests.slim_fixtures import create_slim_tables
 

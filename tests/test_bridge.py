@@ -23,8 +23,8 @@ from slim_report_engine.reporting.submission_report_builder import (  # noqa: E4
     sx5_location_from_filename,
 )
 
-from slim_lab_portal.bridge import NotReadyForReport, to_slim_v1, v1_file_name  # noqa: E402
-from slim_lab_portal.domain import (  # noqa: E402
+from slim_lims.bridge import NotReadyForReport, to_slim_v1, v1_file_name  # noqa: E402
+from slim_lims.domain import (  # noqa: E402
     PaymentMethod,
     ProcessingTime,
     ReportingUnit,
@@ -33,8 +33,8 @@ from slim_lab_portal.domain import (  # noqa: E402
     WaferSize,
     transition,
 )
-from slim_lab_portal.oss_guard import assert_oss_database  # noqa: E402
-from slim_lab_portal.repositories import TRSubmissionRepository  # noqa: E402
+from slim_lims.oss_guard import assert_oss_database  # noqa: E402
+from slim_lims.repositories import TRSubmissionRepository  # noqa: E402
 from tests.factories import NOW, STAFF_ACTOR, sample, submission  # noqa: E402
 
 OSS_DEMO = Path(__file__).resolve().parents[2] / "slim-report-engine-oss" / "demo" / "demo.py"
@@ -153,7 +153,7 @@ def test_unreceived_submission_is_refused():
 
 def test_unmatched_chemical_cannot_be_checked_in():
     """The bridge can only ever see matched chemicals: check-in refuses unmatched ones."""
-    from slim_lab_portal.domain import TransitionNotAllowed
+    from slim_lims.domain import TransitionNotAllowed
 
     with pytest.raises(TransitionNotAllowed, match="match the chemical"):
         _received(submission(tr_number="TR00047", id=47, samples=(sample(1, chemical_id=None, chemical_name="IPA"),)))

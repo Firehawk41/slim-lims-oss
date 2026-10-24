@@ -5,10 +5,10 @@ from alembic.autogenerate import compare_metadata
 from alembic.config import Config
 from alembic.migration import MigrationContext
 
-import slim_lab_portal
-from slim_lab_portal.db import Base, make_engine
+import slim_lims
+from slim_lims.db import Base, make_engine
 
-ALEMBIC_INI = Path(slim_lab_portal.__file__).parent / "alembic.ini"
+ALEMBIC_INI = Path(slim_lims.__file__).parent / "alembic.ini"
 
 
 def test_migrations_match_models(tmp_path):

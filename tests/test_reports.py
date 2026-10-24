@@ -16,18 +16,18 @@ pytest.importorskip("slim_report_engine")
 from slim_data.persistence import migrate  # noqa: E402
 from slim_data.persistence.results import issues_for_tr  # noqa: E402
 
-from slim_lab_portal import reports  # noqa: E402
-from slim_lab_portal.catalog import sync_analysis_catalog  # noqa: E402
-from slim_lab_portal.db import Base, make_engine, make_session_factory  # noqa: E402
-from slim_lab_portal.demo_scenarios import seed_scenarios  # noqa: E402
-from slim_lab_portal.personas import sync_personas  # noqa: E402
-from slim_lab_portal.reference_cache import load_reference  # noqa: E402
-from slim_lab_portal.repositories import TRSubmissionRepository  # noqa: E402
-from slim_lab_portal.results import SpecReader, publish_demo_rules  # noqa: E402
+from slim_lims import reports  # noqa: E402
+from slim_lims.catalog import sync_analysis_catalog  # noqa: E402
+from slim_lims.db import Base, make_engine, make_session_factory  # noqa: E402
+from slim_lims.demo_scenarios import seed_scenarios  # noqa: E402
+from slim_lims.personas import sync_personas  # noqa: E402
+from slim_lims.reference_cache import load_reference  # noqa: E402
+from slim_lims.repositories import TRSubmissionRepository  # noqa: E402
+from slim_lims.results import SpecReader, publish_demo_rules  # noqa: E402
 from slim_data.domain.enums import Qualifier  # noqa: E402
 from slim_data.domain.values import AnalyteRef, SampleRef  # noqa: E402
 from slim_data.service.views import ReportLineView, ReportView, report_view  # noqa: E402
-from slim_lab_portal.reports import plain_renderer  # noqa: E402
+from slim_lims.reports import plain_renderer  # noqa: E402
 
 OSS_DEMO = Path(__file__).resolve().parents[2] / "slim-report-engine-oss" / "demo" / "demo.py"
 

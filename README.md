@@ -1,22 +1,21 @@
-# slim-lab-portal
+# slim-lims
 
-[![CI](https://github.com/Firehawk41/LabPortal/actions/workflows/ci.yml/badge.svg)](https://github.com/Firehawk41/LabPortal/actions/workflows/ci.yml)
+[![CI](https://github.com/Firehawk41/slim-lims-oss/actions/workflows/ci.yml/badge.svg)](https://github.com/Firehawk41/slim-lims-oss/actions/workflows/ci.yml)
 
-The sample submission portal for the **SLIM** LIMS ecosystem
-([slim-domain](https://github.com/Firehawk41/slim-domain-oss),
-[slim-report-engine](https://github.com/Firehawk41/slim-report-engine-oss),
-[slim-lims](https://github.com/Firehawk41/slim-lims-oss)), built for an ISO 17025 accredited
-analytical chemistry lab.
+**SLIM**, a LIMS for an ISO 17025 accredited analytical chemistry lab: the open-source demo of the
+whole host app. It uses [slim-domain](https://github.com/Firehawk41/slim-domain-oss),
+[slim-report-engine](https://github.com/Firehawk41/slim-report-engine-oss) and
+[slim-data](https://github.com/Firehawk41/slim-data-oss) as libraries, on fictional demo data.
 
-Customers log in and submit Testing Requests; lab staff receive the samples and track each
-request from submission to invoice. Submissions are stored as Testing Request domain objects in
-the shape defined in [`docs/SLIM_DOMAIN_V2.md`](docs/SLIM_DOMAIN_V2.md), so the rest of the LIMS
-can consume them directly — no Excel in between.
+Customers log in and submit Testing Requests; lab staff receive the samples, run the results through
+slim-data's rules engine, review and release them, issue reports and track each request to invoice on
+one board. Submissions are stored as Testing Request domain objects in the shape defined in
+[`docs/SLIM_DOMAIN_V2.md`](docs/SLIM_DOMAIN_V2.md), so the rest of the LIMS can consume them
+directly — no Excel in between.
 
-> **Status:** rebuilt from a standalone Flask form ("LabPortal") into a FastAPI module of the SLIM
-> ecosystem. Submission, lab workflow, reference data and **analytical results** (through
-> [slim-data](https://github.com/Firehawk41/slim-data-oss)) work end to end on the OSS demo data.
-> See `CLAUDE.md` for what's next.
+> **History:** began as a standalone Flask form ("LabPortal"), rebuilt on FastAPI, then folded into
+> this repo (2026-10-24). The VBA-facing report API this repo used to mirror from the lab's private
+> slim-lims is retired here; it stays in git history.
 
 ## What it does
 
@@ -38,14 +37,14 @@ can consume them directly — no Excel in between.
   supervisor. Their actions are recorded as *asserted*, never as logged in. The demo seed pre-runs nine
   result scenarios on real requests, so a first visitor already sees history.
 - **Audit:** on Postgres, slim-domain's hash-chained change log covers every table.
-  `python -m slim_lab_portal.cli verify` replays every stored result through its ruleset and checks
+  `python -m slim_lims.cli verify` replays every stored result through its ruleset and checks
   the chain. It exits with 1 on any mismatch.
 - **JSON API** at `/api/docs`; every request is also available as the TR domain object.
 
 ## OSS only
 
 This is a portfolio module. It connects **only** to the open-source SLIM repos and their fictional
-demo data — never to a real lab's systems. `slim_lab_portal/oss_guard.py` enforces it: database URLs
+demo data — never to a real lab's systems. `slim_lims/oss_guard.py` enforces it: database URLs
 mentioning "precilab" are always refused, and only local/demo hosts are allowed unless explicitly
 listed in `PORTAL_ALLOWED_DB_HOSTS`.
 
@@ -68,18 +67,18 @@ cp .env.example .env
 # Fictional SLIM reference data from the OSS repos (checked out next to this one):
 pip install -e ../slim-domain-oss[postgres] -e ../slim-report-engine-oss
 python scripts/seed_demo.py
-PORTAL_PASSWORD='at-least-12-chars' python -m slim_lab_portal.cli create-staff --email you@lab.example --initials JM --lab-role supervisor
-uvicorn --factory slim_lab_portal.main:create_app --reload
+PORTAL_PASSWORD='at-least-12-chars' python -m slim_lims.cli create-staff --email you@lab.example --initials JM --lab-role supervisor
+uvicorn --factory slim_lims.main:create_app --reload
 ```
 
 Open http://127.0.0.1:8000 (API docs at `/api/docs`). Set `DEMO_PERSONAS=true` to pick a persona
-instead of logging in, and run `python -m slim_lab_portal.cli verify` to check the stored results. Create a customer user with
-`python -m slim_lab_portal.cli create-customer-user --email you@customer.example --customer-id 1`.
+instead of logging in, and run `python -m slim_lims.cli verify` to check the stored results. Create a customer user with
+`python -m slim_lims.cli create-customer-user --email you@customer.example --customer-id 1`.
 Run the tests with `pytest`; `e2e/request_flow.js` is a Playwright run-through of the form.
 
 With Docker (Postgres shared the way the SLIM ecosystem shares it; expects the OSS repos next to
 this one): `docker compose up --build`, then create a staff user with
-`docker compose exec portal python -m slim_lab_portal.cli create-staff ...`.
+`docker compose exec portal python -m slim_lims.cli create-staff ...`.
 
 ## Cloud demo (Render)
 

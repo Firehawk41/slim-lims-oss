@@ -7,7 +7,7 @@ that contract: fix the portal, or change §12 and slim-lims together -- never ju
 import pytest
 from fastapi.testclient import TestClient
 
-from slim_lab_portal.main import create_app
+from slim_lims.main import create_app
 from tests.conftest import login_api, make_settings
 from tests.test_api_submissions import payload
 

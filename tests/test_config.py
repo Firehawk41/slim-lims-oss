@@ -1,6 +1,6 @@
 import pytest
 
-from slim_lab_portal.config import _database_url
+from slim_lims.config import _database_url
 
 
 @pytest.mark.parametrize("raw", ["postgres://u:p@dpg-x-a/demo", "postgresql://u:p@dpg-x-a/demo"])

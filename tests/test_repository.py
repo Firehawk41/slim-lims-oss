@@ -4,10 +4,10 @@ from datetime import date
 import pytest
 from sqlalchemy.exc import IntegrityError
 
-from slim_lab_portal.db import make_session_factory
-from slim_lab_portal.domain import RequestType, TRStatus, transition
-from slim_lab_portal.models import TRSubmissionRow
-from slim_lab_portal.repositories import StaleSubmission, TRSubmissionRepository
+from slim_lims.db import make_session_factory
+from slim_lims.domain import RequestType, TRStatus, transition
+from slim_lims.models import TRSubmissionRow
+from slim_lims.repositories import StaleSubmission, TRSubmissionRepository
 from tests.conftest import postgres_only
 from tests.factories import NOW, STAFF_ACTOR, TIME_LIMITED, sample, submission, wafer_sample
 

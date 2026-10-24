@@ -1,6 +1,6 @@
 """Creates SLIM reference tables (from the portal's read-only definitions) with tiny data."""
 
-from slim_lab_portal import slim_tables as t
+from slim_lims import slim_tables as t
 
 
 def create_slim_tables(engine, *, analyses=None) -> None:

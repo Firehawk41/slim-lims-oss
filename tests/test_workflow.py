@@ -2,7 +2,7 @@ from datetime import date
 
 import pytest
 
-from slim_lab_portal.domain import (
+from slim_lims.domain import (
     ALLOWED_TRANSITIONS,
     ActorType,
     TransitionNotAllowed,

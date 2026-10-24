@@ -1,7 +1,7 @@
 import pytest
 
-from slim_lab_portal.models import ROLE_CUSTOMER, User
-from slim_lab_portal.security import hash_password
+from slim_lims.models import ROLE_CUSTOMER, User
+from slim_lims.security import hash_password
 from tests.conftest import PASSWORD, login_api
 
 

@@ -5,8 +5,8 @@ import pytest
 
 from hashlib import sha256
 
-from slim_lab_portal import reports
-from slim_lab_portal.reports import plain_renderer
+from slim_lims import reports
+from slim_lims.reports import plain_renderer
 from fastapi.testclient import TestClient
 from infrastructure import audit as slim_audit
 from slim_domain.domain.report_log.report_log_repository import _ReportGenerationLogRow
@@ -16,14 +16,14 @@ from slim_data.persistence import migrate
 from slim_data.persistence.results import issues_for_tr
 from slim_data.service.views import batch_view, report_view
 
-from slim_lab_portal import cli
-from slim_lab_portal.audit import chain_check, install_audit_log
-from slim_lab_portal.demo_scenarios import seed_scenarios
-from slim_lab_portal.domain import RequestType, TRStatus
-from slim_lab_portal.personas import sync_personas
-from slim_lab_portal.reference import AnalysisRef, ChemicalRef, CustomerRef, ElementRef, StaticReferenceData
-from slim_lab_portal.repositories import TRSubmissionRepository
-from slim_lab_portal.results import publish_demo_rules
+from slim_lims import cli
+from slim_lims.audit import chain_check, install_audit_log
+from slim_lims.demo_scenarios import seed_scenarios
+from slim_lims.domain import RequestType, TRStatus
+from slim_lims.personas import sync_personas
+from slim_lims.reference import AnalysisRef, ChemicalRef, CustomerRef, ElementRef, StaticReferenceData
+from slim_lims.repositories import TRSubmissionRepository
+from slim_lims.results import publish_demo_rules
 from tests.conftest import make_settings, postgres_only
 
 ELEMENTS = {26: "Fe", 29: "Cu", 30: "Zn", 28: "Ni", 24: "Cr", 25: "Mn", 9: "F", 17: "Cl"}
@@ -101,7 +101,7 @@ def test_runs_once(db, seeded, reference):
 
 
 def test_a_visitor_sees_the_history(engine, reference, seeded):
-    from slim_lab_portal.main import create_app
+    from slim_lims.main import create_app
 
     app = create_app(make_settings(str(engine.url), demo_personas=True), engine=engine, reference=reference,
                      specs=specs, report_renderer=plain_renderer)
