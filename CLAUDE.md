@@ -85,11 +85,12 @@ never change the private slim-lims from here. Env vars keep their `PORTAL_` name
    slim-data results; chips per sample × analysis; supervisor-first actions; customers read-only, plain columns,
    and their issued reports (`/requests/{tr}/reports`). Invoice sent / paid: `invoices.py` + `tr_invoices` (payment is
    invoice data, not a TR status); the invoicing module will write those rows (item 14).
-14. ◐ Invoicing, integral to the system (Jamie): SLIM-Invoicing-Program's V5 (`V5-LIMS-Module`, package
+14. ✅ Invoicing, integral to the system (Jamie): SLIM-Invoicing-Program's V5 (`V5-LIMS-Module`, package
    `slim_invoicing`, slim-data D-83/D-84) is a required library. Slice 1 ✅ the library; slice 2 ✅ here:
    `invoices.mark_sent` builds V5's `BillableRequest` (TR + report issues) and V5 prices it into a sales order;
    `/requests/{tr}/invoice`, `/invoices` + `/invoices.csv`; `demo_prices.py` (the seed's default price list);
-   `migrate_invoicing` in `cli migrate` / the seed. Slice 3: quotes per customer in the demo, paid.
+   `migrate_invoicing` in `cli migrate` / the seed. Slice 3 ✅: customer A's own quote in the demo (10 % off,
+   45-day terms) and the price lists on `/invoices` (`invoices.price_lists`); "Mark paid" stays a portal row.
 
 Agreed order: A, B, link-ready (9) and the board (13) done. Next D when approved, then invoicing (14);
 C last. The user is token-constrained: small, focused steps,

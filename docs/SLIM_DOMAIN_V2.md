@@ -540,7 +540,8 @@ reported and what is waiting to be invoiced. `slim_lims/board.py`, `templates/bo
   Refused (flashed) when V5 refuses: already invoiced, nothing reported, an analysis no quote prices.
   `/requests/{tr}/invoice` shows the sales order (customers see their own), `/invoices` lists them
   (staff) with the accounting CSV (`/invoices.csv`, V4's columns). "Mark paid" stays a portal row.
-  The demo seed publishes one default price list for every catalog analysis (`demo_prices.py`, invented).
+  The demo seed publishes one default price list for every catalog analysis and customer A's own quote
+  (`demo_prices.py`, invented); `/invoices` shows every price list.
   Rejected: a PAID status (puts accounting in the TR lifecycle; breaks when one invoice covers several
   TRs or a TR is billed twice).
 - The old request list stays (`/admin` for staff, `/requests` for customers).
