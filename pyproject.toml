@@ -24,6 +24,8 @@ dependencies = [
     "slim-data @ git+https://github.com/Firehawk41/slim-data-oss@main",
     # slim-domain: its hash-chained audit log over the shared database (slim-data D-77), and the bridge.
     "slim-domain @ git+https://github.com/Firehawk41/slim-domain-oss@main",
+    # Invoicing V5 (slim-data D-83): a subfolder of the invoicing repo. Co-developing: pip install -e ../SLIM-Invoicing-Program/V5-LIMS-Module
+    "slim-invoicing @ git+https://github.com/Firehawk41/SLIM-Invoicing-Program@main#subdirectory=V5-LIMS-Module",
 ]
 
 [project.optional-dependencies]

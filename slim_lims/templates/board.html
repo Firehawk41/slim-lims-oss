@@ -42,7 +42,7 @@
               <a class="card__tr" href="{{ url_for('request_detail', tr_number=s.tr_number) }}">{{ s.tr_number }}</a>
               {% if s.is_rush %}<span class="badge badge--rush">RUSH</span>{% endif %}
             </header>
-            {% if card.invoice %}<p class="card__meta">Invoice sent {{ card.invoice.sent_on }}{% if card.invoice.paid_on %} · paid {{ card.invoice.paid_on }}{% endif %}</p>{% endif %}
+            {% if card.invoice %}<p class="card__meta"><a href="{{ url_for('invoice_page', tr_number=s.tr_number) }}">Invoice</a> sent {{ card.invoice.sent_on }}{% if card.invoice.paid_on %} · paid {{ card.invoice.paid_on }}{% endif %}</p>{% endif %}
             <p class="card__meta">
               {% if current_user.is_staff %}{{ s.customer_snapshot.name }} · {% endif %}{{ s.samples|length }} sample{{ "" if s.samples|length == 1 else "s" }}
               {% if s.effective_service_date %} · due {{ s.effective_service_date }}{% elif s.estimated_service_date %} · due ~{{ s.estimated_service_date }}{% endif %}

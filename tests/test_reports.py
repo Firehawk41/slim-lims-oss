@@ -14,6 +14,7 @@ import pytest
 pytest.importorskip("slim_report_engine")
 
 from slim_data.persistence import migrate  # noqa: E402
+from slim_invoicing.persistence import migrate as invoicing_migrate  # noqa: E402
 from slim_data.persistence.results import issues_for_tr  # noqa: E402
 
 from slim_lims import reports  # noqa: E402
@@ -46,6 +47,7 @@ def issued(tmp_path_factory):
     Base.metadata.create_all(engine)
     with engine.begin() as connection:
         migrate.upgrade(connection)
+        invoicing_migrate.upgrade(connection)
     with make_session_factory(engine)() as session:
         sync_analysis_catalog(engine, session)
         session.commit()

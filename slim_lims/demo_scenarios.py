@@ -31,6 +31,7 @@ from slim_lims.domain import (
     TRSubmission,
     transition,
 )
+from slim_lims.demo_prices import seed_demo_quotes
 from slim_lims.invoices import mark_paid, mark_sent
 from slim_lims.models import User
 from slim_lims.reference import ReferenceData
@@ -127,8 +128,9 @@ def seed_scenarios(session: Session, reference: ReferenceData, specs, now: datet
             complete = report_complete(report_view(session, tr_number), service.get(tr_number, sue))
             target = TRStatus.COMPLETE_REPORT if complete else TRStatus.PARTIAL_REPORT
             service.change_status(tr_number, StatusChangeIn(to_status=target, note=f"report issue {issues[-1].id}"), sue)
-    # The board's invoice columns (spec §13): one invoice sent, one paid.
-    mark_sent(session, service, trs["rerun_exception"], sue)
-    mark_sent(session, service, trs["clean_pass"], sue)
+    # The board's invoice columns (spec §13): one invoice sent, one paid, priced from the demo price list.
+    seed_demo_quotes(session, reference, now.date())
+    mark_sent(session, service, trs["rerun_exception"], sue, reference)
+    mark_sent(session, service, trs["clean_pass"], sue, reference)
     mark_paid(session, service, trs["clean_pass"], sue)
     return trs

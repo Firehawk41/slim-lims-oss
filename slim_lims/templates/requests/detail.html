@@ -13,6 +13,9 @@
       {% if s.status in (TRStatus.PARTIAL_REPORT, TRStatus.COMPLETE_REPORT, TRStatus.INVOICED) %}
         <a href="{{ url_for('issued_reports', tr_number=s.tr_number) }}">Issued reports</a> ·
       {% endif %}
+      {% if s.status == TRStatus.INVOICED %}
+        <a href="{{ url_for('invoice_page', tr_number=s.tr_number) }}">Invoice</a> ·
+      {% endif %}
       <a class="muted" href="{{ url_for('get_submission', tr_number=s.tr_number) }}">View as JSON</a>
     </span>
   </div>

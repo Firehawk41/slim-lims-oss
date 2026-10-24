@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}Invoices — YourLab{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <h1>Invoices</h1>
+    <a class="btn btn--secondary" href="{{ url_for('invoices_csv') }}">Download CSV for accounting</a>
+  </div>
+  {% if orders %}
+    <table class="table">
+      <thead><tr><th scope="col">Request</th><th scope="col">Customer</th><th scope="col">Lines</th>
+        <th scope="col">Total</th><th scope="col">By</th><th scope="col">Created</th></tr></thead>
+      <tbody>
+        {% for o in orders %}
+          <tr><td><a href="{{ url_for('invoice_page', tr_number=o.tr_number) }}">{{ o.tr_number }}</a></td>
+            <td>{{ o.customer_name }}</td><td>{{ o.line_items|length }}</td><td>${{ "%.2f"|format(o.total) }}</td>
+            <td>{{ o.created_by }}</td><td>{{ o.created_at.strftime("%Y-%m-%d") if o.created_at else "" }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="muted">Nothing invoiced yet. Invoice a request from the board's To invoice column.</p>
+  {% endif %}
+{% endblock %}
