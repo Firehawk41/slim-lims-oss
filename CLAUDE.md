@@ -85,8 +85,11 @@ never change the private slim-lims from here. Env vars keep their `PORTAL_` name
    slim-data results; chips per sample × analysis; supervisor-first actions; customers read-only, plain columns,
    and their issued reports (`/requests/{tr}/reports`). Invoice sent / paid: `invoices.py` + `tr_invoices` (payment is
    invoice data, not a TR status); the invoicing module will write those rows (item 14).
-14. ⏸ Invoicing, integral to the system (Jamie): rewire SLIM-Invoicing-Program to read SLIM (TRs + slim-data report
-   issues) instead of CSV, driven from the board's To invoice column. Comes after D. Needs the user's go-ahead.
+14. ◐ Invoicing, integral to the system (Jamie): SLIM-Invoicing-Program's V5 (`V5-LIMS-Module`, package
+   `slim_invoicing`, slim-data D-83/D-84) is a required library. Slice 1 ✅ the library; slice 2 ✅ here:
+   `invoices.mark_sent` builds V5's `BillableRequest` (TR + report issues) and V5 prices it into a sales order;
+   `/requests/{tr}/invoice`, `/invoices` + `/invoices.csv`; `demo_prices.py` (the seed's default price list);
+   `migrate_invoicing` in `cli migrate` / the seed. Slice 3: quotes per customer in the demo, paid.
 
 Agreed order: A, B, link-ready (9) and the board (13) done. Next D when approved, then invoicing (14);
 C last. The user is token-constrained: small, focused steps,
@@ -139,12 +142,13 @@ slim_lims/
 ├── security.py      # bcrypt hashing, CSRF (csrf_token / csrf_protect), headers + body-size middleware
 ├── auth.py          # current_user / require_user / require_staff deps; /login, /logout
 ├── board.py         # the lab board (spec §13): TR cards by stage, chips per sample × analysis
-├── invoices.py      # invoice sent / paid per TR (tr_invoices) until the invoicing module writes them
+├── invoices.py      # Invoice: TR + report issues -> invoicing V5's sales order; sent / paid (tr_invoices)
+├── demo_prices.py   # the demo's default price list for invoicing V5 (invented); demo seed only
 ├── reports.py       # the issued report: engine_renderer (lab template as HTML) / plain_renderer, report_files
 ├── routes.py        # Pages: / (board), /requests (customer list), /requests/new|{tr}, status form, /admin, /admin/users
 ├── web.py           # Jinja2 templates, render(), flash()
 ├── audit.py         # slim-domain's audit log: install_audit_log (Postgres), chain_check for verify
-├── cli.py           # migrate (portal + slim-data + audit log), verify, create-staff, create-customer-user, sync-analysis-catalog, sync-personas
+├── cli.py           # migrate (portal + slim-data + invoicing + audit log), verify, create-staff, create-customer-user, sync-analysis-catalog, sync-personas
 ├── alembic.ini, migrations/   # Alembic; only manages tables on db.Base
 ├── templates/       # base, _macros, login, error, requests/{list,new,detail}, admin/{home,users}
 └── static/          # css/style.css, admin.css (.admin-theme), portal.css (components), js/request_form.js

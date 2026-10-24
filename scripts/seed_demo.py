@@ -42,6 +42,7 @@ from slim_lims.oss_guard import assert_oss_database
 from slim_lims.demo_scenarios import seed_scenarios
 from slim_lims.personas import sync_personas
 from slim_lims.reference_cache import load_reference
+from slim_lims.invoices import migrate_invoicing
 from slim_lims.results import SpecReader, migrate_slim_data, publish_demo_rules
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -115,6 +116,7 @@ def main(argv: list[str] | None = None) -> int:
               + ", ".join(report.not_in_catalog))
 
     migrate_slim_data(portal_engine)
+    migrate_invoicing(portal_engine)
     audited = install_audit_log(portal_engine)  # before the scenarios, so their writes are chained (D-77)
     with make_session_factory(portal_engine)() as session:
         reference = load_reference(slim_engine, portal_engine)

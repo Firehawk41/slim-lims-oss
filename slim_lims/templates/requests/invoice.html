@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}Invoice {{ s.tr_number }} — YourLab{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <h1>Invoice for {{ s.tr_number }}</h1>
+    <a href="{{ url_for('request_detail', tr_number=s.tr_number) }}">Back to request</a>
+  </div>
+  <p class="muted">{{ order.customer_name }} · {{ "PO " ~ order.po_number if order.po_number else "Credit card (the lab calls you)" }}
+    · received {{ order.date_received }} · service date {{ order.service_date }} · terms {{ order.payment_terms }} days</p>
+  <p>{% if invoice and invoice.paid_on %}<span class="badge badge--complete_report">Paid {{ invoice.paid_on }}</span>
+     {% elif invoice %}<span class="badge badge--submitted">Sent {{ invoice.sent_on }}</span>{% endif %}</p>
+
+  <table class="table">
+    <thead><tr><th scope="col">Item</th><th scope="col">Samples</th><th scope="col">Quantity</th>
+      <th scope="col">Rate</th><th scope="col">Amount</th></tr></thead>
+    <tbody>
+      {% for li in order.line_items %}
+        <tr><td>{{ li.item }}</td><td>{{ li.samples|join(", ") }}</td><td>{{ li.quantity }}</td>
+          <td>${{ "%.2f"|format(li.rate) }}</td><td>${{ "%.2f"|format(li.total) }}</td></tr>
+      {% endfor %}
+    </tbody>
+    <tfoot><tr><th scope="row" colspan="4">Total</th><td><strong>${{ "%.2f"|format(order.total) }}</strong></td></tr></tfoot>
+  </table>
+  <p class="hint">Only what was reported is billed, each analysis once. Bulk prices count every sample on a line,
+    and you pay whichever is cheaper, a bundle or its parts.</p>
+{% endblock %}

@@ -1,13 +1,15 @@
 """Server-rendered pages. Data changes go through SubmissionService, exactly like the JSON API;
 the submission form itself is JavaScript (static/js/request_form.js) posting to /api/submissions."""
 
+import io
 import uuid
 from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, Response
 from pydantic import ValidationError
+import slim_invoicing
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -63,8 +65,9 @@ def index(request: Request, user: CurrentUser, db: DB, reference: Reference,
 
 
 @router.post("/requests/{tr_number}/invoice", name="invoice_sent")
-def invoice_sent(request: Request, tr_number: str, user: RequireStaff, service: Service, db: DB):
-    return _invoice(request, db, lambda: invoices.mark_sent(db, service, tr_number, user), f"{tr_number}: invoice sent.")
+def invoice_sent(request: Request, tr_number: str, user: RequireStaff, service: Service, db: DB, reference: Reference):
+    return _invoice(request, db, lambda: invoices.mark_sent(db, service, tr_number, user, reference),
+                    f"{tr_number}: invoiced and sent.")
 
 
 @router.post("/requests/{tr_number}/invoice/paid", name="invoice_paid")
@@ -95,6 +98,34 @@ def issued_reports(request: Request, tr_number: str, user: RequireUser, service:
     return render(request, "requests/reports.html", {
         "s": submission, "reports": issued_documents(db, tr_number), "reference": reference,
     })
+
+
+@router.get("/requests/{tr_number}/invoice", name="invoice_page")
+def invoice_page(request: Request, tr_number: str, user: RequireUser, service: Service, db: DB):
+    """The sales order invoicing V5 made for a TR (slim-data D-83). Customers see their own."""
+    try:
+        submission = service.get(tr_number, user)
+    except NotFound:
+        return render(request, "error.html", {"status": 404, "message": f"Testing Request {tr_number} not found."}, 404)
+    order = slim_invoicing.sales_order_for(db, tr_number)
+    if order is None:
+        return render(request, "error.html", {"status": 404, "message": f"{tr_number} has not been invoiced."}, 404)
+    paid = invoices.latest_invoices(db, [submission.id]).get(submission.id)
+    return render(request, "requests/invoice.html", {"s": submission, "order": order, "invoice": paid})
+
+
+@router.get("/invoices", name="invoices_home")
+def invoices_home(request: Request, user: RequireStaff, db: DB):
+    return render(request, "invoices.html", {"orders": slim_invoicing.sales_orders(db)})
+
+
+@router.get("/invoices.csv", name="invoices_csv")
+def invoices_csv(user: RequireStaff, db: DB):
+    """Every sales order as the accounting import file (V4's columns)."""
+    out = io.StringIO()
+    slim_invoicing.write_csv(slim_invoicing.sales_orders(db), out)
+    return Response(out.getvalue(), media_type="text/csv",
+                    headers={"Content-Disposition": 'attachment; filename="sales_orders.csv"'})
 
 
 @router.get("/requests", name="my_requests")

@@ -1,0 +1,91 @@
+"""Invoicing through V5 (slim-data D-83, D-84), on the seeded demo scenarios: a complete report becomes
+one sales order priced from the demo price list, the TR moves to invoiced, and the CSV carries it."""
+
+import csv
+import io
+from decimal import Decimal
+
+import pytest
+import slim_invoicing
+from fastapi.testclient import TestClient
+from sqlalchemy import select
+
+from slim_lims import invoices
+from slim_lims.demo_prices import BASE, seed_demo_quotes
+from slim_lims.domain import TRStatus
+from slim_lims.models import User
+from slim_lims.reports import plain_renderer
+from slim_lims.repositories import TRSubmissionRepository
+from slim_lims.services import Conflict, SubmissionService
+from tests.conftest import make_settings
+from tests.test_demo_scenarios import reference, seeded, specs  # noqa: F401 (fixtures)
+
+
+def sue(db):
+    return db.scalars(select(User).where(User.email == "sue@demo.example")).one()
+
+
+def test_the_demo_invoices_are_sales_orders_priced_from_the_price_list(db, seeded):
+    order = slim_invoicing.sales_order_for(db, seeded["clean_pass"])  # 36 Elements, one sample
+    assert order is not None and order.created_by == sue(db).initials and order.payment_terms == 30
+    [line] = order.line_items
+    assert line.quantity == 1 and line.item.startswith("36 Elements - ")
+    assert line.rate >= BASE["Metals"]  # the five-day base, scaled up for a faster turnaround
+    assert {o.tr_number for o in slim_invoicing.sales_orders(db)} == {seeded["clean_pass"], seeded["rerun_exception"]}
+    assert not seed_demo_quotes(db, None, None)  # the price list is published once
+
+
+def test_a_complete_report_is_invoiced_once_and_only_what_was_reported(db, seeded, reference):
+    service = SubmissionService(TRSubmissionRepository(db), reference)
+    tr = seeded["amended"]  # an assay, reported, then amended: billed once
+    invoices.mark_sent(db, service, tr, sue(db), reference)
+    order = slim_invoicing.sales_order_for(db, tr)
+    assert sum(li.quantity for li in order.line_items) == 1 and order.total > Decimal(0)
+    assert service.get(tr, sue(db)).status is TRStatus.INVOICED
+    with pytest.raises(Conflict, match="invoice a complete report"):  # invoiced now
+        invoices.mark_sent(db, service, tr, sue(db), reference)
+    with pytest.raises(Conflict, match="invoice a complete report"):
+        invoices.mark_sent(db, service, seeded["scale_fault"], sue(db), reference)  # still in progress
+
+
+def test_billable_requests_carry_only_reported_analyses(db, seeded, reference):
+    service = SubmissionService(TRSubmissionRepository(db), reference)
+    released = service.get(seeded["line_by_line"], sue(db))  # released, but no report issued yet
+    request = invoices.billable(db, released, reference, service.lab_today())
+    assert not request.complete and request.reported == frozenset() and request.billable_samples() == ()
+    amended = service.get(seeded["amended"], sue(db))  # its original and its amendment show one result
+    assert invoices.billable(db, amended, reference, service.lab_today()).reported == {
+        (s.position, a) for s in amended.samples for a in s.analysis_ids}
+
+
+def test_invoice_pages_and_the_accounting_csv(engine, db, seeded, reference):
+    from slim_lims.main import create_app
+
+    app = create_app(make_settings(str(engine.url), demo_personas=True), engine=engine, reference=reference,
+                     specs=specs, report_renderer=plain_renderer)
+    staff = str(sue(db).id)
+    customer = db.scalars(select(User).where(User.is_persona.is_(True), User.customer_id.is_not(None))).one()
+    customer_id = str(customer.id)
+    db.rollback()  # end this session's read: SQLite would lock the app's writes
+
+    def as_persona(client, user_id):
+        token = client.get("/demo/personas").text.split('name="csrf_token" value="')[1].split('"')[0]
+        client.post("/demo/continue-as", data={"csrf_token": token, "user_id": user_id})
+
+    with TestClient(app) as client:
+        as_persona(client, staff)
+        listing = client.get("/invoices").text
+        assert seeded["clean_pass"] in listing and "Download CSV" in listing
+        page = client.get(f"/requests/{seeded['clean_pass']}/invoice").text
+        assert "Invoice for" in page and "36 Elements" in page and "Paid " in page
+        assert client.get(f"/requests/{seeded['amended']}/invoice").status_code == 404  # not invoiced
+        response = client.get("/invoices.csv")
+        assert response.headers["content-type"].startswith("text/csv")
+        rows = list(csv.reader(io.StringIO(response.text)))
+        assert rows[0][0] == "Customer" and {r[-1] for r in rows[1:]} == {seeded["clean_pass"], seeded["rerun_exception"]}
+    with TestClient(app) as client:
+        as_persona(client, customer_id)
+        assert client.get(f"/requests/{seeded['clean_pass']}/invoice").status_code == 200  # their own
+        assert client.get(f"/requests/{seeded['cups_disagree']}/invoice").status_code == 404  # customer B's
+        assert client.get("/invoices", follow_redirects=False).status_code == 403
+        assert client.get("/invoices.csv", follow_redirects=False).status_code == 403

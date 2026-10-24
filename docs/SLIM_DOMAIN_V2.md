@@ -533,8 +533,14 @@ reported and what is waiting to be invoiced. `slim_lims/board.py`, `templates/bo
 - **Invoicing is part of the system**, not an add-on (Jamie, option A): **payment is invoice data,
   never a TR status.** `tr_invoices` (portal-owned, `invoices.py`) holds each invoice sent for a TR
   and when it was paid; "Invoice sent" also moves the TR to invoiced (the status slim-lims knows).
-  Until the invoicing program is rewired to read SLIM (TRs and report issues) instead of CSV, staff
-  record "Invoice sent" / "Mark paid" on the card; the invoicing module will write these rows instead.
+  **Invoice** on a To invoice card calls invoicing V5 (`slim_invoicing`, SLIM-Invoicing-Program
+  `V5-LIMS-Module`; slim-data D-83, D-84): `invoices.billable` hands it the TR and every (sample,
+  analysis) a report issue showed; V5 prices that from the quotes into one sales order (bulk on the
+  merged line, the cheaper of bundle or parts), and the TR moves to invoiced, in one transaction.
+  Refused (flashed) when V5 refuses: already invoiced, nothing reported, an analysis no quote prices.
+  `/requests/{tr}/invoice` shows the sales order (customers see their own), `/invoices` lists them
+  (staff) with the accounting CSV (`/invoices.csv`, V4's columns). "Mark paid" stays a portal row.
+  The demo seed publishes one default price list for every catalog analysis (`demo_prices.py`, invented).
   Rejected: a PAID status (puts accounting in the TR lifecycle; breaks when one invoice covers several
   TRs or a TR is billed twice).
 - The old request list stays (`/admin` for staff, `/requests` for customers).
