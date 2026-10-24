@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}Board — YourLab{% endblock %}
+{% block body_class %}board-page{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <h1>{% if current_user.is_staff %}Lab board{% else %}My requests{% endif %}</h1>
+    <a class="btn btn--primary" href="{{ url_for('new_request') }}">New request</a>
+  </div>
+
+  {% if current_user.is_staff %}
+    <form method="get" class="filters" aria-label="Filter the board">
+      <label>Customer
+        <select name="customer">
+          <option value="">All</option>
+          {% for c in customers %}<option value="{{ c.id }}" {% if filters.customer == c.id %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Analysis
+        <select name="analysis">
+          <option value="">All</option>
+          {% for a in analyses %}<option value="{{ a.id }}" {% if filters.analysis == a.id %}selected{% endif %}>{{ a.name }}</option>{% endfor %}
+        </select>
+      </label>
+      <label class="check"><input type="checkbox" name="rush" value="1" {% if filters.rush %}checked{% endif %}> RUSH only</label>
+      <label class="check"><input type="checkbox" name="mine" value="1" {% if filters.mine %}checked{% endif %}> Needs me</label>
+      <button type="submit" class="btn btn--secondary">Filter</button>
+      {% if filters.customer or filters.analysis or filters.rush or filters.mine %}<a href="{{ url_for('index') }}">Clear</a>{% endif %}
+    </form>
+  {% endif %}
+
+  <div class="board" role="list" aria-label="Testing requests by stage">
+    {% for key, title, cards in columns %}
+      <section class="board__column board__column--{{ key }}" role="listitem" aria-labelledby="col-{{ key }}">
+        <h2 id="col-{{ key }}" class="board__title">{{ title }} <span class="board__count">{{ cards|length }}</span></h2>
+        {% if key == "paid" %}<p class="muted board__note">Latest {{ paid_shown }}.</p>{% endif %}
+        {% for card in cards %}
+          {% set s = card.tr %}
+          <article class="card">
+            <header class="card__head">
+              <a class="card__tr" href="{{ url_for('request_detail', tr_number=s.tr_number) }}">{{ s.tr_number }}</a>
+              {% if s.is_rush %}<span class="badge badge--rush">RUSH</span>{% endif %}
+            </header>
+            {% if card.invoice %}<p class="card__meta">Invoice sent {{ card.invoice.sent_on }}{% if card.invoice.paid_on %} · paid {{ card.invoice.paid_on }}{% endif %}</p>{% endif %}
+            <p class="card__meta">
+              {% if current_user.is_staff %}{{ s.customer_snapshot.name }} · {% endif %}{{ s.samples|length }} sample{{ "" if s.samples|length == 1 else "s" }}
+              {% if s.effective_service_date %} · due {{ s.effective_service_date }}{% elif s.estimated_service_date %} · due ~{{ s.estimated_service_date }}{% endif %}
+            </p>
+            {% if current_user.is_staff %}
+              <ul class="chips" aria-label="Samples and analyses">
+                {% for chip in card.chips %}
+                  <li class="chip chip--{{ chip.state }}">
+                    {% if chip.batch %}<a href="{{ url_for('results_batch', code=chip.batch) }}">{% endif %}
+                    <span class="chip__what">#{{ chip.sample }} {{ chip.analysis }}</span> <span class="chip__state">{{ chip.label }}</span>
+                    {% if chip.batch %}</a>{% endif %}
+                  </li>
+                {% endfor %}
+              </ul>
+              <div class="card__actions">
+                {% if key == "expected" %}
+                  <a class="btn btn--small btn--primary" href="{{ url_for('check_in_page', tr_number=s.tr_number) }}">Check in</a>
+                {% endif %}
+                {% if key in ("received", "in_analysis", "partial_report") %}
+                  <a class="btn btn--small" href="{{ url_for('results_home') }}">Upload results</a>
+                {% endif %}
+                {% if key == "ready_to_report" %}
+                  <a class="btn btn--small btn--primary" href="{{ url_for('results_report', tr_number=s.tr_number) }}">Issue report</a>
+                {% endif %}
+                {% if card.issued %}
+                  <a class="btn btn--small" href="{{ url_for('issued_reports', tr_number=s.tr_number) }}">Reports</a>
+                {% endif %}
+                {% if key == "to_invoice" and can_invoice %}
+                  <form method="post" action="{{ url_for('invoice_sent', tr_number=s.tr_number) }}" class="inline-form">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+                    <button type="submit" class="btn btn--small btn--primary">Invoice sent</button>
+                  </form>
+                {% endif %}
+                {% if key == "invoice_sent" and can_invoice %}
+                  <form method="post" action="{{ url_for('invoice_paid', tr_number=s.tr_number) }}" class="inline-form">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+                    <button type="submit" class="btn btn--small btn--primary">Mark paid</button>
+                  </form>
+                {% endif %}
+              </div>
+            {% else %}
+              {% if card.column == "partial_report" %}<p class="card__meta">Partial: more results to come</p>{% endif %}
+              {% if card.issued %}<a class="btn btn--small" href="{{ url_for('issued_reports', tr_number=s.tr_number) }}">Reports</a>{% endif %}
+            {% endif %}
+          </article>
+        {% else %}
+          <p class="muted board__empty">Nothing here.</p>
+        {% endfor %}
+      </section>
+    {% endfor %}
+  </div>
+{% endblock %}

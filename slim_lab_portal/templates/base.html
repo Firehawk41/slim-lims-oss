@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="csrf-token" content="{{ csrf_token(request) }}">
+  <title>{% block title %}YourLab{% endblock %}</title>
+
+  <link href="{{ url_for('static', path='css/style.css') }}" rel="stylesheet" />
+  <link href="{{ url_for('static', path='css/portal.css') }}" rel="stylesheet" />
+  {% if current_user and current_user.is_staff %}
+    <link href="{{ url_for('static', path='css/admin.css') }}" rel="stylesheet" />
+  {% endif %}
+  {% block extra_head %}{% endblock %}
+</head>
+<body class="{% if current_user and current_user.is_staff %}admin-theme {% endif %}{% block body_class %}{% endblock %}">
+  <header class="site-header">
+    <div class="site-header__inner">
+      <a href="{{ url_for('index') }}" class="site-header__brand">YourLab</a>
+      <nav class="site-header__nav" aria-label="Main navigation">
+        {% block nav %}
+          {% if current_user %}
+            <a href="{{ url_for('index') }}">Board</a>
+            {% if current_user.is_staff %}
+              <a href="{{ url_for('admin_home') }}">Requests</a>
+              <a href="{{ url_for('new_request') }}">New request</a>
+              <a href="{{ url_for('results_home') }}">Results</a>
+              <a href="{{ url_for('admin_users') }}">Users</a>
+            {% else %}
+              <a href="{{ url_for('my_requests') }}">My requests</a>
+              <a href="{{ url_for('new_request') }}">New request</a>
+            {% endif %}
+            {% if request.app.state.settings.demo_personas %}
+              <a href="{{ url_for('demo_personas') }}">Switch persona</a>
+            {% endif %}
+            <form method="post" action="{{ url_for('logout') }}" class="nav-form">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+              <button type="submit" class="nav-link-button">Logout</button>
+            </form>
+          {% else %}
+            <a href="{{ url_for('login') }}">Login</a>
+          {% endif %}
+        {% endblock %}
+      </nav>
+    </div>
+  </header>
+
+  <main class="page">
+    {% if current_user and current_user.is_persona %}
+      <div class="flash flash--info" role="status">Demo sandbox, fictional data: you are acting as
+        {{ current_user.initials or current_user.email }} (asserted, not logged in).</div>
+    {% endif %}
+    {% for category, message in flashes %}
+      <div class="flash flash--{{ category }}" role="status">{{ message }}</div>
+    {% endfor %}
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="site-footer">
+    <div class="site-footer__contact">
+      <p>&copy; YourLab. All rights reserved.</p>
+    </div>
+  </footer>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

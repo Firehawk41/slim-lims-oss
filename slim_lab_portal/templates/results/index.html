@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block title %}Results — YourLab{% endblock %}
+
+{% block content %}
+  <h1>Results</h1>
+
+  <section class="form-section" aria-labelledby="upload-heading">
+    <h2 id="upload-heading">Upload a result file</h2>
+    <p class="hint">generic_csv/1: one file per run. Preview checks every row without writing anything;
+      Import writes the file all or nothing, then evaluates every prep batch it touches.
+      The same file is never imported twice.</p>
+    <form method="post" action="{{ url_for('results_upload') }}" enctype="multipart/form-data" class="stack-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+      <label>File <input type="file" name="file" accept=".csv,text/csv" required></label>
+      <div class="choice-row">
+        <button type="submit" name="action" value="preview" class="btn btn--secondary">Preview</button>
+        <button type="submit" name="action" value="import" class="btn btn--primary">Import</button>
+      </div>
+    </form>
+
+    {% if error %}<div class="form-error" role="alert">{{ error }}</div>{% endif %}
+    {% if plan %}
+      <h3>{{ plan.file }}: {{ "ready to import" if plan.ok else "cannot be imported" }}</h3>
+      <dl class="kv">
+        {% if plan.run %}
+          <dt>Run</dt><dd>{{ plan.run.run_code }} on {{ plan.run.instrument }}, {{ plan.run.analyzed_at }}</dd>
+          <dt>Analyst</dt><dd>{{ plan.run.analyst }}</dd>
+        {% endif %}
+        <dt>New readings</dt><dd>{{ plan.readings }}{% if plan.skipped %} ({{ plan.skipped }} rows imported before){% endif %}</dd>
+        <dt>Rejected in the run</dt><dd>{{ plan.rejected }}</dd>
+        <dt>New batches</dt><dd>{{ plan.new_batches|join(", ") or "—" }}</dd>
+        <dt>Added to batches</dt><dd>{{ plan.batch_additions|join(", ") or "—" }}</dd>
+      </dl>
+      {% if plan.errors %}
+        <table class="table">
+          <thead><tr><th scope="col">Line</th><th scope="col">Column</th><th scope="col">Problem</th></tr></thead>
+          <tbody>
+            {% for e in plan.errors %}
+              <tr><td>{{ e.line or "file" }}</td><td>{{ e.column }}</td><td>{{ e.message }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% elif plan.ok %}
+        <p class="hint">Choose the file again and press Import.</p>
+      {% endif %}
+    {% endif %}
+  </section>
+
+  <section class="form-section" aria-labelledby="batches-heading">
+    <h2 id="batches-heading">Prep batches</h2>
+    {% if batches %}
+      <table class="table">
+        <thead><tr><th scope="col">Batch</th><th scope="col">Analysis</th><th scope="col">Prep method</th><th scope="col">Registered</th></tr></thead>
+        <tbody>
+          {% for b in batches %}
+            <tr>
+              <td><a href="{{ url_for('results_batch', code=b.code) }}">{{ b.code }}</a></td>
+              <td>{{ b.analysis }}</td><td>{{ b.prep_method }}</td><td>{{ b.registered_at[:16].replace("T", " ") }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="muted">No prep batches yet. They are registered by the first file that names them.</p>
+    {% endif %}
+  </section>
+{% endblock %}

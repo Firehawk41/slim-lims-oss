@@ -1,0 +1,43 @@
+# The public demo on Render (free plan): Postgres + the portal, seeded with the OSS demo data.
+# OSS ONLY: PORTAL_ALLOWED_DB_HOSTS is set to this blueprint's own demo database host, nothing else
+# (see slim_lab_portal/oss_guard.py). The service is named for the host this portal becomes
+# (slim-lims-oss.onrender.com). The database keeps its old name on purpose: renaming it here would
+# make Render create a second one, and the free plan allows only one.
+databases:
+  - name: labportal-db
+    plan: free
+    databaseName: labportal
+    user: labportal
+
+services:
+  - type: web
+    name: slim-lims-oss
+    runtime: python
+    plan: free
+    # The demo seed loads SLIM's fictional reference data from slim-report-engine-oss's demo/demo.py.
+    buildCommand: >-
+      rm -rf vendor && git clone --depth 1 https://github.com/Firehawk41/slim-report-engine-oss vendor/slim-report-engine-oss
+      && pip install . "slim-domain @ git+https://github.com/Firehawk41/slim-domain-oss@main" ./vendor/slim-report-engine-oss
+    # The seed runs every migration and installs the audit log; re-running it changes nothing
+    # (SLIM data, ruleset, personas and scenarios are each skipped once present).
+    startCommand: >-
+      python scripts/seed_demo.py --oss-report-engine vendor/slim-report-engine-oss
+      && uvicorn --factory slim_lab_portal.main:create_app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips='*'
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.15"
+      - key: APP_ENV
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: labportal-db
+          property: connectionString
+      - key: PORTAL_ALLOWED_DB_HOSTS
+        fromDatabase:
+          name: labportal-db
+          property: host
+      - key: DEMO_PERSONAS
+        value: "true"

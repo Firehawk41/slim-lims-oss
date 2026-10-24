@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}Reports {{ s.tr_number }} — YourLab{% endblock %}
+{% block body_class %}page-wide{% endblock %}
+{% block extra_head %}<link href="{{ url_for('static', path='css/report.css') }}" rel="stylesheet" />{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <h1>Reports for {{ s.tr_number }}</h1>
+    <a href="{{ url_for('request_detail', tr_number=s.tr_number) }}">Back to request</a>
+  </div>
+  <p class="muted">Every report issued for this request, newest first, exactly as it was issued.</p>
+
+  {% for r in reports %}
+    <section class="form-section" aria-labelledby="issue-{{ r.id }}">
+      <h2 id="issue-{{ r.id }}">Report {{ r.id }}{% if r.amends %} (amends report {{ r.amends }}){% endif %}
+        {% if loop.first %}<span class="badge badge--complete_report">latest</span>{% else %}<span class="badge badge--submitted">superseded</span>{% endif %}</h2>
+      <p class="muted">Issued {{ r.at.strftime("%Y-%m-%d %H:%M UTC") if r.at else "" }}
+        {% if r.verified %}· verified: matches what was issued{% else %}<strong>· does not match the recorded hash</strong>{% endif %}</p>
+      {% if r.html %}
+        <div class="report-paper">{{ r.html|safe }}</div>
+      {% else %}
+      <table class="table">
+        <thead><tr>
+          <th scope="col">Sample</th><th scope="col">Analysis</th><th scope="col">Analyte</th><th scope="col">Result</th>
+          <th scope="col">Unit</th><th scope="col">Half delta</th><th scope="col">Recovery</th><th scope="col">Notes</th>
+        </tr></thead>
+        <tbody>
+          {% for line in r.document.lines %}
+            {% set analysis = reference.analysis(line.analysis_id) %}
+            <tr>
+              <td>{{ line.sample }}</td><td>{{ analysis.name if analysis else line.analysis_id }}</td>
+              <td>{{ line.analyte }}</td><td>{{ line.text }}</td><td>{{ line.unit or "" }}</td>
+              <td>{{ line.uncertainty or "N/A" }}</td><td>{{ line.recovery or "" }}</td>
+              <td>{{ (line.notes + line.shown_flags)|join("; ") }}{% if line.amended %}{{ "; " if line.notes or line.shown_flags }}Amended{% endif %}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
+    </section>
+  {% else %}
+    <p class="muted">No report has been issued yet.</p>
+  {% endfor %}
+{% endblock %}

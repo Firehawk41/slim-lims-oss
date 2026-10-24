@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}{{ result.sample }} {{ result.analyte.code }} — YourLab{% endblock %}
+{% block body_class %}page-wide{% endblock %}
+
+{% macro shown_value(v) %}{% if v is none %}—{% elif v is sameas true %}yes{% elif v is sameas false %}no{% elif v is iterable and v is not string %}{{ v|join(", ") }}{% else %}{{ v }}{% endif %}{% endmacro %}
+
+{% block content %}
+  <div class="page-head">
+    <h1>{{ result.sample }} · {{ analysis.name if analysis else result.analyte.analysis_id }} · {{ result.analyte.code }}</h1>
+    <a href="{{ url_for('results_batch', code=code) }}">Back to batch {{ code }}</a>
+  </div>
+  <p class="muted">Status: {{ result.status.name.lower() }} ·
+    Versions:
+    {% for v in result.versions %}
+      {% if v.version == shown.version %}<strong>v{{ v.version }}</strong>{% else %}<a href="{{ url_for('results_trace', code=code) }}?sample={{ result.sample|string|urlencode }}&amp;analysis_id={{ result.analyte.analysis_id }}&amp;analyte={{ result.analyte.code|urlencode }}&amp;version={{ v.version }}">v{{ v.version }}</a>{% endif %}{{ ", " if not loop.last }}
+    {% endfor %}</p>
+
+  <section class="form-section" aria-labelledby="version-heading">
+    <h2 id="version-heading">Version {{ shown.version }}: {{ shown.reported.value if shown.reported else "N/A" }} {{ shown.reported.unit if shown.reported else "" }}
+      ({{ shown.qualifier.name.replace("_", " ").lower() }})</h2>
+    <p class="muted">Made by {{ shown.created_by.display }}{% if shown.created_at %} at {{ shown.created_at.strftime("%Y-%m-%d %H:%M UTC") }}{% endif %}{% if shown.reason %} · why: {{ shown.reason }}{% endif %}
+      · ruleset #{{ shown.ruleset_id }} ({{ (shown.trace.ruleset_hash or "")[:12] }}…)</p>
+    {% if shown.flags %}
+      <ul>{% for f in shown.flags %}<li><strong>{{ f.code }}</strong> ({{ f.severity.name.replace("_", " ").lower() }}, {{ f.step }}){% if f.message %}: {{ f.message }}{% endif %}</li>{% endfor %}</ul>
+    {% else %}
+      <p>No flags.</p>
+    {% endif %}
+  </section>
+
+  <section class="form-section" aria-labelledby="steps-heading">
+    <h2 id="steps-heading">What the engine did, step by step</h2>
+    <p class="hint">Cup values are dilution-corrected. Selection: {{ shown_value(shown.trace.selection) }}{% if shown.trace.chosen_replicate %}, cup {{ shown.trace.chosen_replicate }} believed{% endif %}.</p>
+    <dl class="trace-steps">
+      {% for step in shown.trace.steps or [] %}
+        <dt>{{ step.step }}</dt>
+        <dd>{% for key, value in step.items() if key != "step" %}<span>{{ key.replace("_", " ") }}: {{ shown_value(value) }}</span>{% endfor %}</dd>
+      {% endfor %}
+    </dl>
+  </section>
+
+  <section class="form-section" aria-labelledby="events-heading">
+    <h2 id="events-heading">Who did what to version {{ shown.version }}</h2>
+    {% if events %}
+      <ul>{% for e in events %}<li>{{ e.kind.name.replace("_", " ").lower() }} by {{ e.actor.display }}{% if e.at %} at {{ e.at.strftime("%Y-%m-%d %H:%M UTC") }}{% endif %}{% if e.reason_category %} · {{ e.reason_category }}{% endif %}{% if e.note %} · {{ e.note }}{% endif %}{% if e.solo %} · solo{% endif %}</li>{% endfor %}</ul>
+    {% else %}
+      <p class="muted">Nothing yet.</p>
+    {% endif %}
+  </section>
+{% endblock %}

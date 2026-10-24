@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block title %}Report {{ r.tr_number }} — YourLab{% endblock %}
+{% block body_class %}page-wide{% endblock %}
+{% block extra_head %}<link href="{{ url_for('static', path='css/report.css') }}" rel="stylesheet" />{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <h1>Results report {{ r.tr_number }}</h1>
+    <a href="{{ url_for('request_detail', tr_number=r.tr_number) }}">Back to request</a>
+  </div>
+  <p class="muted">Released results only, latest versions. {{ "Every ordered analysis is reported." if r.complete else "Partial: not every ordered analysis is released yet." }}</p>
+
+  {% if r.lines %}
+    <table class="table">
+      <thead><tr>
+        <th scope="col">Sample</th><th scope="col">Analysis</th><th scope="col">Analyte</th><th scope="col">Result</th>
+        <th scope="col">Unit</th><th scope="col">MDL</th><th scope="col" title="half the difference between the two cups">½Δ</th><th scope="col">Recovery</th><th scope="col">Notes</th>
+      </tr></thead>
+      <tbody>
+        {% for line in r.lines %}
+          {% set analysis = reference.analysis(line.analysis_id) %}
+          <tr>
+            <td>{{ line.sample }}</td><td>{{ analysis.name if analysis else line.analysis_id }}</td>
+            <td>{{ line.analyte }}</td><td>{{ line.text }}</td><td>{{ line.unit or "" }}</td>
+            <td>{{ line.mdl or "" }}</td><td>{{ line.uncertainty or "" }}</td><td>{{ line.recovery or "" }}</td>
+            <td>{{ (line.notes + line.shown_flags)|join("; ") }}{% if line.amended %}{{ "; " if line.notes or line.shown_flags }}Amended{% endif %}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="muted">No released results yet.</p>
+  {% endif %}
+
+  {% if r.html %}
+    <section class="form-section" aria-labelledby="preview-heading">
+      <h2 id="preview-heading">What the customer will get</h2>
+      <div class="report-paper">{{ r.html|safe }}</div>
+    </section>
+  {% endif %}
+
+  {% if r.waiting %}
+    <p class="hint">Waiting: {{ r.waiting|join(", ") }}</p>
+  {% endif %}
+
+  <section class="form-section" aria-labelledby="issue-heading">
+    <h2 id="issue-heading">Issues</h2>
+    {% if r.issues %}
+      <table class="table">
+        <thead><tr><th scope="col">Issue</th><th scope="col">Results</th><th scope="col">By</th><th scope="col">At</th><th scope="col">sha256</th></tr></thead>
+        <tbody>
+          {% for i in r.issues %}
+            <tr><td>{{ i.id }}{% if i.amends %} (amends {{ i.amends }}){% endif %}</td><td>{{ i.lines }}</td>
+              <td>{{ i.by }}</td><td>{{ (i.at or "")[:16].replace("T", " ") }}</td><td><code>{{ i.sha256[:12] }}…</code></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="muted">Not issued yet.</p>
+    {% endif %}
+    <form method="post" action="{{ url_for('results_issue', tr_number=r.tr_number) }}" class="action-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+      <button type="submit" class="btn btn--primary" {% if not r.lines %}disabled{% endif %}>Issue report</button>
+      <span class="hint">Records exactly what this page shows and moves the request to
+        {{ "complete" if r.complete else "partial" }} report.</span>
+    </form>
+  </section>
+{% endblock %}

@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block title %}New testing request — YourLab{% endblock %}
+{% block body_class %}page-wide{% endblock %}
+
+{% block content %}
+  <h1>New testing request</h1>
+
+  <form id="request-form" novalidate data-staff="{{ 1 if current_user.is_staff else 0 }}">
+    <div id="form-error" class="form-error hidden" role="alert" tabindex="-1"></div>
+    <p id="form-loading" class="muted">Loading the lab's analyses…</p>
+
+    {% if current_user.is_staff %}
+    <section class="form-section">
+      <h2>Customer</h2>
+      <label class="field">Submitting on behalf of
+        <select id="customer_id" data-path="customer_id" required><option value="">Choose a customer…</option></select>
+      </label>
+    </section>
+    {% endif %}
+
+    <section class="form-section">
+      <h2>What are you sending?</h2>
+      <div class="choice-row" role="radiogroup" aria-label="Request type" id="request-types" data-path="request_type"></div>
+      <label class="field hidden" id="location-field">Site
+        <select id="location" data-path="location"></select>
+      </label>
+    </section>
+
+    <section class="form-section">
+      <h2>Contact &amp; reports</h2>
+      <div class="grid-2">
+        <label class="field">Contact name <input id="customer_contact" data-path="customer_contact" maxlength="200" required></label>
+        <label class="field">Phone <input id="customer_phone" data-path="customer_phone" maxlength="50" required></label>
+        <label class="field">Results to <input id="results_to" data-path="results_to" placeholder="name@company.com, …" required></label>
+        <label class="field">Results cc <input id="results_cc" data-path="results_cc" placeholder="optional"></label>
+        <label class="field">Invoice to <input id="invoice_to" data-path="invoice_to" placeholder="ap@company.com" required></label>
+        <label class="field">Invoice cc <input id="invoice_cc" data-path="invoice_cc" placeholder="optional"></label>
+      </div>
+      <p class="hint">Separate several addresses with commas.</p>
+    </section>
+
+    <section class="form-section">
+      <h2>Payment &amp; shipping</h2>
+      <div class="choice-row" role="radiogroup" aria-label="Payment method" id="payment-methods" data-path="payment_method"></div>
+      <label class="field" id="po-field">PO number / billing code <input id="po_number" data-path="po_number" maxlength="100"></label>
+      <p class="hint hidden" id="card-hint">The lab will call you to take card payment. Never enter card numbers here.</p>
+      <label class="field">Expected arrival at the lab <input type="date" id="expected_arrival_date" data-path="expected_arrival_date"></label>
+    </section>
+
+    <section class="form-section" id="samples-section" hidden>
+      <h2>Samples</h2>
+      <p class="hint">Paste a column of sample IDs from Excel to add one row per ID; new rows copy the row above.
+        <kbd>Ctrl</kbd>+<kbd>D</kbd> copies a cell from the row above.</p>
+
+      <div class="selection-bar" id="selection-bar" role="region" aria-label="Sample selection" aria-live="polite">
+        <strong id="selection-count"></strong>
+        <span id="selection-actions">
+          <label>Processing time <select id="bulk-processing-time"></select></label>
+          <label id="bulk-chemical-wrap">Chemical <input id="bulk-chemical" placeholder="type, then Enter" size="14"></label>
+          <button type="button" class="btn btn--small bar-btn" id="bulk-duplicate">Duplicate</button>
+          <button type="button" class="btn btn--small bar-btn" id="bulk-remove">Remove</button>
+          <button type="button" class="link-button" id="bulk-clear">Clear selection</button>
+        </span>
+      </div>
+
+      <div class="table-wrap">
+        <table class="sample-table" id="sample-table">
+          <thead><tr id="sample-head"></tr></thead>
+          <tbody id="samples"></tbody>
+        </table>
+      </div>
+      <div class="sample-tools">
+        <button type="button" class="btn btn--secondary btn--small" id="add-sample">Add row</button>
+        <label class="paste-label">or paste several IDs
+          <textarea id="paste-ids" rows="1" placeholder="One ID per line"></textarea></label>
+        <button type="button" class="btn btn--secondary btn--small" id="add-pasted">Add these</button>
+      </div>
+
+      <fieldset class="analyses" id="analysis-panel" data-path="analysis_ids">
+        <legend id="analysis-legend">Analyses</legend>
+        <div class="analysis-collapsed" id="analysis-collapsed" hidden>
+          <span id="analysis-summary-text"></span>
+          <button type="button" class="btn btn--secondary btn--small" id="analysis-edit">Edit analyses</button>
+        </div>
+        <div id="analysis-body">
+          <p class="hint" id="analysis-note"></p>
+          <div class="analysis-groups" id="analysis-groups"></div>
+          <button type="button" class="btn btn--primary btn--small" id="analysis-done">Done</button>
+        </div>
+      </fieldset>
+    </section>
+
+    <button type="submit" class="btn btn--primary" id="submit-button" disabled>Submit request</button>
+  </form>
+
+{% endblock %}
+
+{% block scripts %}<script src="{{ url_for('static', path='js/request_form.js') }}" defer></script>{% endblock %}

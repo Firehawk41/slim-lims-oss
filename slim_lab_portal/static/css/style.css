@@ -1,0 +1,420 @@
+/* YourLab theme
+   Palette: steel blue primary (#2B5B8E), white background, dark gray body text
+   Flat, professional B2B aesthetic — no gradients, no shadows, no decoration */
+
+:root {
+  --color-primary: #2B5B8E;
+  --color-primary-dark: #20456C;
+  --color-text: #333333;
+  --color-text-muted: #666666;
+  --color-border: #D5D9DE;
+  --color-bg: #FFFFFF;
+  --color-section-bg: #F5F7F9;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  line-height: 1.5;
+}
+
+a {
+  color: var(--color-primary);
+}
+
+/* ---------- Header ---------- */
+
+.site-header {
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.site-header__inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1em 1.5em;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.site-header__brand {
+  font-size: 1.25em;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+.site-header__nav {
+  display: flex;
+  gap: 1.5em;
+}
+
+.site-header__nav a {
+  color: var(--color-text);
+  text-decoration: none;
+  font-size: 0.95em;
+}
+
+.site-header__nav a:hover,
+.site-header__nav a.is-active {
+  color: var(--color-primary);
+  border-bottom: 2px solid var(--color-primary);
+}
+
+/* Logout is a POST (CSRF-protected), styled to look like the other nav links. */
+.nav-form {
+  display: inline;
+  margin: 0;
+}
+
+.nav-link-button {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 0.95em;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.nav-link-button:hover {
+  color: var(--color-primary);
+}
+
+/* ---------- Page / layout ---------- */
+
+.page {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2em 1.5em 3em;
+}
+
+h1 {
+  font-size: 1.6em;
+  margin-bottom: 0.75em;
+}
+
+h2 {
+  font-size: 1.2em;
+  margin-top: 0;
+}
+
+/* ---------- Form sections ---------- */
+
+.form-section {
+  background: var(--color-section-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 1.5em;
+  margin: 0 0 1.5em;
+}
+
+.form-section legend {
+  font-weight: 700;
+  padding: 0 0.5em;
+}
+
+.form-row {
+  margin-bottom: 1em;
+}
+
+.form-row label {
+  display: block;
+  margin-bottom: 0.3em;
+  font-size: 0.9em;
+  color: var(--color-text-muted);
+}
+
+/* ---------- Inputs ---------- */
+
+input[type="text"],
+input[type="tel"],
+input[type="email"],
+input[type="password"],
+input:not([type]),
+select,
+textarea {
+  width: 100%;
+  max-width: 420px;
+  padding: 0.5em 0.6em;
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font: inherit;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+/* ---------- Third-party widget overrides ---------- */
+
+/* Tagify: make the tag container match plain inputs */
+.tagify {
+  background: var(--color-bg);
+  border-color: var(--color-border);
+  border-radius: 3px;
+  max-width: 420px;
+}
+
+.tagify:focus-within {
+  border-color: var(--color-primary);
+}
+
+/* Select2: make the selection box match plain inputs */
+.select2-container .select2-selection--multiple,
+.select2-container .select2-selection--single {
+  background: var(--color-bg);
+  border-color: var(--color-border);
+  border-radius: 3px;
+}
+
+.select2-container--default.select2-container--focus .select2-selection--multiple,
+.select2-container--default.select2-container--open .select2-selection--single {
+  border-color: var(--color-primary);
+}
+
+input[type="radio"] {
+  margin-right: 0.4em;
+}
+
+.form-row--radio {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1.25em;
+}
+
+.form-row__radio-label {
+  font-size: 0.9em;
+  color: var(--color-text-muted);
+}
+
+.radio-option {
+  display: flex;
+  align-items: center;
+  font-size: 0.9em;
+  color: var(--color-text);
+  margin-bottom: 0;
+  cursor: pointer;
+}
+
+/* ---------- Buttons ---------- */
+
+.btn {
+  display: inline-block;
+  padding: 0.6em 1.4em;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.btn--primary {
+  background: var(--color-primary);
+  color: #FFFFFF;
+}
+
+.btn--primary:hover {
+  background: var(--color-primary-dark);
+}
+
+.btn--primary:disabled {
+  background: var(--color-border);
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+}
+
+.btn--secondary {
+  background: var(--color-bg);
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.btn--secondary:hover {
+  background: var(--color-section-bg);
+}
+
+/* ---------- Sample rows ---------- */
+
+.sample-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75em;
+  align-items: center;
+  padding: 0.75em 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.sample-row:last-child {
+  border-bottom: none;
+}
+
+.sample-row input,
+.sample-row select {
+  width: auto;
+  flex: 1 1 160px;
+  max-width: none;
+}
+
+.sample-row .btn--icon {
+  flex: 0 0 auto;
+  padding: 0.4em 0.6em;
+  line-height: 1;
+  font-size: 1.1em;
+}
+
+/* ---------- Profile page ---------- */
+
+.profile-email {
+  color: var(--color-text-muted);
+  font-size: 0.9em;
+  margin-bottom: 1.5em;
+}
+
+.profile-saved {
+  background: #EAF5EA;
+  border: 1px solid #5DA75D;
+  border-radius: 3px;
+  padding: 0.75em 1em;
+  margin-bottom: 1.25em;
+  font-size: 0.9em;
+}
+
+.field-error {
+  display: block;
+  color: #C0392B;
+  font-size: 0.85em;
+  margin-top: 0.25em;
+}
+
+/* ---------- Credit card notice ---------- */
+
+.cc-notice {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.9em;
+}
+
+/* ---------- Error / alert ---------- */
+
+.flash {
+  border: 1px solid var(--color-primary);
+  border-radius: 3px;
+  padding: 0.75em 1em;
+  margin-bottom: 1em;
+}
+
+.flash--error {
+  border-color: #C0392B;
+  background: #FBEAEA;
+}
+
+.form-error {
+  border: 1px solid #C0392B;
+  background: #FBEAEA;
+  border-radius: 3px;
+  padding: 0.75em 1em;
+  white-space: pre-line;
+}
+
+.hidden {
+  display: none;
+}
+
+/* ---------- Modal ---------- */
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(43, 91, 142, 0.5);
+  z-index: 1000;
+}
+
+.modal-box {
+  background: var(--color-bg);
+  margin: 8vh auto;
+  padding: 2em;
+  width: 90%;
+  max-width: 480px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+}
+
+.json-summary {
+  max-height: 300px;
+  overflow: auto;
+  background: var(--color-section-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  padding: 1em;
+  font-size: 0.85em;
+}
+
+/* ---------- Footer ---------- */
+
+.site-footer {
+  background: var(--color-primary);
+  color: #FFFFFF;
+  margin-top: 3em;
+  padding: 2.5em 1.5em 1.5em;
+}
+
+.site-footer__links {
+  max-width: 1100px;
+  margin: 0 auto 2em;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2em;
+  justify-content: space-between;
+}
+
+.site-footer__col h3 {
+  font-size: 0.95em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0 0 0.75em;
+}
+
+.site-footer__col a {
+  display: block;
+  color: #FFFFFF;
+  text-decoration: none;
+  opacity: 0.85;
+  font-size: 0.9em;
+  margin-bottom: 0.5em;
+}
+
+.site-footer__col a:hover {
+  opacity: 1;
+  text-decoration: underline;
+}
+
+.site-footer__contact {
+  text-align: center;
+  border-top: 1px solid rgba(255, 255, 255, 0.3);
+  padding-top: 1.5em;
+}
+
+.site-footer__contact p {
+  margin: 0.25em 0;
+  font-size: 0.9em;
+  opacity: 0.9;
+}

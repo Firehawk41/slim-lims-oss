@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% from "_macros.html" import badge with context %}
+
+{% block title %}{{ s.tr_number }} — YourLab{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <h1>{{ s.tr_number }} {{ badge(s.status) }} {% if s.is_rush %}<span class="badge badge--rush">RUSH</span>{% endif %}</h1>
+    <span>
+      {% if current_user.is_staff and s.status not in (TRStatus.SUBMITTED, TRStatus.CANCELLED) %}
+        <a href="{{ url_for('results_report', tr_number=s.tr_number) }}">Results report</a> ·
+      {% endif %}
+      {% if s.status in (TRStatus.PARTIAL_REPORT, TRStatus.COMPLETE_REPORT, TRStatus.INVOICED) %}
+        <a href="{{ url_for('issued_reports', tr_number=s.tr_number) }}">Issued reports</a> ·
+      {% endif %}
+      <a class="muted" href="{{ url_for('get_submission', tr_number=s.tr_number) }}">View as JSON</a>
+    </span>
+  </div>
+
+  <section class="form-section">
+    <dl class="kv">
+      <dt>Customer</dt><dd>{{ s.customer_snapshot.name }}{% if s.location %} — {{ s.location }}{% endif %}<br>
+        <span class="muted">{{ s.customer_snapshot.address_line_1 }} {{ s.customer_snapshot.address_line_2 }}</span></dd>
+      <dt>Request type</dt><dd>{{ s.request_type.label }}</dd>
+      <dt>Contact</dt><dd>{{ s.customer_contact }}, {{ s.customer_phone }}</dd>
+      <dt>Payment</dt><dd>{{ s.payment_method.label }}{% if s.po_number %} — {{ s.po_number }}{% endif %}</dd>
+      <dt>Results to</dt><dd>{{ s.results_to|join(", ") }}{% if s.results_cc %} <span class="muted">(cc {{ s.results_cc|join(", ") }})</span>{% endif %}</dd>
+      <dt>Invoice to</dt><dd>{{ s.invoice_to|join(", ") }}{% if s.invoice_cc %} <span class="muted">(cc {{ s.invoice_cc|join(", ") }})</span>{% endif %}</dd>
+      <dt>Submitted</dt><dd>{{ s.submitted_at.strftime("%Y-%m-%d %H:%M UTC") }} by {{ s.submitted_by.display }}</dd>
+      {% if s.receipt %}
+        <dt>Received</dt><dd>{{ s.receipt.date_received }} by {{ s.receipt.received_by }}</dd>
+        <dt>Service date</dt><dd>{{ s.effective_service_date }}</dd>
+      {% else %}
+        <dt>Expected arrival</dt><dd>{{ s.expected_arrival_date or "—" }}</dd>
+        {% if s.estimated_service_date %}<dt>Estimated results</dt><dd>~{{ s.estimated_service_date }} <span class="muted">(estimate; confirmed when samples arrive)</span></dd>{% endif %}
+      {% endif %}
+    </dl>
+  </section>
+
+  <h2>Samples</h2>
+  {% for d in samples %}{% set smp = d.sample %}
+    <section class="sample-card">
+      <h3>{{ smp.position }}. {{ smp.sample_name }}</h3>
+      <dl class="kv">
+        {% if smp.wafer_size %}
+          <dt>Wafer</dt><dd>{{ smp.wafer_size.label }}, results in {{ smp.reporting_unit.label }}</dd>
+        {% else %}
+          <dt>Chemical</dt><dd>{{ smp.chemical_name }}
+            {% if current_user.is_staff and s.request_type.value == 1 %}
+              {% if d.slim_chemical %}<span class="muted">→ SLIM: {{ d.slim_chemical }}</span>
+              {% else %}<span class="badge badge--rush">Not matched to SLIM</span>{% endif %}
+            {% endif %}</dd>
+          {% if current_user.is_staff and s.request_type.value == 1 and s.status != TRStatus.SUBMITTED %}
+            <dt>Match to SLIM</dt><dd>
+              <form method="post" action="{{ url_for('match_chemical_form', tr_number=s.tr_number, position=smp.position) }}" class="inline-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+                <select name="chemical_id" aria-label="SLIM chemical for sample {{ smp.position }}">
+                  <option value="">Choose…</option>
+                  {% for c in chemicals %}<option value="{{ c.id }}" {% if c.id == smp.chemical_id %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
+                </select>
+                <button type="submit" class="btn btn--secondary btn--small">{{ "Change" if smp.chemical_id else "Match" }}</button>
+                <span class="hint">Not listed? Create it in SLIM, reload reference data, then match.</span>
+              </form></dd>
+          {% endif %}
+        {% endif %}
+        <dt>Processing time</dt><dd>{{ smp.processing_time.portal_label }}{% if smp.requested_time %} — report by {{ smp.requested_time.strftime("%H:%M") }}{% endif %}</dd>
+        <dt>Analyses</dt><dd>{{ d.analyses|join(", ") or "—" }}</dd>
+        {% if d.elements %}<dt>Additional elements</dt><dd>{{ d.elements|join(", ") }}</dd>{% endif %}
+        {% if smp.additional_notes %}<dt>Notes</dt><dd>{{ smp.additional_notes }}</dd>{% endif %}
+      </dl>
+    </section>
+  {% endfor %}
+
+  {% if current_user.is_staff and s.status == TRStatus.SUBMITTED %}
+    <section class="form-section">
+      <h2>Next step</h2>
+      <p>When the samples arrive, check them in: confirm the receipt and match the chemicals to SLIM.</p>
+      <a class="btn btn--primary" href="{{ url_for('check_in_page', tr_number=s.tr_number) }}">Check in</a>
+    </section>
+  {% endif %}
+
+  {% if next_statuses %}
+    <section class="form-section" aria-labelledby="actions-heading">
+      <h2 id="actions-heading">Actions</h2>
+      {% for st in next_statuses if st != TRStatus.RECEIVED %}
+        <form method="post" action="{{ url_for('change_status_form', tr_number=s.tr_number) }}" class="action-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+          <input type="hidden" name="to_status" value="{{ st.value }}">
+          <label>Note <input type="text" name="note" maxlength="2000" placeholder="optional"></label>
+          <button type="submit" class="btn {% if st == TRStatus.CANCELLED %}btn--danger{% else %}btn--primary{% endif %}">
+            {% if st == TRStatus.CANCELLED %}{{ "Reject request" if current_user.is_staff and s.status == TRStatus.SUBMITTED else "Cancel request" }}{% else %}Mark {{ st.label|lower }}{% endif %}
+          </button>
+        </form>
+      {% endfor %}
+    </section>
+  {% endif %}
+
+  <h2>History</h2>
+  <ol class="history" reversed>
+    {% for e in s.status_history|reverse %}
+      <li><strong>{{ e.to_status.label }}</strong> — {{ e.at.strftime("%Y-%m-%d %H:%M UTC") }} by {{ e.actor.display }}{% if e.note %}: <em>{{ e.note }}</em>{% endif %}</li>
+    {% endfor %}
+  </ol>
+{% endblock %}

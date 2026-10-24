@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    name: test (py${{ matrix.python }}, ${{ matrix.db }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12"]
+        db: [sqlite, postgres]
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: portal_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      TEST_DATABASE_URL: ${{ matrix.db == 'postgres' && 'postgresql+psycopg2://postgres:postgres@localhost:5432/portal_test' || '' }}
+    steps:
+      - uses: actions/checkout@v5
+      # The report engine's demo seed (demo/demo.py) for the bridge and real-report tests, beside this
+      # checkout where they look for it.
+      - run: git clone --depth 1 https://github.com/Firehawk41/slim-report-engine-oss ../slim-report-engine-oss
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+      # slim-data and slim-domain come from their GitHub repos (pyproject.toml); the report engine
+      # too, so the bridge tests run instead of skipping. slim-domain is named again here: the report
+      # engine asks for it by bare name, which pip won't match to the editable install's git URL.
+      - run: >-
+          pip install -e ".[dev]"
+          "slim-domain @ git+https://github.com/Firehawk41/slim-domain-oss@main"
+          "slim-report-engine @ git+https://github.com/Firehawk41/slim-report-engine-oss@main"
+      - run: pytest -q

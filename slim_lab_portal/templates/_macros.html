@@ -1,0 +1,50 @@
+{% macro badge(status) -%}
+  <span class="badge badge--{{ status.name|lower }}">{{ status.label }}</span>
+{%- endmacro %}
+
+{% macro request_table(result, show_customer=false) -%}
+  {% if result.items %}
+    <table class="table">
+      <thead>
+        <tr>
+          <th scope="col">TR</th>
+          {% if show_customer %}<th scope="col">Customer</th>{% endif %}
+          <th scope="col">Type</th>
+          <th scope="col">Samples</th>
+          <th scope="col">Submitted</th>
+          <th scope="col">Service date</th>
+          <th scope="col">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in result.items %}
+          <tr>
+            <td><a href="{{ url_for('request_detail', tr_number=s.tr_number) }}">{{ s.tr_number }}</a>
+              {% if s.is_rush %}<span class="badge badge--rush">RUSH</span>{% endif %}
+              {% if current_user and current_user.is_staff and s.request_type.value == 1 and s.samples|selectattr("chemical_id", "none")|list %}<span class="badge badge--submitted" title="Chemical not matched to SLIM">match chemical</span>{% endif %}</td>
+            {% if show_customer %}<td>{{ s.customer_snapshot.name }}{% if s.location %} ({{ s.location }}){% endif %}</td>{% endif %}
+            <td>{{ s.request_type.label }}</td>
+            <td>{{ s.samples|length }}</td>
+            <td>{{ s.submitted_at.strftime("%Y-%m-%d") }}</td>
+            <td>{% if s.effective_service_date %}{{ s.effective_service_date }}{% elif s.estimated_service_date %}~{{ s.estimated_service_date }} (est.){% else %}—{% endif %}</td>
+            <td>{{ badge(s.status) }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="muted">No testing requests yet.</p>
+  {% endif %}
+{%- endmacro %}
+
+{% macro pager(result, base_params) -%}
+  {% set pages = ((result.total + result.per_page - 1) // result.per_page) %}
+  {% if pages > 1 %}
+    <nav class="pager" aria-label="Pages">
+      {% for p in range(1, pages + 1) %}
+        {% if p == result.page %}<span aria-current="page">{{ p }}</span>
+        {% else %}<a href="?{{ base_params }}page={{ p }}">{{ p }}</a>{% endif %}
+      {% endfor %}
+    </nav>
+  {% endif %}
+{%- endmacro %}

@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% from "_macros.html" import badge with context %}
+
+{% block title %}Check in {{ s.tr_number }} — YourLab{% endblock %}
+{% block body_class %}page-wide{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <h1>Check in {{ s.tr_number }} {{ badge(s.status) }}</h1>
+    <a href="{{ url_for('request_detail', tr_number=s.tr_number) }}">Back to request</a>
+  </div>
+  <p class="muted">{{ s.customer_snapshot.name }}{% if s.location %} — {{ s.location }}{% endif %} ·
+    {{ s.request_type.label }} · {{ s.samples|length }} sample{{ "" if s.samples|length == 1 else "s" }} ·
+    submitted {{ s.submitted_at.strftime("%Y-%m-%d") }} by {{ s.submitted_by.display }}</p>
+
+  <form method="post" action="{{ url_for('check_in_form', tr_number=s.tr_number) }}" id="check-in-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+
+    <section class="form-section">
+      <h2>Receipt</h2>
+      <div class="grid-2">
+        <label class="field">Date received
+          <input type="date" name="date_received" value="{{ lab_today }}" max="{{ lab_today }}" required></label>
+        <label class="field">Received by (initials)
+          <input name="received_by" value="{{ current_user.initials }}" maxlength="10" required></label>
+      </div>
+      <label class="field">Note <input name="note" maxlength="2000"
+        placeholder="optional, e.g. sample 4 not received, cooler at 6 °C"></label>
+    </section>
+
+    <section class="form-section">
+      <h2>Samples</h2>
+      {% if s.request_type.value == 1 %}
+        <p class="hint">Match each chemical to SLIM. A chemical that isn't listed must be created in SLIM first,
+          then reload reference data on the Requests page.</p>
+      {% endif %}
+      <table class="table check-in-table">
+        <thead><tr>
+          <th scope="col">#</th><th scope="col">Sample ID</th>
+          <th scope="col">{{ "Wafer" if s.request_type.value == 3 else "Chemical (as submitted)" }}</th>
+          {% if s.request_type.value == 1 %}<th scope="col">SLIM chemical</th>{% endif %}
+          <th scope="col">Processing time</th><th scope="col">Analyses</th>
+        </tr></thead>
+        <tbody>
+          {% for d in samples %}{% set smp = d.sample %}
+            <tr>
+              <td>{{ smp.position }}</td>
+              <td>{{ smp.sample_name }}</td>
+              <td>{% if smp.wafer_size %}{{ smp.wafer_size.label }}, {{ smp.reporting_unit.label }}{% else %}{{ smp.chemical_name }}{% endif %}</td>
+              {% if s.request_type.value == 1 %}
+                <td>
+                  <select name="chemical_{{ smp.position }}" required aria-label="SLIM chemical for sample {{ smp.position }}">
+                    <option value="">Choose…</option>
+                    {% for c in chemicals %}<option value="{{ c.id }}" {% if c.id == smp.chemical_id %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
+                  </select>
+                </td>
+              {% endif %}
+              <td>{{ smp.processing_time.portal_label }}{% if smp.requested_time %} — by {{ smp.requested_time.strftime("%H:%M") }}{% endif %}</td>
+              <td>{{ d.analyses|join(", ") }}{% if d.elements %}<br><span class="muted">+ {{ d.elements|join(", ") }}</span>{% endif %}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    <button type="submit" class="btn btn--primary">Accept into LIMS</button>
+  </form>
+
+  <section class="form-section" aria-labelledby="reject-heading">
+    <h2 id="reject-heading">Reject instead</h2>
+    <form method="post" action="{{ url_for('change_status_form', tr_number=s.tr_number) }}" class="action-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+      <input type="hidden" name="to_status" value="{{ TRStatus.CANCELLED.value }}">
+      <label>Reason <input name="note" maxlength="2000" required size="40" placeholder="e.g. samples never arrived"></label>
+      <button type="submit" class="btn btn--danger">Reject request</button>
+    </form>
+  </section>
+{% endblock %}
