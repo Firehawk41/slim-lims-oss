@@ -1,0 +1,60 @@
+code,slim_name,group,request_types,portal_selectable
+10_elements_icpms,10 Elements,Metals,CWF,1
+10_elements_icpoes,10 Elements (ICP-OES),Metals,CW,1
+26_elements_icpms,26 Elements,Metals,CWF,1
+26_elements_icpoes,26 Elements (ICP-OES),Metals,CW,1
+36_elements_icpms,36 Elements,Metals,CWF,1
+36_elements_icpoes,36 Elements (ICP-OES),Metals,CW,1
+36_elements_microwave,36 Elements (Microwave Digestion),Metals,C,1
+36_elements_organic_matrix,36 Elements (Organic Matrix),Metals,C,1
+36_elements_replicates,36 Elements (with reported replicates),Metals,CW,1
+67_elements_icpms,67 Elements,Metals,CWF,1
+usp_elements_icpms,USP Elements,Metals,CW,1
+list2_36_elements,List #2 36 Elements,Metals,F,1
+additional_element_icpms,Additional Element,Metals,CWF,0
+additional_element_icpoes,Additional Element (ICP-OES),Metals,CW,0
+additional_element_microwave,Additional Element (Microwave Digestion),Metals,C,0
+additional_element_organic_matrix,Additional Element (Organic Matrix),Metals,C,0
+4_anions,4 Anions,Anions,CWF,1
+5_anions,5 Anions,Anions,CWF,1
+7_anions,7 Anions,Anions,CWF,1
+anions,Anions,Anions,CW,1
+4_anions_ms,4 Anions + MS Confirmation,Anions,CW,1
+5_anions_ms,5 Anions + MS Confirmation,Anions,CW,1
+7_anions_ms,7 Anions + MS Confirmation,Anions,CW,1
+anions_ms,Anions + MS Confirmation,Anions,CW,1
+anions_organic,Anions + Organic Anions,Anions,CW,1
+anions_organic_ms,Anions + Organic Anions + MS Confirmation,Anions,CW,1
+cl,Cl,Anions,CW,1
+organic_anions,Organic Anions,Anions,CW,1
+acetate_formate,Acetate and Formate,Anions,CW,1
+6_cations,6 Cations,Cations,CW,1
+cations,Cations,Cations,CW,1
+nh4,NH4,Cations,CW,1
+methylamines,Methylamines,Cations,CW,1
+gbp,GBP,Cations,CW,1
+gbp_ms,GBP + MS Confirmation,Cations,CW,1
+toc,TOC,Organics,W,1
+tic,TIC,Organics,W,1
+gc_fid,GC-FID,Organics,CW,1
+gc_ms,GC-MS,Organics,CW,1
+conductivity,Conductivity,Physical,CW,1
+density,Density,Physical,CW,1
+hardness,Hardness,Physical,CW,1
+liquid_particle_count,Liquid Particle Count,Physical,CW,1
+ph,pH,Physical,CW,1
+alkalinity,Alkalinity,Physical,CW,1
+apha_color,APHA Color,Physical,CW,1
+uv_vis,UV-Vis,Physical,CW,1
+moisture,Moisture,Physical,CW,1
+moisture_kf,Moisture (Karl Fischer),Physical,CW,1
+total_silicon,Total Silicon,Silicon,CW,1
+dissolved_silicon,Dissolved Silicon,Silicon,CW,1
+dissolved_total_silicon,Dissolved and Total Si,Silicon,CW,1
+bacteria_count,Bacteria Count,Microbiology,W,1
+assay,Assay,Assay & titration,CW,1
+mixed_acid_assay,Mixed Acid Assay,Assay & titration,C,1
+sn2_iodine_titration,Sn+2 Iodine Titration,Assay & titration,C,1
+free_acid,Determination of Free Acid,Assay & titration,C,1
+ts_slg,Analysis of TS-SLG,Assay & titration,C,1
+h2o2_testing,H2O2 Testing,Assay & titration,C,1

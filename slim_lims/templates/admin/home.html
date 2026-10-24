@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% from "_macros.html" import request_table, pager with context %}
+
+{% block title %}Requests — YourLab{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <h1>Testing requests</h1>
+    <a class="btn btn--primary" href="{{ url_for('new_request') }}">New request</a>
+  </div>
+
+  <form method="get" class="filters" aria-label="Filter requests">
+    <label>Status
+      <select name="status">
+        <option value="">All</option>
+        {% for st in statuses %}<option value="{{ st.value }}" {% if filters.status == st.value %}selected{% endif %}>{{ st.label }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Type
+      <select name="request_type">
+        <option value="">All</option>
+        {% for rt in request_types %}<option value="{{ rt.value }}" {% if filters.request_type == rt.value %}selected{% endif %}>{{ rt.label }}</option>{% endfor %}
+      </select>
+    </label>
+    <button type="submit" class="btn btn--secondary">Filter</button>
+    <span class="muted">{{ result.total }} request{{ "" if result.total == 1 else "s" }}</span>
+  </form>
+
+  {{ request_table(result, show_customer=true) }}
+  {{ pager(result, "status=" ~ (filters.status or "") ~ "&request_type=" ~ (filters.request_type or "") ~ "&") }}
+
+  <section class="form-section" aria-labelledby="reference-heading">
+    <h2 id="reference-heading">SLIM reference data</h2>
+    {% if reference_status %}
+      {% if reference_status.loaded_at %}
+        <p>Last loaded {{ reference_status.loaded_at.strftime("%Y-%m-%d %H:%M UTC") }}:
+          {{ reference_status.counts.customers }} customers,
+          {{ reference_status.counts.chemicals }} chemicals,
+          {{ reference_status.counts.elements }} elements,
+          {{ reference_status.counts.analyses }} analyses
+          ({{ reference_status.counts.portal_analyses }} offered in the portal).</p>
+      {% else %}
+        <p>Not loaded yet.</p>
+      {% endif %}
+      {% if reference_status.last_error %}
+        <div class="form-error" role="alert">Last refresh failed
+          ({{ reference_status.last_error_at.strftime("%Y-%m-%d %H:%M UTC") }}): {{ reference_status.last_error }}</div>
+      {% endif %}
+    {% endif %}
+    <form method="post" action="{{ url_for('refresh_reference') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+      <button type="submit" class="btn btn--secondary">Reload now</button>
+    </form>
+  </section>
+{% endblock %}

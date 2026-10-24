@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% block title %}Batch {{ view.code }} — YourLab{% endblock %}
+{% block body_class %}page-wide{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <h1>Prep batch {{ view.code }}</h1>
+    <a href="{{ url_for('results_home') }}">All batches</a>
+  </div>
+  <p class="muted">{{ view.prep_method }} · {{ view.samples|length }} sample{{ "" if view.samples|length == 1 else "s" }}:
+    {% for s in view.samples %}{{ s }}{{ ", " if not loop.last }}{% endfor %}</p>
+
+  {% macro csrf() %}<input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">{% endmacro %}
+  {% macro solo_box() %}
+    <label class="check"><input type="checkbox" name="solo" value="true"> Solo: I entered these readings
+      and am signing off alone after the policy's wait; the note is the reason</label>
+  {% endmacro %}
+
+  <section class="form-section" aria-labelledby="batch-actions-heading">
+    <h2 id="batch-actions-heading">Batch</h2>
+    <form method="post" action="{{ url_for('results_review', code=view.code) }}" class="action-form">
+      {{ csrf() }}
+      <label>Review note <input name="note" maxlength="2000"></label>
+      {{ solo_box() }}
+      <button type="submit" class="btn btn--primary">Review every draft</button>
+    </form>
+    <form method="post" action="{{ url_for('results_re_evaluate', code=view.code) }}" class="action-form">
+      {{ csrf() }}
+      <label>Reason <input name="reason" maxlength="500" placeholder="optional"></label>
+      <button type="submit" class="btn btn--secondary">Re-evaluate</button>
+    </form>
+    <p class="hint">Nobody reviews or releases results on readings they entered (four-eyes), unless solo.
+      Accepting a NEEDS SUPERVISOR result and recording an exception need a supervisor.</p>
+  </section>
+
+  {% if release_groups %}
+    <section class="form-section" aria-labelledby="release-heading">
+      <h2 id="release-heading">Release</h2>
+      <p class="hint">Releases the reviewed and cleared results of a sample + analysis; the rest wait.
+        The TR's status moves when a report is issued, not here.</p>
+      {% for sample, analysis_id in release_groups %}
+        {% set analysis = reference.analysis(analysis_id) %}
+        <form method="post" action="{{ url_for('results_release', code=view.code) }}" class="action-form">
+          {{ csrf() }}
+          <input type="hidden" name="sample" value="{{ sample }}">
+          <input type="hidden" name="analysis_id" value="{{ analysis_id }}">
+          <strong>{{ sample }} · {{ analysis.name if analysis else analysis_id }}</strong>
+          <label>Note <input name="note" maxlength="2000"></label>
+          {{ solo_box() }}
+          <button type="submit" class="btn btn--primary btn--small">Release</button>
+        </form>
+      {% endfor %}
+    </section>
+  {% endif %}
+
+  {% if view.results %}
+    <p class="hint">Cups are dilution-corrected. Red: the cups disagreed and the engine believed one of them.
+      Click a result for every step the engine took.</p>
+    <table class="table">
+      <thead><tr>
+        <th scope="col">Sample</th><th scope="col">Analysis</th><th scope="col">Analyte</th>
+        <th scope="col">Cups</th><th scope="col">Believed</th><th scope="col">Recovery</th><th scope="col">Blank</th>
+        <th scope="col">MDL / QL</th><th scope="col" title="half the difference between the two cups">½Δ</th>
+        <th scope="col">Result</th><th scope="col">Verdict</th><th scope="col">Status</th><th scope="col">Version</th><th scope="col">Flags</th>
+        <th scope="col">Actions</th>
+      </tr></thead>
+      <tbody>
+        {% for r in view.results %}
+          {% set analysis = reference.analysis(r.analyte.analysis_id) %}
+          <tr>
+            <td><a href="{{ url_for('request_detail', tr_number=r.sample.tr_number) }}">{{ r.sample }}</a></td>
+            <td>{{ analysis.name if analysis else r.analyte.analysis_id }}</td>
+            <td>{{ r.analyte.code }}</td>
+            {% set c = r.cups %}
+            <td class="cups{{ ' cups--disagree' if c.agree == false }}">{{ c.cups|join(" / ") }}</td>
+            <td>{% if c.chosen %}cup {{ c.chosen }} · {{ c.why.replace("_", " ") }}{% elif c.agree %}mean{% elif c.why %}{{ c.why.replace("_", " ") }}{% endif %}</td>
+            <td>{% if c.recovery is not none %}{{ (c.recovery * 100)|round|int }}%{% if c.recovery_basis and c.recovery_basis != "own" %} ({{ c.recovery_basis.replace("_", " ") }}){% endif %}{% endif %}</td>
+            <td>{{ c.blank or "" }}</td>
+            <td class="cups">{{ c.mdl or "" }}{% if c.ql %} / {{ c.ql }}{% endif %}</td>
+            <td>{{ c.half_delta or "" }}</td>
+            <td><a href="{{ url_for('results_trace', code=view.code) }}?sample={{ r.sample|string|urlencode }}&amp;analysis_id={{ r.analyte.analysis_id }}&amp;analyte={{ r.analyte.code|urlencode }}" title="every step the engine took">{{ r.text }}</a></td>
+            <td>{{ r.verdict.name.replace("_", " ").lower() }}</td>
+            <td>{{ r.status.name.lower() }}{% if r.rerun_requested %} · rerun requested{% endif %}{% if r.correction_started %} · correcting{% endif %}</td>
+            <td>v{{ r.version }}</td>
+            <td>{% for f in r.flags %}<span title="{{ f.message }}">{{ f.code }}</span> ({{ f.severity.name.lower() }}){{ "; " if not loop.last }}{% endfor %}</td>
+            <td>
+              {% if r.status.name != "REJECTED" %}
+                <details>
+                  <summary>Act</summary>
+                  {% if r.status.name == "RELEASED" %}
+                    {% set choices = [(actions.CORRECT, "Start a correction", "reason")] %}
+                  {% else %}
+                    {% set choices = [] %}
+                    {% if r.verdict.name == "NEEDS_SUPERVISOR" %}{% set choices = choices + [(actions.ACCEPT, "Accept", "accept")] %}{% endif %}
+                    {% if r.verdict.name == "RERUN" %}{% set choices = choices + [(actions.EXCEPTION, "Release by exception", "exception+reason")] %}{% endif %}
+                    {% set choices = choices + [(actions.RERUN, "Request a rerun", ""), (actions.REJECT, "Reject", "reason")] %}
+                  {% endif %}
+                  {% for action, label, needs in choices %}
+                    <form method="post" action="{{ url_for('results_act', code=view.code) }}" class="action-form">
+                      {{ csrf() }}
+                      <input type="hidden" name="sample" value="{{ r.sample }}">
+                      <input type="hidden" name="analysis_id" value="{{ r.analyte.analysis_id }}">
+                      <input type="hidden" name="analyte" value="{{ r.analyte.code }}">
+                      <input type="hidden" name="action" value="{{ action.value }}">
+                      {% set kind = needs.split("+")[0] %}
+                      {% if kind in categories %}<label>Reason category (printed on the report)
+                        <select name="reason_category" required>
+                          <option value="">Choose…</option>
+                          {% for text in categories[kind] %}<option>{{ text }}</option>{% endfor %}
+                        </select></label>{% endif %}
+                      <label>{{ "Reason" if "reason" in needs else "Note" }}
+                        <input name="note" maxlength="2000" {% if "reason" in needs %}required{% endif %}></label>
+                      <button type="submit" class="btn btn--secondary btn--small">{{ label }}</button>
+                    </form>
+                  {% endfor %}
+                </details>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="muted">No results yet.</p>
+  {% endif %}
+{% endblock %}

@@ -1,0 +1,35 @@
+/* Issued reports (spec §13): the lab's report template as a page. Classes come from
+   slim-report-engine's html_report (r-<RowStyle>, c<column>, value, below-mdl). */
+.report-paper { background: #fff; color: #1a1a1a; border: 1px solid #d5d9de; padding: 1.5rem; overflow-x: auto; }
+.slim-report { font-family: Calibri, Arial, sans-serif; font-size: 0.9rem; }
+.slim-report__lab { text-align: right; line-height: 1.25; margin-bottom: 0.5rem; }
+.slim-report__lab p { margin: 0; }
+.slim-report__lab p:first-child { font-weight: 700; font-size: 1.1rem; }
+.slim-report__title { font-size: 1.2rem; margin: 0.5rem 0 1rem; }
+.slim-report__tabs { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-bottom: 0.75rem; }
+.slim-report__tabs a { border: 1px solid #b7c2cc; border-bottom: 3px solid #2b5b8e; padding: 0.15rem 0.6rem; text-decoration: none; }
+.slim-report__sheet { margin-bottom: 1.5rem; page-break-after: always; }
+.slim-report__sheet-name { font-size: 0.95rem; color: #555; margin: 0 0 0.25rem; }
+.slim-report__table { border-collapse: collapse; width: 100%; max-width: 52rem; }
+.slim-report__table td, .slim-report__table th { padding: 0.15rem 0.5rem; vertical-align: top; }
+.slim-report__table th { text-align: left; border-bottom: 1px solid #999; }
+.r-SectionTitle td { font-size: 1.15rem; font-weight: 700; padding-top: 0.5rem; }
+.r-NormalBold td { font-weight: 700; }
+.r-NormalBoldBlue td { font-weight: 700; color: #1f4fbf; }
+.r-SampleIdEchoWide td, .r-SampleIdEchoSimple td { padding-top: 1rem; font-weight: 600; }
+.r-ColumnHeader td { background: #dce6f1; border-top: 1px solid #7f9db9; border-bottom: 1px solid #7f9db9; font-weight: 700; }
+.r-DataLabel td { border-bottom: 1px solid #e3e8ee; }
+.r-DataLabel .c2, .r-DataLabel .c3 { white-space: nowrap; }
+.r-SummaryRow td { border-top: 1px solid #7f9db9; font-style: italic; }
+.slim-report td.value { font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+.slim-report td.below-mdl { color: #1f4fbf; }
+.slim-report__notes { margin-top: 1rem; }
+.slim-report__notes h2 { font-size: 1rem; }
+.slim-report__key { margin-top: 1rem; font-size: 0.9em; }
+.slim-report__key h2 { font-size: 1rem; }
+.slim-report__key dt { font-weight: 600; }
+.slim-report__key dd { margin: 0 0 0.4em 0; }
+@media print {
+  .site-header, .site-footer, .page-head, .flash, .muted, .badge { display: none; }
+  .report-paper { border: 0; padding: 0; }
+}

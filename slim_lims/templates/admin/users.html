@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}Users — YourLab{% endblock %}
+
+{% block content %}
+  <h1>Users</h1>
+  <table class="table">
+    <thead><tr><th scope="col">Email</th><th scope="col">Role</th><th scope="col">Customer / initials</th><th scope="col">Lab role</th><th scope="col">Status</th><th scope="col"></th></tr></thead>
+    <tbody>
+      {% for u in users %}
+        <tr>
+          <td>{{ u.email }}</td>
+          <td>{{ u.role }}</td>
+          <td>{% if u.is_staff %}{{ u.initials }}{% else %}{{ customers.get(u.customer_id, "Customer #" ~ u.customer_id) }}{% endif %}</td>
+          <td>{% if u.is_staff %}
+            {% if current_user.lab_role == 3 and u.id != current_user.id %}
+              <form method="post" action="{{ url_for('set_lab_role', user_id=u.id) }}" class="nav-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+                <select name="lab_role" aria-label="Lab role for {{ u.email }}">
+                  {% for id, label in lab_roles.items() %}<option value="{{ id }}" {% if u.lab_role == id %}selected{% endif %}>{{ label }}</option>{% endfor %}
+                </select>
+                <button type="submit" class="btn btn--secondary btn--small">Set</button>
+              </form>
+            {% else %}{{ lab_roles.get(u.lab_role, "—") }}{% endif %}
+          {% endif %}</td>
+          <td>{{ "Active" if u.is_active else "Deactivated" }}</td>
+          <td>{% if u.id != current_user.id %}
+            <form method="post" action="{{ url_for('toggle_user_active', user_id=u.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+              <button type="submit" class="btn btn--secondary btn--small">{{ "Deactivate" if u.is_active else "Reactivate" }}</button>
+            </form>{% endif %}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <section class="form-section" aria-labelledby="new-user-heading">
+    <h2 id="new-user-heading">Add a user</h2>
+    <p class="muted">Customers must already exist in SLIM. Several users can belong to one customer.</p>
+    <form method="post" action="{{ url_for('create_user') }}" class="stack-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+      <label>Email <input type="email" name="email" required></label>
+      <label>Role
+        <select name="role" required>
+          <option value="customer">Customer</option>
+          <option value="staff">Lab staff</option>
+        </select>
+      </label>
+      <label>Customer (customer users)
+        <select name="customer_id">
+          <option value="">—</option>
+          {% for id, name in customers.items() %}<option value="{{ id }}">{{ name }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Initials (staff; the analyst ID in result files) <input type="text" name="initials" maxlength="10" size="5"></label>
+      <label>Lab role (staff{% if current_user.lab_role != 3 %}; only a supervisor can give a higher role{% endif %})
+        <select name="lab_role">
+          {% for id, label in lab_roles.items() %}<option value="{{ id }}">{{ label }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Password (12+ characters) <input type="password" name="password" minlength="12" required autocomplete="new-password"></label>
+      <button type="submit" class="btn btn--primary">Add user</button>
+    </form>
+  </section>
+{% endblock %}

@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% from "_macros.html" import request_table, pager with context %}
+
+{% block title %}My requests — YourLab{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <h1>My testing requests</h1>
+    <a class="btn btn--primary" href="{{ url_for('new_request') }}">New request</a>
+  </div>
+  {{ request_table(result) }}
+  {{ pager(result, "") }}
+{% endblock %}

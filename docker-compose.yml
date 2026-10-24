@@ -1,0 +1,59 @@
+# The portal the way it runs in the SLIM ecosystem: one Postgres shared with SLIM, holding
+# SLIM's reference tables (fictional OSS demo data) and the portal's own tables.
+#
+#   docker compose up --build        then http://127.0.0.1:8000
+#
+# Expects the OSS repos next to this one (~/slim/slim-domain-oss, ~/slim/slim-report-engine-oss);
+# override with SLIM_DOMAIN_OSS_DIR / SLIM_REPORT_ENGINE_OSS_DIR. OSS demo data only -- never
+# point this at the lab's database. slim-lims and Caddy join in the ecosystem compose later.
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: slim
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d slim"]
+      interval: 2s
+      retries: 15
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  # One-shot: portal migrations, SLIM demo reference data (only if SLIM's tables are empty),
+  # analysis catalog. Safe to re-run.
+  seed:
+    build: .
+    environment:
+      DATABASE_URL: postgresql+psycopg2://postgres:postgres@db:5432/slim
+    volumes:
+      - ./scripts:/app/scripts:ro
+      - ${SLIM_DOMAIN_OSS_DIR:-../slim-domain-oss}:/oss/slim-domain-oss:ro
+      - ${SLIM_REPORT_ENGINE_OSS_DIR:-../slim-report-engine-oss}:/oss/slim-report-engine-oss:ro
+    # Copied before installing: pip builds in the source tree, and the mounts are read-only.
+    command: >
+      sh -c "cp -r /oss /tmp/oss
+      && pip install --no-cache-dir -q '/tmp/oss/slim-domain-oss[postgres]' /tmp/oss/slim-report-engine-oss
+      && python scripts/seed_demo.py --oss-report-engine /tmp/oss/slim-report-engine-oss"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  portal:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-key-change-me}
+      DATABASE_URL: postgresql+psycopg2://postgres:postgres@db:5432/slim
+      # slim-lims's API token (docs/SLIM_DOMAIN_V2.md §12); empty = no machine access.
+      LIMS_API_TOKEN: ${LIMS_API_TOKEN:-}
+      # Demo personas ("Continue as...", /demo/personas); DEMO_PERSONAS=false to sign in with passwords only.
+      DEMO_PERSONAS: ${DEMO_PERSONAS:-true}
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+
+volumes:
+  postgres-data:
