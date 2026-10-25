@@ -227,8 +227,9 @@ docs/SLIM_DOMAIN_V2.md
 - Call-in RUSH = outside business hours. Wafer sizes 200 / 300 mm; units atoms/cm² or
   10¹⁰ atoms/cm². Water packages exist in the shape but are not offered yet.
 - Hosting target: portfolio VPS running the whole ecosystem via Docker Compose. `render.yaml`
-  names the web service `slim-lims-oss` (the demo URL) and keeps the database name `labportal-db`
-  (renaming it would make Render create a second database; the free plan allows one).
+  names the web service `slim-lims-oss` (the demo URL) and the database `slim-lims-db` (Postgres
+  database and user `slim_lims`). Renaming the database makes Render create a second one, and the
+  free plan allows one: delete the old database first.
 
 ## Backlog
 
