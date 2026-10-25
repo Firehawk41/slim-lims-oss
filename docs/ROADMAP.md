@@ -46,7 +46,7 @@ with the lab, delivery with Admin.
 | # | Department | Work | Why now |
 |---|---|---|---|
 | 0 | IT | **Jamie:** make slim-lims-oss public; point the Render Blueprint at it; delete `labportal-db` and redeploy; archive LabPortal; drop the slim-lims pair from any local "sync private → OSS" instruction. **Claude:** stale docs (CLAUDE.md still says "portal"), invoicing in the README, ruff in slim-lims-oss CI (about 126 errors today) | The live demo shows what's built |
-| 1 | Lab | `slim-prep`: prep batches, weights and volumes (dilution calculated, not typed), spike amounts with standard lot and expiry, balance and pipette used, who and when, the instrument run list; hands the batch to slim-data's existing batch API. QC sample roles in slim-data (check standard, CRM). One or two instrument file readers | Quality trends need this data |
+| 1 | Lab | ◐ QC sample roles in slim-data ✅ (D-87: CHECK / CRM, `qc_check@1`). `slim-prep`: prep batches, weights and volumes (dilution calculated, not typed), spike amounts with standard lot and expiry, balance and pipette used, who and when, the instrument run list; hands the batch to slim-data's existing batch API. QC sample roles in slim-data (check standard, CRM). One or two instrument file readers | Quality trends need this data |
 | 2 | Quality | `slim-quality` part 1, read-only: QC control charts (Westgard), trends per instrument, analyst, method (pooled precision → uncertainty, §7.6) and customer (turnaround, spec exceedances, a customer's own lot trend). Demo history: months of QC on two instruments with a planted drift, kept off the board. The software validation pack (§7.11) | The third standalone portfolio piece |
 | 3 | Admin + IT | Landing page and architecture diagram (by department) for the sandbox | A visitor understands it in 30 seconds |
 | 4 | Lab + Admin | `slim-samples`: condition on receipt, labels, storage, retention and disposal (§7.4); check-in moves here from the host. Report signatory (Lab), delivery by email and PDF (Admin) | Completes the sample's journey |
@@ -56,10 +56,10 @@ with the lab, delivery with Admin.
 
 ## Open questions
 
-- **Samples and prep: one module or two?** Recommendation: two (`slim-samples`, `slim-prep`). Custody and
-  bench prep have different users and records; one "lab operations" module would save a repo but blur both.
-- **Prep book layout:** the bench's real steps and columns, described by Jamie or read (structure
-  only, nothing copied) from the private slim-raw-data, then invented for the OSS version.
+- ~~Samples and prep: one module or two?~~ Two, decided (slim-data D-86): `slim-prep` now (repo
+  `slim-prep-oss`), `slim-samples` in phase 4.
+- **Prep book layout:** Jamie describes the bench's real steps and columns; the OSS version is invented
+  from that (D-86). slim-prep waits for it.
 - **Landing page timing:** phase 3 as drafted; earlier if a recruiter may look soon.
 
 ## Where things are
