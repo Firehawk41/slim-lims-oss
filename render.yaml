@@ -1,13 +1,13 @@
 # The public demo on Render (free plan): Postgres + the portal, seeded with the OSS demo data.
 # OSS ONLY: PORTAL_ALLOWED_DB_HOSTS is set to this blueprint's own demo database host, nothing else
 # (see slim_lims/oss_guard.py). The service is named for the host this portal becomes
-# (slim-lims-oss.onrender.com). The database keeps its old name on purpose: renaming it here would
-# make Render create a second one, and the free plan allows only one.
+# (slim-lims-oss.onrender.com); the database is slim-lims-db. Renaming the database later makes
+# Render create a second one (the free plan allows one): delete the old database first.
 databases:
-  - name: labportal-db
+  - name: slim-lims-db
     plan: free
-    databaseName: labportal
-    user: labportal
+    databaseName: slim_lims
+    user: slim_lims
 
 services:
   - type: web
@@ -33,11 +33,11 @@ services:
         generateValue: true
       - key: DATABASE_URL
         fromDatabase:
-          name: labportal-db
+          name: slim-lims-db
           property: connectionString
       - key: PORTAL_ALLOWED_DB_HOSTS
         fromDatabase:
-          name: labportal-db
+          name: slim-lims-db
           property: host
       - key: DEMO_PERSONAS
         value: "true"
