@@ -63,8 +63,8 @@ def seeded(engine, db, reference):
 
 def test_every_scenario_runs_on_its_own_received_tr(db, seeded):
     assert list(seeded) == ["clean_pass", "cups_disagree", "scale_fault", "pooled_spike", "below_mdl",
-                            "rerun_exception", "accepted", "amended", "line_by_line"]
-    assert list(seeded.values()) == [f"TR{n:05d}" for n in range(1, 10)]
+                            "rerun_exception", "accepted", "amended", "line_by_line", "qc_failed"]
+    assert list(seeded.values()) == [f"TR{n:05d}" for n in range(1, 11)]
     tr = TRSubmissionRepository(db).get_by_tr_number(seeded["cups_disagree"])
     assert tr.customer_id == 2 and tr.samples[0].analysis_ids == (TEN,) and tr.samples[0].chemical_name == "IPA"
     analyses = {name: TRSubmissionRepository(db).get_by_tr_number(number).samples[0].analysis_ids

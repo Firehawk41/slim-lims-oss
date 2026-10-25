@@ -23,11 +23,11 @@ def where(columns, tr_number):
 
 
 def test_columns_follow_what_happened(db, seeded, reference):
-    TRSubmissionRepository(db).add(submission(samples=(sample(1, analysis_ids=(TEN,)),)))  # TR00010: expected
+    new = TRSubmissionRepository(db).add(submission(samples=(sample(1, analysis_ids=(TEN,)),))).tr_number
     db.commit()
     columns = b.board(db, persona(db, "sue@demo.example"), reference)
-    assert where(columns, "TR00010")[0] == "expected"
-    assert where(columns, "TR00010")[1].chips[0].state == "expected"
+    assert where(columns, new)[0] == "expected"
+    assert where(columns, new)[1].chips[0].state == "expected"
     assert where(columns, seeded["scale_fault"])[0] == "in_analysis"  # nothing reviewed yet
     assert {c.state for c in where(columns, seeded["scale_fault"])[1].chips} == {"to_review"}
     assert where(columns, seeded["cups_disagree"])[0] == "ready_to_report"  # released, never issued
@@ -39,6 +39,7 @@ def test_columns_follow_what_happened(db, seeded, reference):
     assert clean[1].batches == [f"PB-{seeded['clean_pass'][2:]}"] and clean[1].invoice.paid_on is not None
     assert where(columns, seeded["rerun_exception"])[0] == "invoice_sent"
     assert where(columns, seeded["amended"])[0] == "to_invoice"
+    assert where(columns, seeded["qc_failed"])[0] == "in_analysis"  # check standard failed: rerun (D-87)
 
 
 def test_needs_me_narrows_by_lab_role(db, seeded, reference):
