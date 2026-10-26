@@ -1,4 +1,4 @@
-"""The portal attaches to the OSS demo ecosystem only (slim_lims/oss_guard.py)."""
+"""The app attaches to the OSS demo ecosystem only (slim_lims/oss_guard.py)."""
 
 import re
 from pathlib import Path

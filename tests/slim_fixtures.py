@@ -1,4 +1,4 @@
-"""Creates SLIM reference tables (from the portal's read-only definitions) with tiny data."""
+"""Creates SLIM reference tables (from the app's read-only definitions) with tiny data."""
 
 from slim_lims import slim_tables as t
 

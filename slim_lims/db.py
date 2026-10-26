@@ -1,6 +1,6 @@
-"""SQLAlchemy 2 engine, session factory and the declarative base for portal-owned tables.
+"""SQLAlchemy 2 engine, session factory and the declarative base for app-owned tables.
 
-SLIM reference tables (customers, chemicals, ...) are NOT declared on `Base`: the portal
+SLIM reference tables (customers, chemicals, ...) are NOT declared on `Base`: the app
 only reads them, and Alembic must never create or alter them.
 """
 
@@ -27,7 +27,7 @@ class Base(DeclarativeBase):
 
 
 def make_engine(url: str, **kwargs) -> Engine:
-    """The only way the portal connects to a database. OSS demo databases only (see oss_guard)."""
+    """The only way the app connects to a database. OSS demo databases only (see oss_guard)."""
     assert_oss_database(url)
     if url.startswith("sqlite"):
         kwargs.setdefault("connect_args", {"check_same_thread": False})

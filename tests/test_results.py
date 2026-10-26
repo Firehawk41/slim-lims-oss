@@ -1,4 +1,4 @@
-"""slim-data in the portal (D-70, M6 part 2 slice 1): upload -> preview / import -> evaluate -> batch."""
+"""slim-data in the app (D-70, M6 part 2 slice 1): upload -> preview / import -> evaluate -> batch."""
 
 from datetime import date
 

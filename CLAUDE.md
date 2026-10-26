@@ -18,12 +18,12 @@
 
 ## What This Is
 
-The sample submission portal for the SLIM LIMS ecosystem (slim-domain, slim-report-engine,
-slim-lims), built for an ISO 17025 accredited analytical chemistry lab. Customers log in and
-submit Testing Requests (TRs); lab staff receive samples and move TRs through their statuses.
-The portal replaces the Excel Testing Request form as the primary intake path; emailed `.xlsx`
-forms stay supported by slim-domain's parsers for back-compatibility. The portal never produces
-Excel — it produces TR domain objects.
+SLIM's host app (OSS demo) for an ISO 17025 accredited analytical chemistry lab: the composition
+root and the screens for the modules (slim-domain, slim-data, slim-report-engine, invoicing V5).
+Customers log in and submit Testing Requests (TRs); staff check samples in, upload readings, review
+and release results, issue reports and invoice; the lab board (`/`) shows it all. Its request form
+replaces the Excel Testing Request form as the primary intake path; emailed `.xlsx` forms stay
+supported by slim-domain's parsers. The app never produces Excel — it produces TR domain objects.
 
 **The domain spec is `docs/SLIM_DOMAIN_V2.md`. Read it before changing anything under
 `slim_lims/domain/`, the TR tables, enums or statuses.**
@@ -57,7 +57,7 @@ never change the private slim-lims from here. Env vars keep their `PORTAL_` name
    repos — **needs the user's explicit go-ahead.** Includes: the report engine should print actual
    results from the DB instead of a blank report, generated once results exist ("data is in") —
    to be designed in a separate conversation.
-8. ⏸ (C) Ecosystem docker-compose (portal + slim-lims + Postgres + Caddy) for the portfolio VPS.
+8. ⏸ (C) Ecosystem docker-compose (the app + Postgres + Caddy) for the portfolio VPS.
    **DEFERRED — do not start.** Waits until the other modules are ready to bolt in, so the demo
    launches with several modules and can take one submission end to end: submission → receipt →
    analysis/report → delivery → invoice.
@@ -94,7 +94,7 @@ never change the private slim-lims from here. Env vars keep their `PORTAL_` name
    `migrate_invoicing` in `cli migrate` / the seed. Slice 3 ✅: customer A's own quote in the demo (10 % off,
    45-day terms) and the price lists on `/invoices` (`invoices.price_lists`); "Mark paid" stays a portal row.
 
-Agreed order: A, B, link-ready (9) and the board (13) done. Next D when approved, then invoicing (14);
+Done: A, B, link-ready (9), the board (13), invoicing (14). What comes next follows `docs/ROADMAP.md`;
 C last. The user is token-constrained: small, focused steps,
 short replies.
 
@@ -105,16 +105,16 @@ python -m venv .venv && . .venv/bin/activate
 pip install -e ".[dev]"
 cp .env.example .env                     # DATABASE_URL defaults to sqlite:///slim_lims.db
 pip install -e ../slim-domain-oss[postgres] -e ../slim-report-engine-oss   # OSS repos, for the demo seed
-python scripts/seed_demo.py              # migrations (portal + slim-data) + OSS demo SLIM data + catalog + demo ruleset
+python scripts/seed_demo.py              # migrations (app + slim-data + invoicing) + OSS demo SLIM data + catalog + demo ruleset
 PORTAL_PASSWORD='at-least-12-chars' python -m slim_lims.cli create-staff --email you@lab.example --initials JM --lab-role supervisor
 uvicorn --factory slim_lims.main:create_app --reload   # http://127.0.0.1:8000, API docs at /api/docs
 python -m slim_lims.cli verify     # replay every result + check the audit chain (Postgres)
 pytest                                   # TEST_DATABASE_URL=postgresql+psycopg2://... pytest  to run on Postgres
 ```
 
-Or `docker compose up --build`: Postgres 16 shared like the ecosystem (SLIM demo tables + portal
+Or `docker compose up --build`: Postgres 16 shared like the ecosystem (SLIM demo tables + the app's
 tables), a one-shot `seed` service (needs `../slim-domain-oss` and `../slim-report-engine-oss`), and the
-portal on :8000 with demo personas on (`/demo/personas`). Set `LIMS_API_TOKEN` to let slim-lims call the API.
+app on :8000 with demo personas on (`/demo/personas`). Set `LIMS_API_TOKEN` to let slim-lims call the API.
 Cloud demo: `render.yaml` (Blueprint; the seed runs on every start and is idempotent). CI:
 `.github/workflows/ci.yml` ({SQLite, Postgres 16} × {3.11, 3.12}).
 
@@ -124,7 +124,7 @@ Cloud demo: `render.yaml` (Blueprint; the seed runs on every start and is idempo
 slim_lims/
 ├── main.py          # create_app(settings, engine): middleware, routers, exception handlers, /health
 ├── config.py        # Settings from env (APP_ENV, SECRET_KEY, DATABASE_URL, ...)
-├── db.py            # Base (portal-owned tables only), make_engine (the only way to connect), get_db
+├── db.py            # Base (app-owned tables only), make_engine (the only way to connect), get_db
 ├── oss_guard.py     # OSS-ONLY guard: refuses "precilab" URLs and non-demo hosts (called by make_engine)
 ├── domain/          # Spec §3–4: enums.py, tr.py (TRSubmission, TRSample, ...), workflow.py (transitions)
 ├── models.py        # SQLAlchemy models: User + TR tables (tr_submissions, tr_samples, ...)
@@ -136,7 +136,7 @@ slim_lims/
 ├── slim_tables.py   # Read-only Core defs of SLIM's customers/chemicals/elements/analyses (own MetaData)
 ├── catalog.py       # sync_analysis_catalog: data/analysis_catalog.csv -> analysis_catalog, matched by SLIM name
 ├── data/analysis_catalog.csv  # Spec §8 code/group/request-type table
-├── bridge.py        # to_slim_v1: portal TR -> slim-domain-oss v1 TRSubmission (location/TR no. in file_name)
+├── bridge.py        # to_slim_v1: TR -> slim-domain-oss v1 TRSubmission (location/TR no. in file_name)
 ├── results.py       # slim-data host side: TrSampleTables, SpecReader, StaffDirectory, actor_for, demo rules
 ├── results_routes.py  # /results (upload, batches with every cup, trace, reports) and /api/results — staff only
 ├── personas.py      # demo personas (DEMO_PERSONAS): data/demo_personas.csv -> users.is_persona rows
@@ -151,7 +151,7 @@ slim_lims/
 ├── routes.py        # Pages: / (board), /requests (customer list), /requests/new|{tr}, status form, /admin, /admin/users
 ├── web.py           # Jinja2 templates, render(), flash()
 ├── audit.py         # slim-domain's audit log: install_audit_log (Postgres), chain_check for verify
-├── cli.py           # migrate (portal + slim-data + invoicing + audit log), verify, create-staff, create-customer-user, sync-analysis-catalog, sync-personas
+├── cli.py           # migrate (app + slim-data + invoicing + audit log), verify, create-staff, create-customer-user, sync-analysis-catalog, sync-personas
 ├── alembic.ini, migrations/   # Alembic; only manages tables on db.Base
 ├── templates/       # base, _macros, login, error, requests/{list,new,detail}, admin/{home,users}
 └── static/          # css/style.css, admin.css (.admin-theme), portal.css (components), js/request_form.js
@@ -164,11 +164,11 @@ docs/SLIM_DOMAIN_V2.md
 
 - **Layers:** `domain/` (pure pydantic + stdlib, liftable into slim-domain unchanged) ← input
   models validate HTTP input ← repositories are the only code that touches the DB for TRs.
-- **Data ownership:** one Postgres shared with SLIM. The portal only READS SLIM reference tables
+- **Data ownership:** one Postgres shared with SLIM. The app only READS SLIM reference tables
   (customers, chemicals, elements, analyses) and never declares them on `db.Base`; Alembic must
-  never create/alter them. No FKs from portal tables into SLIM tables.
+  never create/alter them. No FKs from the app's tables into SLIM tables.
 - **Portable schema:** must run on SQLite and Postgres (as slim-domain does) — no ARRAY columns,
-  enums stored as ints. Portal-owned TR tables use integer keys; `users` uses UUIDs.
+  enums stored as ints. App-owned TR tables use integer keys; `users` uses UUIDs.
 - **slim-data:** a required library (git dependency). Its tables share the database, migrated by its own
   Alembic (`alembic_version_slim_data`; `cli migrate` / seed run both). It flushes; routes commit. Staff
   act as `results.actor_for(user)` (UUID id, initials, `lab_role`); result files name the analyst by
@@ -204,7 +204,7 @@ docs/SLIM_DOMAIN_V2.md
   arrival (optional, customer) can't be in the past; `date_received` (staff) can't be in the future.
 - **Demo data only:** dev, tests and the portfolio use the OSS repos' fictional data
   (`slim-report-engine-oss/demo/demo.py`). `scripts/seed_demo.py` never writes into SLIM tables
-  that already hold data. Never point the portal at the lab's production database from here.
+  that already hold data. Never point the app at the lab's production database from here.
 - **Routes are plain `def`** (sync SQLAlchemy), not `async def`.
 - 1 MB request cap (`MAX_BODY_BYTES`), enforced with or without Content-Length.
 
@@ -219,7 +219,7 @@ docs/SLIM_DOMAIN_V2.md
 - TR numbers `TR00001`… from a gapless counter row locked in the submit transaction.
 - **Check-in** (staff, `/requests/{tr}/check-in`, `POST /api/submissions/{tr}/check-in`) is the only
   way to RECEIVED: receipt (date, initials, note) + every chemical matched to SLIM, one step —
-  the portal's equivalent of the VBA/manual log-in. "Reject" = cancel with a reason.
+  the app's equivalent of the VBA/manual log-in. "Reject" = cancel with a reason.
 - Statuses: submitted → received → in progress → partial report (repeatable) → complete report
   → invoiced (terminal, staff only); cancelled (customer may cancel only while submitted).
 - Payment: purchase order (PO number, also used for billing codes) or credit card (lab calls;

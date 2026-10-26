@@ -1,8 +1,8 @@
-"""Bridge: portal TR (spec v2) -> slim-domain-oss's current TRSubmission (v1).
+"""Bridge: slim-lims TR (spec v2) -> slim-domain-oss's current TRSubmission (v1).
 
-Lets the existing OSS report engine build a report from a portal submission without changing
+Lets the existing OSS report engine build a report from a slim-lims submission without changing
 slim-domain or slim-report-engine (CLAUDE.md step A). Needs the OSS `slim-domain` package; the
-import is local so the rest of the portal never depends on it. Pure conversion — no database
+import is local so the rest of the app never depends on it. Pure conversion — no database
 access, so the OSS-only guard is not involved here.
 
 v1 has no explicit fields for some v2 data, so they are encoded the way v1 expects:

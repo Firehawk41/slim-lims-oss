@@ -1,4 +1,4 @@
-"""slim-data's named demo scenarios on real portal TRs (slim-data D-75)."""
+"""slim-data's named demo scenarios on real TRs (slim-data D-75)."""
 
 from decimal import Decimal
 from hashlib import sha256

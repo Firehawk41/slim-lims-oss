@@ -1,8 +1,8 @@
-"""Fills the portal's analysis_catalog from data/analysis_catalog.csv (spec §8).
+"""Fills the app's analysis_catalog from data/analysis_catalog.csv (spec §8).
 
 Rows are matched to SLIM's analyses table by analysis_name (case-insensitive, trimmed), so the
 same file works against any SLIM database — the OSS demo one or, later, the lab's. Only the
-portal-owned analysis_catalog table is written; SLIM's tables are read.
+app-owned analysis_catalog table is written; SLIM's tables are read.
 """
 
 import csv

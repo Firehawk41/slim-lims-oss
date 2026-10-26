@@ -1,4 +1,4 @@
-"""Input models: what the portal accepts over HTTP. They validate shape and types only; the
+"""Input models: what the app accepts over HTTP. They validate shape and types only; the
 submission service turns them into domain objects and applies the business rules."""
 
 from datetime import date, time

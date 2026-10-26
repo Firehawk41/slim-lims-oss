@@ -1,4 +1,4 @@
-"""SQLAlchemy models for portal-owned tables — persistence only, no business logic."""
+"""SQLAlchemy models for app-owned tables — persistence only, no business logic."""
 
 import uuid
 from datetime import UTC, date, datetime
@@ -37,7 +37,7 @@ def _utcnow() -> datetime:
 
 
 class User(Base):
-    """A portal login. Customer users belong to one SLIM customer; staff users have initials."""
+    """A login. Customer users belong to one SLIM customer; staff users have initials."""
 
     __tablename__ = "users"
     __table_args__ = (

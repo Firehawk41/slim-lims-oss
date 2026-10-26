@@ -1,7 +1,7 @@
-"""The portal <-> slim-lims contract (docs/SLIM_DOMAIN_V2.md §12).
+"""The machine-access contract with slim-lims, the bearer-token client (docs/SLIM_DOMAIN_V2.md §12).
 
-slim-lims will be written against §12. If one of these tests fails, the portal has broken
-that contract: fix the portal, or change §12 and slim-lims together -- never just the test.
+slim-lims will be written against §12. If one of these tests fails, this app has broken
+that contract: fix the app, or change §12 and slim-lims together -- never just the test.
 """
 
 import pytest

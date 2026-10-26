@@ -1,8 +1,8 @@
-"""Read-only Core definitions of the SLIM reference tables the portal reads (specifications: for
+"""Read-only Core definitions of the SLIM reference tables the app reads (specifications: for
 slim-data's spec limits).
 
 These live on their own MetaData, NOT on db.Base, so Alembic and create_all never touch them —
-slim-domain owns them. Only the columns the portal reads are declared. tests/test_slim_tables.py
+slim-domain owns them. Only the columns the app reads are declared. tests/test_slim_tables.py
 checks them against slim-domain's own row classes when slim-domain is installed.
 """
 

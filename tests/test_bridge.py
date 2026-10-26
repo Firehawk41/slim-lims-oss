@@ -1,7 +1,7 @@
-"""Step A: portal submissions feed the OSS report engine unchanged.
+"""Step A: slim-lims submissions feed the OSS report engine unchanged.
 
 Seeds the fictional OSS demo data (slim-report-engine-oss/demo/demo.py) into a temp SQLite file,
-converts portal TRs with bridge.to_slim_v1 and runs the report engine's own sheet builder.
+converts TRs with bridge.to_slim_v1 and runs the report engine's own sheet builder.
 Skipped when the OSS packages or the checkout aren't available.
 """
 
@@ -173,7 +173,7 @@ def test_wafer_submission_builds_report_sheets(services, unit):
 
 
 def test_stored_submission_round_trips_into_report(services, db):
-    """Through the portal's own storage, as the real flow will be."""
+    """Through the app's own storage, as the real flow will be."""
     chem = services.chemical_svc.get_by_name("HNO3")
     repo = TRSubmissionRepository(db)
     stored = repo.add(

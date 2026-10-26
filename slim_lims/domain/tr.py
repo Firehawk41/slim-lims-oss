@@ -2,7 +2,7 @@
 
 Pure pydantic + standard library: this module must stay liftable into slim-domain unchanged.
 Rules that need reference data (IDs exist, analysis allowed for the request type, customer
-locations) are NOT checked here — see the portal's submission service.
+locations) are NOT checked here — see the app's submission service.
 """
 
 import re

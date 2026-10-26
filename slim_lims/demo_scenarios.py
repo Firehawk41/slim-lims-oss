@@ -1,6 +1,6 @@
-"""slim-data's named demo scenarios, seeded into the portal (slim-data D-75). Demo databases only.
+"""slim-data's named demo scenarios, seeded into the app (slim-data D-75). Demo databases only.
 
-slim-data's scenarios are host-agnostic: this module is the portal's `DemoHost`. Each scenario
+slim-data's scenarios are host-agnostic: this module is the app's `DemoHost`. Each scenario
 gets a real TR (submitted and checked in by the supervisor persona, ordering its demo analysis,
 D-78: customer A's IPA, or customer B's when the scenario needs a spec; an assay is of HNO3), readings
 uploaded by the analyst persona and decisions by the reviewer and supervisor personas, so a first visitor
@@ -148,7 +148,7 @@ class PortalDemoHost:
 def seed_scenarios(
     session: Session, reference: ReferenceData, specs, now: datetime | None = None, renderer=engine_renderer
 ) -> dict[str, str]:
-    """Runs slim-data's scenarios on the portal and settles each TR's status; returns scenario ->
+    """Runs slim-data's scenarios on the app and settles each TR's status; returns scenario ->
     TR number, or {} when results exist already. The caller commits."""
     if batches(session):
         return {}

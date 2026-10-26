@@ -1,4 +1,4 @@
-"""OSS-ONLY GUARD — this portal attaches to the open-source SLIM demo ecosystem only.
+"""OSS-ONLY GUARD — this app attaches to the open-source SLIM demo ecosystem only.
 
 slim-lims is a portfolio module. It must never connect to a real lab's databases
 (e.g. anything PreciLab production). Every database connection goes through

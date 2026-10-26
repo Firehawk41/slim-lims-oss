@@ -60,7 +60,7 @@ async def csrf_protect(request: Request) -> None:
     if "authorization" in request.headers:
         # Bearer-token clients (slim-lims, spec §12). Such requests are authenticated by the
         # token only -- auth.current_user ignores the session cookie for them -- and a browser
-        # cannot add this header to a cross-site request without a CORS preflight the portal
+        # cannot add this header to a cross-site request without a CORS preflight the app
         # never allows. So there is no cookie to ride on and nothing for CSRF to protect.
         return
     expected = request.session.get(CSRF_SESSION_KEY)

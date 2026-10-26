@@ -3,13 +3,13 @@
     python scripts/seed_demo.py [--oss-report-engine ../slim-report-engine-oss]
 
 What it does, in order:
-  1. Runs the portal's migrations.
+  1. Runs the app's migrations.
   2. If SLIM's reference tables are missing or empty, creates and fills them by running
      slim-report-engine-oss's own `demo/demo.py` seed() — fictional customers "A".."Z",
      IPA, HNO3, Acetone, H2O2, PGMEA, "Water", the periodic table and the supported analyses. If they
      already hold data they are LEFT UNTOUCHED: this script never writes into a populated
      SLIM database.
-  3. Syncs the portal-owned analysis_catalog from slim_lims/data/analysis_catalog.csv.
+  3. Syncs the app-owned analysis_catalog from slim_lims/data/analysis_catalog.csv.
   4. Runs slim-data's migrations and publishes its demo metals ruleset (bound to 10 Elements by
      catalog code, D-70) and demo policy. Both are content-hashed: re-running changes nothing.
   5. Creates the demo personas (data/demo_personas.csv); offered only when DEMO_PERSONAS is on.
@@ -90,7 +90,7 @@ def main(argv: list[str] | None = None) -> int:
 
     settings = load_settings()
     slim_url = settings.slim_database_url or settings.database_url
-    print(f"Portal database: {make_url(settings.database_url).render_as_string(hide_password=True)}")
+    print(f"Database: {make_url(settings.database_url).render_as_string(hide_password=True)}")
     print(f"SLIM database:   {make_url(slim_url).render_as_string(hide_password=True)}")
 
     config = Config(str(Path(slim_lims.__file__).parent / "alembic.ini"))

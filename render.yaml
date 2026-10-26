@@ -1,8 +1,8 @@
-# The public demo on Render (free plan): Postgres + the portal, seeded with the OSS demo data.
+# The public demo on Render (free plan): Postgres + slim-lims-oss, seeded with the OSS demo data.
 # OSS ONLY: PORTAL_ALLOWED_DB_HOSTS is set to this blueprint's own demo database host, nothing else
-# (see slim_lims/oss_guard.py). The service is named for the host this portal becomes
-# (slim-lims-oss.onrender.com); the database is slim-lims-db. Renaming the database later makes
-# Render create a second one (the free plan allows one): delete the old database first.
+# (see slim_lims/oss_guard.py). The service is slim-lims-oss (slim-lims-oss.onrender.com); the database
+# is slim-lims-db. Renaming the database later makes Render create a second one (the free plan allows
+# one): delete the old database first.
 databases:
   - name: slim-lims-db
     plan: free

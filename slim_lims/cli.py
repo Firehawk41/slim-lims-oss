@@ -84,7 +84,7 @@ def _sync_personas() -> int:
 
 
 def _migrate() -> int:
-    """The portal's migrations, then slim-data's and invoicing's (each its own tables and version table),
+    """The app's migrations, then slim-data's and invoicing's (each its own tables and version table),
     then the audit log over every table on Postgres (slim-data D-77)."""
     from pathlib import Path
 
@@ -102,7 +102,7 @@ def _migrate() -> int:
     migrate_invoicing(engine)
     audited = install_audit_log(engine)
     print(
-        "Portal, slim-data and invoicing migrations applied."
+        "slim-lims, slim-data and invoicing migrations applied."
         + (
             f" Audit log on {len(audited)} tables."
             if audited
@@ -148,7 +148,7 @@ def main(argv: list[str] | None = None) -> int:
     customer.add_argument("--customer-id", required=True, type=int)
 
     sub.add_parser("sync-analysis-catalog", help="Refill analysis_catalog from data/analysis_catalog.csv")
-    sub.add_parser("migrate", help="Apply the portal's, slim-data's and invoicing's database migrations")
+    sub.add_parser("migrate", help="Apply the app's, slim-data's and invoicing's database migrations")
     sub.add_parser("sync-personas", help="Create/update the demo personas from data/demo_personas.csv")
     sub.add_parser("verify", help="Replay every stored result and check the audit chain (slim-data D-76)")
 

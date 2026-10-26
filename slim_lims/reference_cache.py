@@ -42,7 +42,7 @@ class CacheStatus:
 
 
 def load_reference(slim_engine: Engine, portal_engine: Engine) -> StaticReferenceData:
-    """Reads SLIM's reference tables plus the portal's analysis_catalog overlay."""
+    """Reads SLIM's reference tables plus the app's analysis_catalog overlay."""
     with slim_engine.connect() as conn:
         customers = [
             CustomerRef(
@@ -71,7 +71,7 @@ def load_reference(slim_engine: Engine, portal_engine: Engine) -> StaticReferenc
     for r in analysis_rows:
         entry = catalog.get(r.id)
         if entry is None:
-            # In SLIM but not yet described for the portal: kept for lookups, never offered.
+            # In SLIM but not yet described for the app: kept for lookups, never offered.
             analyses.append(
                 AnalysisRef(
                     id=r.id,

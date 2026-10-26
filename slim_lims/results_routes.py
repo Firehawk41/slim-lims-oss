@@ -163,7 +163,7 @@ def _decide(db: Session, action) -> tuple[int, dict[str, Any]]:
 
 def _report(db: Session, service, tr_number: str, user, renderer, reference) -> dict[str, Any]:
     """The report as it stands now, rendered as "Issue report" would issue it, and every issue so
-    far (raises the portal's NotFound)."""
+    far (raises the app's NotFound)."""
     submission = service.get(tr_number, user)
     view = report_view(db, tr_number)
     document = report_document(view)

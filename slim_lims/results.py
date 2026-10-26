@@ -1,17 +1,17 @@
 """The host side of slim-data, the analytical results module (slim-data D-70, M6 part 2).
 
-slim-data is a library: it sees the outside world through two ports, and the portal (its host)
+slim-data is a library: it sees the outside world through two ports, and this app (its host)
 implements them over its own tables and SLIM's:
 
 * `ReferenceLookup` -- slim-data's `SlimReferenceLookup`, fed with the analysis catalog (code ->
-  SLIM analysis), SLIM's elements, the portal's TR samples (`TrSampleTables`) and SLIM's spec
+  SLIM analysis), SLIM's elements, the app's TR samples (`TrSampleTables`) and SLIM's spec
   limits (`SpecReader`). Built per request, on the request's session.
 * `StaffDirectory` -- active staff users, found by initials (the `analyst` column of a result file).
 
 People reach slim-data as an `Actor`: the user's UUID (what four-eyes compares; stable if initials
 change), initials for display, their lab role, AUTHENTICATED (a real login).
 
-slim-data flushes; the portal owns the transaction and commits (slim-data D-23).
+slim-data flushes; the app owns the transaction and commits (slim-data D-23).
 
 Issuing a report (D-73): until the report engine renders a file, the "file" is a canonical JSON
 form of the report view; its sha256 is what slim-data records, and `report_view(as_of=...)`
@@ -78,7 +78,7 @@ def actor_for(user: User) -> Actor:
 
 
 class TrSampleTables:
-    """slim-data's `TrSamples` over the portal's TR tables (until they move to slim-domain, D-45)."""
+    """slim-data's `TrSamples` over the app's TR tables (until they move to slim-domain, D-45)."""
 
     def __init__(self, session: Session) -> None:
         self._session = session

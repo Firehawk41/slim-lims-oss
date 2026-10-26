@@ -11,7 +11,7 @@ from tests.test_api_submissions import payload
 
 
 def lab_today():
-    """The lab's date (LAB_TIMEZONE default), which the portal checks receipt dates against; the
+    """The lab's date (LAB_TIMEZONE default), which the app checks receipt dates against; the
     machine's own date runs a day ahead of it each evening in Chicago."""
     return datetime.now(ZoneInfo("America/Chicago")).date()
 

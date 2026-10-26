@@ -1,4 +1,4 @@
-"""Contract: the portal's read-only SLIM table definitions match slim-domain's own tables.
+"""Contract: the app's read-only SLIM table definitions match slim-domain's own tables.
 
 Runs when slim-domain (the OSS package) is installed; skipped otherwise.
 """
