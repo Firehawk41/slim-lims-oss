@@ -4,8 +4,13 @@
 
 **SLIM**, a LIMS for an ISO 17025 accredited analytical chemistry lab: the open-source demo of the
 whole host app. It uses [slim-domain](https://github.com/Firehawk41/slim-domain-oss),
-[slim-report-engine](https://github.com/Firehawk41/slim-report-engine-oss) and
-[slim-data](https://github.com/Firehawk41/slim-data-oss) as libraries, on fictional demo data.
+[slim-report-engine](https://github.com/Firehawk41/slim-report-engine-oss),
+[slim-data](https://github.com/Firehawk41/slim-data-oss) and invoicing V5
+([SLIM-Invoicing-Program](https://github.com/Firehawk41/SLIM-Invoicing-Program)) as libraries, on
+fictional demo data.
+
+**Live demo:** https://slim-lims-oss.onrender.com/demo/personas (free plan: the first visit wakes it,
+about a minute). **Roadmap:** [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 Customers log in and submit Testing Requests; lab staff receive the samples, run the results through
 slim-data's rules engine, review and release them, issue reports and track each request to invoice on
@@ -23,6 +28,9 @@ directly — no Excel in between.
   spreadsheet-like sample table (paste a column of IDs, Ctrl+D fills down), free-text chemical /
   matrix, and one analysis panel that applies to the ticked samples or to all of them. Each request
   gets a TR number (`TR00001`…) and its status is visible to the customer.
+- **The lab board** (`/`, everyone's home page) shows each request as a card in the column for where it
+  stands, from expected to paid, with a chip per sample × analysis. Customers see their own requests
+  and their issued reports.
 - **Lab staff** receive samples, move requests through submitted → received → in progress →
   partial report → complete report → invoiced (or cancelled), match free-text chemicals to SLIM,
   and manage users.
@@ -32,9 +40,12 @@ directly — no Excel in between.
   nothing), and a versioned rules engine decides each result. Then review the batch, accept, send to
   rerun, record exceptions, release, and issue the report. Four-eyes and role rules come from slim-data's
   policy, and the request's status follows what actually happened: first readings → in progress,
-  issued report → partial / complete report.
+  issued report → partial / complete report. Batches carry method blanks, check standards and CRMs.
+- **Invoicing** through invoicing V5: a reported request is priced from the customer's own quote or the
+  default price list into a sales order (`/requests/{tr}/invoice`); `/invoices` lists them, with an
+  accounting CSV, and payment is recorded on the invoice.
 - **Demo personas** (`DEMO_PERSONAS=true`): "Continue as..." a customer, analyst, reviewer or
-  supervisor. Their actions are recorded as *asserted*, never as logged in. The demo seed pre-runs nine
+  supervisor. Their actions are recorded as *asserted*, never as logged in. The demo seed pre-runs ten
   result scenarios on real requests, so a first visitor already sees history.
 - **Audit:** on Postgres, slim-domain's hash-chained change log covers every table.
   `python -m slim_lims.cli verify` replays every stored result through its ruleset and checks
@@ -82,9 +93,9 @@ this one): `docker compose up --build`, then create a staff user with
 
 ## Cloud demo (Render)
 
-`render.yaml` is a Render Blueprint: a free Postgres plus the portal. Each start runs the demo seed
-(migrations, the audit log, SLIM's fictional reference data, the demo ruleset, personas and the nine
-result scenarios; each step is skipped once it's done), then serves the app with personas on. Go to
+`render.yaml` is a Render Blueprint: a free Postgres (`slim-lims-db`) plus the app. Each start runs the
+demo seed (migrations, the audit log, SLIM's fictional reference data, the demo rulesets and prices,
+personas and the ten result scenarios; each step is skipped once it's done), then serves the app with personas on. Go to
 **New → Blueprint** in Render, pick this repo, and open `/demo/personas` on the URL it gives you.
 On the free plan the app sleeps when idle (the first visit takes about a minute) and the free
 database expires after a while: recreate it and the next start seeds it again.
@@ -92,7 +103,7 @@ database expires after a while: recreate it and the next start seeds it again.
 ## Tests
 
 `pytest` (SQLite), or `TEST_DATABASE_URL=postgresql+psycopg2://... pytest` (Postgres). CI runs both
-on Python 3.11 and 3.12, with slim-data, slim-domain and the report engine installed from GitHub.
+on Python 3.11 and 3.12, with slim-data, slim-domain, invoicing V5 and the report engine installed from GitHub.
 
 ## Security
 
