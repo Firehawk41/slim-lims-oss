@@ -15,9 +15,20 @@ def payload(**overrides):
         "results_to": ["jane@acme.example"],
         "invoice_to": ["ap@acme.example"],
         "samples": [
-            {"sample_name": "S-001", "chemical_name": "Chemical 01", "processing_time": 7, "analysis_ids": [1, 2]},
-            {"sample_name": "S-002", "chemical_name": "chemical 02", "processing_time": 3, "requested_time": "15:00",
-             "analysis_ids": [1], "additional_element_ids": [26]},
+            {
+                "sample_name": "S-001",
+                "chemical_name": "Chemical 01",
+                "processing_time": 7,
+                "analysis_ids": [1, 2],
+            },
+            {
+                "sample_name": "S-002",
+                "chemical_name": "chemical 02",
+                "processing_time": 3,
+                "requested_time": "15:00",
+                "analysis_ids": [1],
+                "additional_element_ids": [26],
+            },
         ],
     }
     body.update(overrides)
@@ -47,8 +58,11 @@ def test_customer_submits(as_customer):
     assert body["tr_number"] == "TR00001"
     assert body["status"] == 1
     assert body["customer_id"] == 1
-    assert body["customer_snapshot"] == {"name": "A", "address_line_1": "1 A Street",
-                                         "address_line_2": "Anytown, TX 75000, USA"}
+    assert body["customer_snapshot"] == {
+        "name": "A",
+        "address_line_1": "1 A Street",
+        "address_line_2": "Anytown, TX 75000, USA",
+    }
     assert body["submitted_by"]["display"] == "jane@acme.example"
     assert body["samples"][0]["chemical_name"] == "Chemical 01"
     assert body["samples"][1]["requested_time"] == "15:00:00"
@@ -95,7 +109,9 @@ def test_domain_rule_errors_are_422(as_customer):
 
 
 def test_water_samples_get_the_water_chemical(as_customer):
-    body = payload(request_type=2, samples=[{"sample_name": "W-1", "processing_time": 8, "analysis_ids": [3]}])
+    body = payload(
+        request_type=2, samples=[{"sample_name": "W-1", "processing_time": 8, "analysis_ids": [3]}]
+    )
     response = as_customer.post("/api/submissions", json=body)
     assert response.status_code == 201, response.text
     assert response.json()["samples"][0]["chemical_id"] == 1
@@ -103,12 +119,24 @@ def test_water_samples_get_the_water_chemical(as_customer):
 
 
 def test_wafer_submission(as_customer):
-    body = payload(request_type=3, samples=[{"sample_name": "Lot 7", "processing_time": 9, "analysis_ids": [1],
-                                             "wafer_size": 2, "reporting_unit": 2}])
+    body = payload(
+        request_type=3,
+        samples=[
+            {
+                "sample_name": "Lot 7",
+                "processing_time": 9,
+                "analysis_ids": [1],
+                "wafer_size": 2,
+                "reporting_unit": 2,
+            }
+        ],
+    )
     response = as_customer.post("/api/submissions", json=body)
     assert response.status_code == 201, response.text
     assert response.json()["is_rush"] is True
-    no_size = payload(request_type=3, samples=[{"sample_name": "Lot 7", "processing_time": 9, "analysis_ids": [1]}])
+    no_size = payload(
+        request_type=3, samples=[{"sample_name": "Lot 7", "processing_time": 9, "analysis_ids": [1]}]
+    )
     assert as_customer.post("/api/submissions", json=no_size).status_code == 422
 
 
@@ -117,7 +145,9 @@ def test_customer_cannot_submit_for_another_company(as_customer):
 
 
 def test_customer_with_locations_must_pick_one(client, db):
-    db.add(User(email="bob@b.example", password_hash=hash_password(PASSWORD), role=ROLE_CUSTOMER, customer_id=2))
+    db.add(
+        User(email="bob@b.example", password_hash=hash_password(PASSWORD), role=ROLE_CUSTOMER, customer_id=2)
+    )
     db.commit()
     login_api(client, "bob@b.example")
     assert client.post("/api/submissions", json=payload()).status_code == 422
@@ -130,7 +160,11 @@ def test_staff_submits_on_behalf(as_staff):
     assert as_staff.post("/api/submissions", json=payload()).status_code == 422  # must choose customer
     response = as_staff.post("/api/submissions", json=payload(customer_id=1))
     assert response.status_code == 201
-    assert response.json()["submitted_by"] == {"type": 1, "id": response.json()["submitted_by"]["id"], "display": "JM"}
+    assert response.json()["submitted_by"] == {
+        "type": 1,
+        "id": response.json()["submitted_by"]["id"],
+        "display": "JM",
+    }
 
 
 def test_group_cannot_submit(as_staff):
@@ -156,7 +190,9 @@ def test_status_workflow_over_http(client, staff_user, customer_user):
     login_api(client, "staff@lab.example")
     client.post("/api/submissions", json=payload(customer_id=1))
 
-    assert client.post("/api/submissions/TR00001/status", json={"to_status": 2}).status_code == 409  # check-in only
+    assert (
+        client.post("/api/submissions/TR00001/status", json={"to_status": 2}).status_code == 409
+    )  # check-in only
     response = client.post("/api/submissions/TR00001/check-in", json={"date_received": "2026-10-07"})
     assert response.status_code == 200, response.text
     body = response.json()
@@ -178,8 +214,12 @@ def test_customer_cancels_own_submitted_request(client, staff_user, customer_use
     response = client.post("/api/submissions/TR00001/status", json={"to_status": 7, "note": "duplicate"})
     assert response.status_code == 200
     assert response.json()["status_history"][-1]["note"] == "duplicate"
-    assert client.post("/api/submissions/TR00002/status",
-                       json={"to_status": 2, "date_received": "2026-10-07"}).status_code == 409
+    assert (
+        client.post(
+            "/api/submissions/TR00002/status", json={"to_status": 2, "date_received": "2026-10-07"}
+        ).status_code
+        == 409
+    )
 
 
 def test_reference_for_customer(as_customer):
@@ -227,45 +267,85 @@ def test_future_receipt_date_is_refused(as_staff):
 
 
 def test_chemical_is_free_text_matched_when_known(as_customer):
-    body = payload(samples=[
-        {"sample_name": "S-1", "chemical_name": "  CHEMICAL 01 ", "processing_time": 7, "analysis_ids": [1]},
-        {"sample_name": "S-2", "chemical_name": "IPA 99.9% semi grade", "processing_time": 7, "analysis_ids": [1]},
-    ])
+    body = payload(
+        samples=[
+            {
+                "sample_name": "S-1",
+                "chemical_name": "  CHEMICAL 01 ",
+                "processing_time": 7,
+                "analysis_ids": [1],
+            },
+            {
+                "sample_name": "S-2",
+                "chemical_name": "IPA 99.9% semi grade",
+                "processing_time": 7,
+                "analysis_ids": [1],
+            },
+        ]
+    )
     samples = as_customer.post("/api/submissions", json=body).json()["samples"]
     assert (samples[0]["chemical_id"], samples[0]["chemical_name"]) == (2, "CHEMICAL 01")  # as typed, linked
     assert (samples[1]["chemical_id"], samples[1]["chemical_name"]) == (None, "IPA 99.9% semi grade")
 
 
 def test_chemical_ids_are_not_accepted_from_customers(as_customer):
-    body = payload(samples=[{"sample_name": "S-1", "chemical_id": 2, "processing_time": 7, "analysis_ids": [1]}])
+    body = payload(
+        samples=[{"sample_name": "S-1", "chemical_id": 2, "processing_time": 7, "analysis_ids": [1]}]
+    )
     assert as_customer.post("/api/submissions", json=body).status_code == 422
 
 
 def test_check_in_requires_every_chemical_matched(client, staff_user, customer_user):
     login_api(client, "jane@acme.example")
-    body = payload(samples=[
-        {"sample_name": "S-1", "chemical_name": "Chemical 01", "processing_time": 7, "analysis_ids": [1]},
-        {"sample_name": "S-2", "chemical_name": "IPA semi grade", "processing_time": 7, "analysis_ids": [1]},
-    ])
+    body = payload(
+        samples=[
+            {"sample_name": "S-1", "chemical_name": "Chemical 01", "processing_time": 7, "analysis_ids": [1]},
+            {
+                "sample_name": "S-2",
+                "chemical_name": "IPA semi grade",
+                "processing_time": 7,
+                "analysis_ids": [1],
+            },
+        ]
+    )
     client.post("/api/submissions", json=body)
-    assert client.post("/api/submissions/TR00001/check-in", json={"date_received": "2026-10-07"}).status_code == 403
+    assert (
+        client.post("/api/submissions/TR00001/check-in", json={"date_received": "2026-10-07"}).status_code
+        == 403
+    )
     client.post("/logout", data={"csrf_token": client.headers.pop("X-CSRF-Token")})
 
     login_api(client, "staff@lab.example")
     response = client.post("/api/submissions/TR00001/check-in", json={"date_received": "2026-10-07"})
     assert response.status_code == 409 and "sample(s) 2" in response.json()["detail"]
-    bad = client.post("/api/submissions/TR00001/check-in", json={"date_received": "2026-10-07", "chemicals": {"2": 99}})
+    bad = client.post(
+        "/api/submissions/TR00001/check-in", json={"date_received": "2026-10-07", "chemicals": {"2": 99}}
+    )
     assert bad.status_code == 422
-    ok = client.post("/api/submissions/TR00001/check-in",
-                     json={"date_received": "2026-10-07", "chemicals": {"2": 3}, "note": "cooler at 4 C"})
+    ok = client.post(
+        "/api/submissions/TR00001/check-in",
+        json={"date_received": "2026-10-07", "chemicals": {"2": 3}, "note": "cooler at 4 C"},
+    )
     assert ok.status_code == 200, ok.text
     body = ok.json()
     assert body["status"] == 2 and body["receipt"]["received_by"] == "JM"
-    assert [(s["chemical_name"], s["chemical_id"]) for s in body["samples"]] == [("Chemical 01", 2), ("IPA semi grade", 3)]
+    assert [(s["chemical_name"], s["chemical_id"]) for s in body["samples"]] == [
+        ("Chemical 01", 2),
+        ("IPA semi grade", 3),
+    ]
     assert body["status_history"][-1]["note"] == "cooler at 4 C"
 
 
 def test_water_and_wafer_check_in_needs_no_matching(as_staff):
-    as_staff.post("/api/submissions", json=payload(customer_id=1, request_type=2, samples=[
-        {"sample_name": "W-1", "processing_time": 8, "analysis_ids": [3]}]))
-    assert as_staff.post("/api/submissions/TR00001/check-in", json={"date_received": "2026-10-07"}).status_code == 200
+    as_staff.post(
+        "/api/submissions",
+        json=payload(
+            customer_id=1,
+            request_type=2,
+            samples=[{"sample_name": "W-1", "processing_time": 8, "analysis_ids": [3]}],
+        ),
+    )
+    assert (
+        as_staff.post("/api/submissions/TR00001/check-in", json={"date_received": "2026-10-07"}).status_code
+        == 200
+    )

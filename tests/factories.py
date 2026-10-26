@@ -1,6 +1,6 @@
 """Builders for valid domain objects; tests override only what they care about."""
 
-from datetime import datetime, time, timezone
+from datetime import UTC, datetime, time
 
 from slim_lims.domain import (
     Actor,
@@ -18,7 +18,7 @@ from slim_lims.domain import (
     WaferSize,
 )
 
-NOW = datetime(2026, 10, 8, 14, 30, tzinfo=timezone.utc)
+NOW = datetime(2026, 10, 8, 14, 30, tzinfo=UTC)
 CUSTOMER_ACTOR = Actor(type=ActorType.CUSTOMER_USER, id="u-1", display="jane@acme.example")
 STAFF_ACTOR = Actor(type=ActorType.STAFF, id="u-2", display="JM")
 
@@ -56,7 +56,9 @@ def submission(**overrides) -> TRSubmission:
         request_type=RequestType.CHEMICAL,
         submitted_at=NOW,
         submitted_by=CUSTOMER_ACTOR,
-        customer_snapshot=CustomerSnapshot(name="A", address_line_1="1 A Street", address_line_2="Anytown, TX 75000, USA"),
+        customer_snapshot=CustomerSnapshot(
+            name="A", address_line_1="1 A Street", address_line_2="Anytown, TX 75000, USA"
+        ),
         customer_contact="Jane Doe",
         customer_phone="555-1234",
         payment_method=PaymentMethod.PURCHASE_ORDER,
@@ -64,7 +66,9 @@ def submission(**overrides) -> TRSubmission:
         results_to=("jane@acme.example",),
         invoice_to=("ap@acme.example",),
         samples=(sample(1), sample(2)),
-        status_history=(TRStatusEvent(from_status=None, to_status=TRStatus.SUBMITTED, at=NOW, actor=CUSTOMER_ACTOR),),
+        status_history=(
+            TRStatusEvent(from_status=None, to_status=TRStatus.SUBMITTED, at=NOW, actor=CUSTOMER_ACTOR),
+        ),
     )
     values.update(overrides)
     return TRSubmission(**values)

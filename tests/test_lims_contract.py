@@ -17,15 +17,47 @@ BEARER = {"Authorization": f"Bearer {TOKEN}"}
 # The JSON slim-lims reads. Adding a key is fine (update §12 and this list); removing or
 # renaming one breaks slim-lims.
 SUBMISSION_KEYS = {
-    "id", "tr_number", "source", "status", "customer_id", "location", "request_type",
-    "submitted_at", "submitted_by", "customer_snapshot", "customer_contact", "customer_phone",
-    "payment_method", "po_number", "expected_arrival_date", "results_to", "results_cc",
-    "invoice_to", "invoice_cc", "receipt", "samples", "status_history",
-    "service_date_override", "file_name", "effective_service_date", "estimated_service_date", "is_rush",
+    "id",
+    "tr_number",
+    "source",
+    "status",
+    "customer_id",
+    "location",
+    "request_type",
+    "submitted_at",
+    "submitted_by",
+    "customer_snapshot",
+    "customer_contact",
+    "customer_phone",
+    "payment_method",
+    "po_number",
+    "expected_arrival_date",
+    "results_to",
+    "results_cc",
+    "invoice_to",
+    "invoice_cc",
+    "receipt",
+    "samples",
+    "status_history",
+    "service_date_override",
+    "file_name",
+    "effective_service_date",
+    "estimated_service_date",
+    "is_rush",
 }
 SAMPLE_KEYS = {
-    "id", "position", "sample_name", "chemical_id", "chemical_name", "processing_time", "requested_time",
-    "additional_notes", "analysis_ids", "additional_element_ids", "wafer_size", "reporting_unit",
+    "id",
+    "position",
+    "sample_name",
+    "chemical_id",
+    "chemical_name",
+    "processing_time",
+    "requested_time",
+    "additional_notes",
+    "analysis_ids",
+    "additional_element_ids",
+    "wafer_size",
+    "reporting_unit",
     "water_package",
 }
 RECEIPT_KEYS = {"date_received", "received_by", "recorded_at", "recorded_by"}
@@ -33,7 +65,9 @@ RECEIPT_KEYS = {"date_received", "received_by", "recorded_at", "recorded_by"}
 
 @pytest.fixture
 def app(engine, reference):
-    return create_app(make_settings(str(engine.url), lims_api_token=TOKEN), engine=engine, reference=reference)
+    return create_app(
+        make_settings(str(engine.url), lims_api_token=TOKEN), engine=engine, reference=reference
+    )
 
 
 @pytest.fixture
@@ -73,7 +107,9 @@ def test_submission_json_shape(lims, received):
 
 def test_lims_moves_work_forward(lims, received):
     for to_status in (3, 4, 4, 5):  # in progress, partial report (repeatable), complete report
-        response = lims.post("/api/submissions/TR00001/status", json={"to_status": to_status, "note": "report R-1"})
+        response = lims.post(
+            "/api/submissions/TR00001/status", json={"to_status": to_status, "note": "report R-1"}
+        )
         assert response.status_code == 200, response.text
     last = response.json()["status_history"][-1]
     assert last["to_status"] == 5
@@ -92,15 +128,18 @@ def test_lims_cannot_start_work_before_check_in(lims, received):
     assert lims.post("/api/submissions/TR00002/status", json={"to_status": 3}).status_code == 409
 
 
-@pytest.mark.parametrize("method, path, body", [
-    ("post", "/api/submissions", payload(customer_id=1)),
-    ("post", "/api/submissions/TR00002/check-in", {"date_received": "2026-10-07"}),
-    ("post", "/api/submissions/TR00001/samples/1/chemical", {"chemical_id": 1}),
-    ("get", "/api/reference", None),
-    ("get", "/api/me", None),
-    ("get", "/admin", None),
-    ("get", "/requests/TR00001", None),
-])
+@pytest.mark.parametrize(
+    "method, path, body",
+    [
+        ("post", "/api/submissions", payload(customer_id=1)),
+        ("post", "/api/submissions/TR00002/check-in", {"date_received": "2026-10-07"}),
+        ("post", "/api/submissions/TR00001/samples/1/chemical", {"chemical_id": 1}),
+        ("get", "/api/reference", None),
+        ("get", "/api/me", None),
+        ("get", "/admin", None),
+        ("get", "/requests/TR00001", None),
+    ],
+)
 def test_lims_is_limited_to_its_routes(lims, received, method, path, body):
     response = lims.request(method.upper(), path, json=body)
     assert response.status_code == 403, (path, response.status_code, response.text)

@@ -64,8 +64,15 @@ def test_failed_insert_does_not_burn_a_number(repo, db):
 def test_tr_numbers_are_unique_in_the_database(repo, db):
     repo.add(submission())
     db.commit()
-    db.add(TRSubmissionRow(**{c.name: getattr(db.get(TRSubmissionRow, 1), c.name)
-                              for c in TRSubmissionRow.__table__.columns if c.name != "id"}))
+    db.add(
+        TRSubmissionRow(
+            **{
+                c.name: getattr(db.get(TRSubmissionRow, 1), c.name)
+                for c in TRSubmissionRow.__table__.columns
+                if c.name != "id"
+            }
+        )
+    )
     with pytest.raises(IntegrityError):
         db.flush()
 
@@ -79,8 +86,15 @@ def test_cannot_add_twice(repo, db):
 def test_record_transition_with_receipt(repo, db):
     stored = repo.add(submission())
     db.commit()
-    received = transition(stored, TRStatus.RECEIVED, actor=STAFF_ACTOR, at=NOW,
-                          date_received=date(2026, 10, 9), received_by="JM", note="2 bottles")
+    received = transition(
+        stored,
+        TRStatus.RECEIVED,
+        actor=STAFF_ACTOR,
+        at=NOW,
+        date_received=date(2026, 10, 9),
+        received_by="JM",
+        note="2 bottles",
+    )
     saved = repo.record_transition(stored, received)
     db.commit()
     db.expire_all()
@@ -96,8 +110,14 @@ def test_stale_transition_is_refused(repo, db):
     db.commit()
     repo.record_transition(stored, transition(stored, TRStatus.CANCELLED, actor=STAFF_ACTOR, at=NOW))
     db.commit()
-    late = transition(stored, TRStatus.RECEIVED, actor=STAFF_ACTOR, at=NOW,
-                      date_received=date(2026, 10, 9), received_by="JM")
+    late = transition(
+        stored,
+        TRStatus.RECEIVED,
+        actor=STAFF_ACTOR,
+        at=NOW,
+        date_received=date(2026, 10, 9),
+        received_by="JM",
+    )
     with pytest.raises(StaleSubmission):
         repo.record_transition(stored, late)
 

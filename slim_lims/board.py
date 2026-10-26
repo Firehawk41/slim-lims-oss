@@ -22,8 +22,8 @@ from dataclasses import dataclass, field
 from slim_data.domain.enums import ResultStatus, Verdict
 from slim_data.domain.results import Result
 from slim_data.domain.values import SampleRef
-from slim_data.persistence.results import issues_for_tr, results_for_tr
 from slim_data.persistence.observations import get_batch
+from slim_data.persistence.results import issues_for_tr, results_for_tr
 from slim_data.service.views import batches
 from sqlalchemy.orm import Session
 
@@ -144,8 +144,13 @@ def _batch_index(session: Session) -> dict[tuple[SampleRef, int], str]:
     return index
 
 
-def card_for(session: Session, tr: TRSubmission, reference: ReferenceData, batch_of,
-             invoice: TRInvoiceRow | None = None) -> Card:
+def card_for(
+    session: Session,
+    tr: TRSubmission,
+    reference: ReferenceData,
+    batch_of,
+    invoice: TRInvoiceRow | None = None,
+) -> Card:
     issues = issues_for_tr(session, tr.tr_number)
     on_last_issue = {(li.sample, li.analyte, li.version) for li in issues[-1].lines} if issues else set()
     results: dict[tuple[int, int], list[Result]] = {}
@@ -156,11 +161,20 @@ def card_for(session: Session, tr: TRSubmission, reference: ReferenceData, batch
     for sample in tr.samples:
         for analysis_id in sample.analysis_ids:
             analysis = reference.analysis(analysis_id)
-            state = ("expected" if tr.status == TRStatus.SUBMITTED
-                     else _chip_state(results.get((sample.position, analysis_id), []), on_last_issue))
+            state = (
+                "expected"
+                if tr.status == TRStatus.SUBMITTED
+                else _chip_state(results.get((sample.position, analysis_id), []), on_last_issue)
+            )
             ref = SampleRef(tr_number=tr.tr_number, position=sample.position)
-            chips.append(Chip(sample.position, analysis.name if analysis else f"Analysis #{analysis_id}",
-                              state, batch_of.get((ref, analysis_id))))
+            chips.append(
+                Chip(
+                    sample.position,
+                    analysis.name if analysis else f"Analysis #{analysis_id}",
+                    state,
+                    batch_of.get((ref, analysis_id)),
+                )
+            )
     return Card(tr, _column(tr, chips, invoice), chips, issued=bool(issues), invoice=invoice)
 
 
@@ -179,9 +193,16 @@ def _column(tr: TRSubmission, chips: list[Chip], invoice: TRInvoiceRow | None) -
     return "partial_report" if tr.status == TRStatus.PARTIAL_REPORT else "in_analysis"
 
 
-def board(session: Session, user: User, reference: ReferenceData, *, customer_id: int | None = None,
-          analysis_id: int | None = None, rush: bool = False, mine: bool = False,
-          ) -> list[tuple[str, str, list[Card]]]:
+def board(
+    session: Session,
+    user: User,
+    reference: ReferenceData,
+    *,
+    customer_id: int | None = None,
+    analysis_id: int | None = None,
+    rush: bool = False,
+    mine: bool = False,
+) -> list[tuple[str, str, list[Card]]]:
     """(column key, title, cards oldest first), in board order. Customers only ever see their own TRs,
     in CUSTOMER_COLUMNS."""
     if not user.is_staff:
@@ -204,5 +225,7 @@ def board(session: Session, user: User, reference: ReferenceData, *, customer_id
             columns[card.column].append(card)
     columns["paid"] = sorted(columns["paid"], key=lambda c: (c.invoice.paid_on, c.invoice.id))[-PAID_SHOWN:]
     if not user.is_staff:
-        return [(key, title, [c for k in parts for c in columns[k]]) for key, title, parts in CUSTOMER_COLUMNS]
+        return [
+            (key, title, [c for k in parts for c in columns[k]]) for key, title, parts in CUSTOMER_COLUMNS
+        ]
     return [(key, title, columns[key]) for key, title in COLUMNS]

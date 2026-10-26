@@ -67,5 +67,8 @@ def sync_personas(session: Session, personas: list[Persona] | None = None) -> in
 
 def persona_choices(session: Session) -> list[tuple[User, str]]:
     """The personas a visitor may continue as, with their labels, in the data file's order."""
-    users = {u.email: u for u in session.scalars(select(User).where(User.is_persona.is_(True), User.is_active.is_(True)))}
+    users = {
+        u.email: u
+        for u in session.scalars(select(User).where(User.is_persona.is_(True), User.is_active.is_(True)))
+    }
     return [(users[p.email], p.label) for p in load_personas() if p.email in users]

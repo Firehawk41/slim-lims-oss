@@ -118,6 +118,7 @@ class SecurityHeadersMiddleware:
 
 # ---------------------------------------------------------------- request size
 
+
 class BodySizeLimitMiddleware:
     """Rejects request bodies over `max_bytes` with 413, whether or not Content-Length is sent."""
 
@@ -166,9 +167,11 @@ class BodySizeLimitMiddleware:
 
 async def _send_413(send: Send) -> None:
     body = b'{"detail":"Request body too large."}'
-    await send({
-        "type": "http.response.start",
-        "status": 413,
-        "headers": [(b"content-type", b"application/json"), (b"content-length", str(len(body)).encode())],
-    })
+    await send(
+        {
+            "type": "http.response.start",
+            "status": 413,
+            "headers": [(b"content-type", b"application/json"), (b"content-length", str(len(body)).encode())],
+        }
+    )
     await send({"type": "http.response.body", "body": body})

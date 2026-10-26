@@ -32,8 +32,11 @@ def test_session_cookie_flags(client):
 
 
 def test_oversized_body_is_rejected(client):
-    response = client.post("/login", content=b"x" * (1024 * 1024 + 1),
-                           headers={"content-type": "application/x-www-form-urlencoded"})
+    response = client.post(
+        "/login",
+        content=b"x" * (1024 * 1024 + 1),
+        headers={"content-type": "application/x-www-form-urlencoded"},
+    )
     assert response.status_code == 413
     assert response.headers["x-frame-options"] == "DENY"
 
@@ -43,7 +46,9 @@ def test_oversized_chunked_body_is_rejected(client):
         for _ in range(20):
             yield b"x" * 100_000
 
-    response = client.post("/login", content=chunks(), headers={"content-type": "application/x-www-form-urlencoded"})
+    response = client.post(
+        "/login", content=chunks(), headers={"content-type": "application/x-www-form-urlencoded"}
+    )
     assert response.status_code == 413
 
 

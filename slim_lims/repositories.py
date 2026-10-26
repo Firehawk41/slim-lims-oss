@@ -1,7 +1,7 @@
 """TRSubmissionRepository — the only code that converts TR domain objects to and from rows."""
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session, selectinload
@@ -73,7 +73,7 @@ class TRSubmissionRepository:
         """Persists a workflow.transition() / check_in() result (status, receipt, chemical matches,
         new events). Raises StaleSubmission if the stored status
         is no longer `before.status` (a concurrent update won)."""
-        new_events = after.status_history[len(before.status_history):]
+        new_events = after.status_history[len(before.status_history) :]
         if before.id != after.id or not new_events:
             raise ValueError("`after` must be a transition of `before`")
         values = {"status": int(after.status)}
@@ -129,7 +129,9 @@ class TRSubmissionRepository:
         return _from_row(row) if row else None
 
     def get_by_tr_number(self, tr_number: str) -> TRSubmission | None:
-        row = self.session.scalars(_select_full().where(TRSubmissionRow.tr_number == tr_number.upper())).first()
+        row = self.session.scalars(
+            _select_full().where(TRSubmissionRow.tr_number == tr_number.upper())
+        ).first()
         return _from_row(row) if row else None
 
     def list(
@@ -150,9 +152,11 @@ class TRSubmissionRepository:
             filters.append(TRSubmissionRow.request_type == int(request_type))
         total = self.session.scalar(select(func.count()).select_from(TRSubmissionRow).where(*filters))
         rows = self.session.scalars(
-            _select_full().where(*filters)
+            _select_full()
+            .where(*filters)
             .order_by(TRSubmissionRow.submitted_at.desc(), TRSubmissionRow.id.desc())
-            .limit(per_page).offset((page - 1) * per_page)
+            .limit(per_page)
+            .offset((page - 1) * per_page)
         ).all()
         return SubmissionPage([_from_row(r) for r in rows], total or 0, page, per_page)
 
@@ -163,6 +167,7 @@ class TRSubmissionRepository:
 
 
 # ---------------------------------------------------------------- mapping
+
 
 def _select_full():
     return select(TRSubmissionRow).options(
@@ -175,7 +180,7 @@ def _select_full():
 
 def _utc(value: datetime) -> datetime:
     """SQLite drops the time zone; everything is stored in UTC, so put it back."""
-    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
+    return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
 
 
 def _to_row(s: TRSubmission, tr_number: str) -> TRSubmissionRow:
@@ -235,7 +240,9 @@ def _sample_row(s: TRSample) -> TRSampleRow:
         wafer_size=_int_or_none(s.wafer_size),
         reporting_unit=_int_or_none(s.reporting_unit),
         water_package=_int_or_none(s.water_package),
-        analyses=[TRSampleAnalysisRow(analysis_id=a, position=i) for i, a in enumerate(s.analysis_ids, start=1)],
+        analyses=[
+            TRSampleAnalysisRow(analysis_id=a, position=i) for i, a in enumerate(s.analysis_ids, start=1)
+        ],
         additional_elements=[
             TRSampleAdditionalElementRow(element_id=e, position=i)
             for i, e in enumerate(s.additional_element_ids, start=1)
@@ -292,10 +299,14 @@ def _from_row(row: TRSubmissionRow) -> TRSubmission:
         location=row.location,
         request_type=RequestType(row.request_type),
         submitted_at=_utc(row.submitted_at),
-        submitted_by=Actor(type=ActorType(row.submitted_by_type), id=row.submitted_by_id,
-                           display=row.submitted_by_display),
-        customer_snapshot=CustomerSnapshot(name=row.snapshot_name, address_line_1=row.snapshot_address_1,
-                                           address_line_2=row.snapshot_address_2),
+        submitted_by=Actor(
+            type=ActorType(row.submitted_by_type), id=row.submitted_by_id, display=row.submitted_by_display
+        ),
+        customer_snapshot=CustomerSnapshot(
+            name=row.snapshot_name,
+            address_line_1=row.snapshot_address_1,
+            address_line_2=row.snapshot_address_2,
+        ),
         customer_contact=row.customer_contact,
         customer_phone=row.customer_phone,
         payment_method=PaymentMethod(row.payment_method),

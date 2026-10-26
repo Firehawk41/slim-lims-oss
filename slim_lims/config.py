@@ -2,7 +2,6 @@
 
 import os
 from dataclasses import dataclass
-
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -61,8 +60,10 @@ def load_settings() -> Settings:
         secret_key = _DEV_SECRET
     lims_api_token = os.environ.get("LIMS_API_TOKEN", "").strip() or None
     if lims_api_token is not None and len(lims_api_token) < 32:
-        raise RuntimeError("LIMS_API_TOKEN must be at least 32 characters (e.g. python -c "
-                           "'import secrets; print(secrets.token_urlsafe(32))')")
+        raise RuntimeError(
+            "LIMS_API_TOKEN must be at least 32 characters (e.g. python -c "
+            "'import secrets; print(secrets.token_urlsafe(32))')"
+        )
     return Settings(
         env=env,
         database_url=_database_url(os.environ.get("DATABASE_URL", "sqlite:///slim_lims.db")),
@@ -70,7 +71,9 @@ def load_settings() -> Settings:
         session_cookie_secure=_bool(os.environ.get("SESSION_COOKIE_SECURE"), env == "production"),
         session_max_age_seconds=int(os.environ.get("SESSION_MAX_AGE_SECONDS", 8 * 60 * 60)),
         max_body_bytes=int(os.environ.get("MAX_BODY_BYTES", 1024 * 1024)),
-        slim_database_url=_database_url(os.environ["SLIM_DATABASE_URL"]) if os.environ.get("SLIM_DATABASE_URL") else None,
+        slim_database_url=_database_url(os.environ["SLIM_DATABASE_URL"])
+        if os.environ.get("SLIM_DATABASE_URL")
+        else None,
         reference_cache_ttl_seconds=int(os.environ.get("REFERENCE_CACHE_TTL_SECONDS", 300)),
         lab_timezone=os.environ.get("LAB_TIMEZONE", "America/Chicago"),
         lims_api_token=lims_api_token,

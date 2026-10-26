@@ -27,6 +27,7 @@ class FakeClock:
 
 # ---------------------------------------------------------------- catalog file and sync
 
+
 def test_catalog_csv_is_consistent():
     entries = read_catalog(CATALOG_CSV)
     assert len({e.code for e in entries}) == len(entries)
@@ -34,8 +35,16 @@ def test_catalog_csv_is_consistent():
     assert all(e.request_types for e in entries)
     wafer = {e.slim_name for e in entries if RequestType.WAFER in e.request_types and e.portal_selectable}
     # The report engine's Wafer allow-list (wafer_submission_builder._RECOGNIZED_SELECTIONS).
-    assert wafer == {"10 Elements", "26 Elements", "36 Elements", "67 Elements", "List #2 36 Elements",
-                     "4 Anions", "5 Anions", "7 Anions"}
+    assert wafer == {
+        "10 Elements",
+        "26 Elements",
+        "36 Elements",
+        "67 Elements",
+        "List #2 36 Elements",
+        "4 Anions",
+        "5 Anions",
+        "7 Anions",
+    }
 
 
 def test_sync_matches_names_case_insensitively(engine, db):
@@ -56,6 +65,7 @@ def test_sync_replaces_previous_rows(engine, db):
 
 
 # ---------------------------------------------------------------- loading
+
 
 def test_load_reference(slim):
     data = load_reference(slim, slim)
@@ -79,6 +89,7 @@ def test_analysis_without_catalog_entry_is_never_offered(slim):
 
 
 # ---------------------------------------------------------------- cache behaviour
+
 
 def test_cache_loads_lazily_and_refreshes_after_ttl(slim):
     clock = FakeClock()

@@ -57,7 +57,9 @@ class CheckInIn(_Input):
     """Staff accept a submitted request into the LIMS (receipt + chemical matching)."""
 
     date_received: date
-    received_by: Annotated[Text, StringConstraints(max_length=10)] | None = None  # defaults to the user's initials
+    received_by: Annotated[Text, StringConstraints(max_length=10)] | None = (
+        None  # defaults to the user's initials
+    )
     chemicals: dict[int, int] = {}  # sample position -> SLIM chemical ID
     note: Annotated[Text, StringConstraints(max_length=2000)] = ""
 
@@ -70,14 +72,18 @@ class StatusChangeIn(_Input):
     to_status: TRStatus
     note: Annotated[Text, StringConstraints(max_length=2000)] = ""
     date_received: date | None = None  # receiving only
-    received_by: Annotated[Text, StringConstraints(max_length=10)] | None = None  # defaults to the staff user's initials
+    received_by: Annotated[Text, StringConstraints(max_length=10)] | None = (
+        None  # defaults to the staff user's initials
+    )
 
 
 # ---------------------------------------------------------------- results (slim-data, D-70)
 
+
 class SignOffIn(_Input):
     """Reviewing a batch or releasing a sample + analysis. `solo`: a chemist alone signing off their
     own results after the policy's delay, with `note` as the reason (slim-data D-68)."""
+
     note: Annotated[Text, StringConstraints(max_length=2000)] = ""
     solo: bool = False
 
@@ -86,6 +92,7 @@ class ResultActionIn(_Input):
     """Accept, rerun, exception, reject or correct one result. Accept and exception need a reason
     category (printed on the report as a standard qualifier, D-11); exception, reject and correct
     need a note (the reason)."""
+
     reason_category: Annotated[Text, StringConstraints(max_length=100)] = ""
     note: Annotated[Text, StringConstraints(max_length=2000)] = ""
 

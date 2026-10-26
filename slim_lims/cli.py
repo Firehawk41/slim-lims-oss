@@ -21,9 +21,9 @@ from slim_lims.audit import chain_check, install_audit_log
 from slim_lims.catalog import sync_analysis_catalog
 from slim_lims.config import load_settings
 from slim_lims.db import make_engine, make_session_factory
+from slim_lims.invoices import migrate_invoicing
 from slim_lims.models import LAB_ROLES, ROLE_CUSTOMER, ROLE_STAFF, User
 from slim_lims.personas import sync_personas
-from slim_lims.invoices import migrate_invoicing
 from slim_lims.results import migrate_slim_data
 from slim_lims.security import hash_password
 
@@ -46,14 +46,16 @@ def _create_user(
             raise SystemExit(f"A user with email {email} already exists.")
         if initials and db.scalars(select(User).where(User.initials == initials)).first():
             raise SystemExit(f"Initials {initials} are taken: they identify the analyst in result files.")
-        db.add(User(
-            email=email,
-            password_hash=hash_password(_password()),
-            role=role,
-            initials=initials,
-            customer_id=customer_id,
-            lab_role=lab_role,
-        ))
+        db.add(
+            User(
+                email=email,
+                password_hash=hash_password(_password()),
+                role=role,
+                initials=initials,
+                customer_id=customer_id,
+                lab_role=lab_role,
+            )
+        )
         db.commit()
     print(f"Created {role} user {email}.")
 
@@ -65,8 +67,10 @@ def _sync_catalog() -> int:
     with make_session_factory(portal_engine)() as db:
         report = sync_analysis_catalog(slim_engine, db)
         db.commit()
-    print(f"{report.matched} analyses mapped; {len(report.not_in_slim)} catalog entries not in SLIM; "
-          f"{len(report.not_in_catalog)} SLIM analyses without a catalog entry.")
+    print(
+        f"{report.matched} analyses mapped; {len(report.not_in_slim)} catalog entries not in SLIM; "
+        f"{len(report.not_in_catalog)} SLIM analyses without a catalog entry."
+    )
     return 0
 
 
@@ -80,8 +84,8 @@ def _sync_personas() -> int:
 
 
 def _migrate() -> int:
-    """The portal's migrations, then slim-data's and invoicing's (each its own tables and version table), then the audit
-    log over every table on Postgres (slim-data D-77)."""
+    """The portal's migrations, then slim-data's and invoicing's (each its own tables and version table),
+    then the audit log over every table on Postgres (slim-data D-77)."""
     from pathlib import Path
 
     from alembic import command
@@ -97,8 +101,14 @@ def _migrate() -> int:
     migrate_slim_data(engine)
     migrate_invoicing(engine)
     audited = install_audit_log(engine)
-    print("Portal, slim-data and invoicing migrations applied."
-          + (f" Audit log on {len(audited)} tables." if audited else " No audit log (not Postgres, or no SLIM tables yet)."))
+    print(
+        "Portal, slim-data and invoicing migrations applied."
+        + (
+            f" Audit log on {len(audited)} tables."
+            if audited
+            else " No audit log (not Postgres, or no SLIM tables yet)."
+        )
+    )
     return 0
 
 
@@ -109,8 +119,10 @@ def _verify() -> int:
     engine = make_engine(load_settings().database_url)
     with make_session_factory(engine)() as session:
         report = verify(session, chain_check(engine))
-    print(f"Replayed {report.versions} result versions: "
-          + ("all match." if not report.mismatches else f"{len(report.mismatches)} don't match:"))
+    print(
+        f"Replayed {report.versions} result versions: "
+        + ("all match." if not report.mismatches else f"{len(report.mismatches)} don't match:")
+    )
     for mismatch in report.mismatches:
         print(f"  {mismatch}")
     if not report.chain_checked:
@@ -151,8 +163,13 @@ def main(argv: list[str] | None = None) -> int:
         return _verify()
     if args.command == "create-staff":
         lab_role = next(k for k, v in LAB_ROLES.items() if v.lower() == args.lab_role)
-        _create_user(args.email, ROLE_STAFF, initials=args.initials.strip().upper(), customer_id=None,
-                     lab_role=lab_role)
+        _create_user(
+            args.email,
+            ROLE_STAFF,
+            initials=args.initials.strip().upper(),
+            customer_id=None,
+            lab_role=lab_role,
+        )
     else:
         _create_user(args.email, ROLE_CUSTOMER, initials=None, customer_id=args.customer_id)
     return 0

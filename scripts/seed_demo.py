@@ -38,11 +38,11 @@ from slim_lims.audit import install_audit_log
 from slim_lims.catalog import sync_analysis_catalog
 from slim_lims.config import load_settings
 from slim_lims.db import make_engine, make_session_factory
-from slim_lims.oss_guard import assert_oss_database
 from slim_lims.demo_scenarios import seed_scenarios
+from slim_lims.invoices import migrate_invoicing
+from slim_lims.oss_guard import assert_oss_database
 from slim_lims.personas import sync_personas
 from slim_lims.reference_cache import load_reference
-from slim_lims.invoices import migrate_invoicing
 from slim_lims.results import SpecReader, migrate_slim_data, publish_demo_rules
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -59,8 +59,10 @@ def _load_oss_demo(oss_dir: Path):
     try:
         spec.loader.exec_module(module)
     except ImportError as e:
-        raise SystemExit(f"{e}\nInstall the OSS packages first: pip install -e ../slim-domain-oss[postgres] "
-                         "-e ../slim-report-engine-oss") from e
+        raise SystemExit(
+            f"{e}\nInstall the OSS packages first: pip install -e ../slim-domain-oss[postgres] "
+            "-e ../slim-report-engine-oss"
+        ) from e
     return module
 
 
@@ -74,10 +76,15 @@ def _slim_tables_have_data(engine) -> bool:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--oss-report-engine", type=Path,
-                        default=Path(os.environ.get("SLIM_REPORT_ENGINE_OSS_DIR", DEFAULT_OSS_DIR)),
-                        help="checkout of slim-report-engine-oss (default: %(default)s)")
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "--oss-report-engine",
+        type=Path,
+        default=Path(os.environ.get("SLIM_REPORT_ENGINE_OSS_DIR", DEFAULT_OSS_DIR)),
+        help="checkout of slim-report-engine-oss (default: %(default)s)",
+    )
     parser.add_argument("--no-scenarios", action="store_true", help="skip slim-data's demo scenarios")
     args = parser.parse_args(argv)
 
@@ -109,11 +116,15 @@ def main(argv: list[str] | None = None) -> int:
         session.commit()
     print(f"analysis_catalog: {report.matched} analyses offered or mapped.")
     if report.not_in_slim:
-        print(f"  {len(report.not_in_slim)} catalog entries not in this SLIM database (skipped): "
-              + ", ".join(report.not_in_slim))
+        print(
+            f"  {len(report.not_in_slim)} catalog entries not in this SLIM database (skipped): "
+            + ", ".join(report.not_in_slim)
+        )
     if report.not_in_catalog:
-        print(f"  {len(report.not_in_catalog)} SLIM analyses with no catalog entry (not offered): "
-              + ", ".join(report.not_in_catalog))
+        print(
+            f"  {len(report.not_in_catalog)} SLIM analyses with no catalog entry (not offered): "
+            + ", ".join(report.not_in_catalog)
+        )
 
     migrate_slim_data(portal_engine)
     migrate_invoicing(portal_engine)
@@ -125,9 +136,16 @@ def main(argv: list[str] | None = None) -> int:
         session.commit()
         scenarios = {} if args.no_scenarios else seed_scenarios(session, reference, SpecReader(slim_engine))
         session.commit()
-    print("slim-data: demo rulesets published for " + ", ".join(code for code, _ in analyses.values())
-          + "; demo policy.")
-    print(f"Audit log on {len(audited)} tables." if audited else "No audit log (not Postgres, or no SLIM tables).")
+    print(
+        "slim-data: demo rulesets published for "
+        + ", ".join(code for code, _ in analyses.values())
+        + "; demo policy."
+    )
+    print(
+        f"Audit log on {len(audited)} tables."
+        if audited
+        else "No audit log (not Postgres, or no SLIM tables)."
+    )
     print(f"{personas} demo personas (offered when DEMO_PERSONAS is on).")
     if scenarios:
         print("Demo scenarios: " + ", ".join(f"{name} {tr}" for name, tr in scenarios.items()))

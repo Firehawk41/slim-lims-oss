@@ -27,8 +27,9 @@ from slim_lims.reference import ReferenceData
 
 
 class ReportRenderer(Protocol):
-    def __call__(self, session: Session, submission: TRSubmission, view: ReportView,
-                 reference: ReferenceData) -> str: ...
+    def __call__(
+        self, session: Session, submission: TRSubmission, view: ReportView, reference: ReferenceData
+    ) -> str: ...
 
 
 def _recovery(value: Decimal | None) -> str:
@@ -56,42 +57,60 @@ def _notes(view: ReportView, reference: ReferenceData) -> str:
             texts.append("Amended: corrects a result reported before")
         if texts:
             analysis = reference.analysis(line.analyte.analysis_id)
-            what = f"Sample {line.sample.position}, {analysis.name if analysis else line.analyte.analysis_id} {line.analyte.code}"
+            name = analysis.name if analysis else line.analyte.analysis_id
+            what = f"Sample {line.sample.position}, {name} {line.analyte.code}"
             rows.append(f"<li>{escape(what)}: {escape('; '.join(texts))}</li>")
-    return f'<section class="slim-report__notes"><h2>Notes</h2><ul>{"".join(rows)}</ul></section>' if rows else ""
+    return (
+        f'<section class="slim-report__notes"><h2>Notes</h2><ul>{"".join(rows)}</ul></section>'
+        if rows
+        else ""
+    )
 
 
 _TERMS = {
     "MDL": "Method detection limit: the lowest concentration the method tells apart from a blank. "
-           "A result printed \"< MDL\" was not detected.",
+    'A result printed "< MDL" was not detected.',
     "QL": "Quantitation limit: the lowest concentration the method measures with acceptable precision.",
     "Half delta": "Half the difference between the two measurements of the sample. Shown only where a "
-                  "result is outside your specification, or close enough to it for this difference to matter.",
+    "result is outside your specification, or close enough to it for this difference to matter.",
     "Decision rule": "Simple acceptance: a result meets your specification when its reported value is "
-                     "within the limit. Half delta is given for information and does not change that.",
+    "within the limit. Half delta is given for information and does not change that.",
 }
 
 
 def _key(view: ReportView, columns: set[str]) -> str:
     """Explains every term the report uses (slim-data D-80): the limit columns it prints, half delta, and the
     decision rule wherever the report says how a result stands against a spec (ISO 17025 §7.1.3)."""
-    used = {"MDL": "MDL" in columns and any(line.mdl for line in view.lines),
-            "QL": "QL" in columns and any(line.ql for line in view.lines),
-            "Half delta": any(line.half_delta is not None for line in view.lines),
-            "Decision rule": any(line.shown_flags or line.half_delta is not None for line in view.lines)}
+    used = {
+        "MDL": "MDL" in columns and any(line.mdl for line in view.lines),
+        "QL": "QL" in columns and any(line.ql for line in view.lines),
+        "Half delta": any(line.half_delta is not None for line in view.lines),
+        "Decision rule": any(line.shown_flags or line.half_delta is not None for line in view.lines),
+    }
     items = "".join(f"<dt>{term}</dt><dd>{escape(_TERMS[term])}</dd>" for term, on in used.items() if on)
     return f'<section class="slim-report__key"><h2>Key</h2><dl>{items}</dl></section>' if items else ""
 
 
 def _template_columns(sheets) -> set[str]:
-    return {str(v).strip() for sheet in sheets for section in sheet.sections for row in section.rows
-            if row.style_name == "ColumnHeader" for v in row.values.values()}
+    return {
+        str(v).strip()
+        for sheet in sheets
+        for section in sheet.sections
+        for row in section.rows
+        if row.style_name == "ColumnHeader"
+        for v in row.values.values()
+    }
 
 
-_FLAG_TEXT = {"ABOVE_SPEC": "above the customer's specification", "BELOW_SPEC": "below the customer's specification"}
+_FLAG_TEXT = {
+    "ABOVE_SPEC": "above the customer's specification",
+    "BELOW_SPEC": "below the customer's specification",
+}
 
 
-def engine_renderer(session: Session, submission: TRSubmission, view: ReportView, reference: ReferenceData) -> str:
+def engine_renderer(
+    session: Session, submission: TRSubmission, view: ReportView, reference: ReferenceData
+) -> str:
     """The lab's report template, filled with the released results (slim-report-engine-oss)."""
     from slim_domain.domain.analysis.analysis_service import AnalysisService
     from slim_domain.domain.chemical.chemical_service import ChemicalService
@@ -104,8 +123,12 @@ def engine_renderer(session: Session, submission: TRSubmission, view: ReportView
     engine = session.get_bind()
     v1 = to_slim_v1(submission)
     sheets = build_submission_sheets(
-        v1, CustomerService(session, engine=engine).load_customer(v1.customer_id), ChemicalService(session, engine=engine),
-        AnalysisService(session, engine=engine), ElementService(session), SpecificationService(session),
+        v1,
+        CustomerService(session, engine=engine).load_customer(v1.customer_id),
+        ChemicalService(session, engine=engine),
+        AnalysisService(session, engine=engine),
+        ElementService(session),
+        SpecificationService(session),
     )
     if len(sheets) != len(submission.samples):
         raise ValueError(f"{submission.tr_number}: expected a report sheet per sample, got {len(sheets)}")
@@ -116,26 +139,48 @@ def engine_renderer(session: Session, submission: TRSubmission, view: ReportView
         if analysis is None or line.sample.position not in positions:
             continue
         by_sample[positions.index(line.sample.position)][(analysis.name, line.analyte.code)] = ResultCell(
-            text=line.text, mdl=_limit(line.mdl), ql=_limit(line.ql), recovery=_recovery(line.recovery),
+            text=line.text,
+            mdl=_limit(line.mdl),
+            ql=_limit(line.ql),
+            recovery=_recovery(line.recovery),
             below_mdl=line.qualifier == Qualifier.BELOW_MDL,
         )
-    return (render_html(sheets, by_sample, title=_title(submission, view)) + _notes(view, reference)
-            + _key(view, _template_columns(sheets)))
+    return (
+        render_html(sheets, by_sample, title=_title(submission, view))
+        + _notes(view, reference)
+        + _key(view, _template_columns(sheets))
+    )
 
 
-def plain_renderer(session: Session, submission: TRSubmission, view: ReportView, reference: ReferenceData) -> str:
+def plain_renderer(
+    session: Session, submission: TRSubmission, view: ReportView, reference: ReferenceData
+) -> str:
     """The same lines as a plain table, for hosts without SLIM's report tables."""
+
     def row(line: ReportLineView) -> str:
         analysis = reference.analysis(line.analyte.analysis_id)
-        cells = (str(line.sample), analysis.name if analysis else str(line.analyte.analysis_id), line.analyte.code,
-                 line.text, line.reported.unit if line.reported else "", _recovery(line.recovery), _limit(line.mdl))
+        cells = (
+            str(line.sample),
+            analysis.name if analysis else str(line.analyte.analysis_id),
+            line.analyte.code,
+            line.text,
+            line.reported.unit if line.reported else "",
+            _recovery(line.recovery),
+            _limit(line.mdl),
+        )
         return "<tr>" + "".join(f"<td>{escape(c)}</td>" for c in cells) + "</tr>"
 
-    head = "".join(f"<th>{h}</th>" for h in ("Sample", "Analysis", "Analyte", "Result", "Unit", "Recovery", "MDL"))
-    return (f'<div class="slim-report"><h1 class="slim-report__title">{escape(_title(submission, view))}</h1>'
-            f'<table class="slim-report__table"><thead><tr>{head}</tr></thead><tbody>'
-            + "".join(row(line) for line in view.lines) + "</tbody></table></div>" + _notes(view, reference)
-            + _key(view, {"MDL"}))
+    head = "".join(
+        f"<th>{h}</th>" for h in ("Sample", "Analysis", "Analyte", "Result", "Unit", "Recovery", "MDL")
+    )
+    return (
+        f'<div class="slim-report"><h1 class="slim-report__title">{escape(_title(submission, view))}</h1>'
+        f'<table class="slim-report__table"><thead><tr>{head}</tr></thead><tbody>'
+        + "".join(row(line) for line in view.lines)
+        + "</tbody></table></div>"
+        + _notes(view, reference)
+        + _key(view, {"MDL"})
+    )
 
 
 def store(session: Session, tr_number: str, html: str) -> str:

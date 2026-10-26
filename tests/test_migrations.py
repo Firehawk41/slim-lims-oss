@@ -32,5 +32,7 @@ def test_migrations_leave_slim_tables_alone(tmp_path):
         command.upgrade(config, "head")
         command.downgrade(config, "base")
     with engine.connect() as connection:
-        tables = {row[0] for row in connection.exec_driver_sql("SELECT name FROM sqlite_master WHERE type='table'")}
+        tables = {
+            row[0] for row in connection.exec_driver_sql("SELECT name FROM sqlite_master WHERE type='table'")
+        }
     assert "customers" in tables

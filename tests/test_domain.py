@@ -37,7 +37,9 @@ def test_unknown_fields_are_rejected():
         sample(1, colour="blue")
 
 
-@pytest.mark.parametrize("n, expected", [(1, "TR00001"), (42, "TR00042"), (99999, "TR99999"), (100000, "TR100000")])
+@pytest.mark.parametrize(
+    "n, expected", [(1, "TR00001"), (42, "TR00042"), (99999, "TR99999"), (100000, "TR100000")]
+)
 def test_tr_number_format(n, expected):
     assert format_tr_number(n) == expected
 
@@ -61,14 +63,26 @@ def test_working_days_skip_weekends():
 
 def _received(sub, day=date(2026, 10, 9)):
     receipt = TRReceipt(date_received=day, received_by="JM", recorded_at=NOW, recorded_by=STAFF_ACTOR)
-    event = TRStatusEvent(from_status=TRStatus.SUBMITTED, to_status=TRStatus.RECEIVED, at=NOW, actor=STAFF_ACTOR)
-    return submission(**{**dict(sub), "status": TRStatus.RECEIVED, "receipt": receipt,
-                         "status_history": (*sub.status_history, event)})
+    event = TRStatusEvent(
+        from_status=TRStatus.SUBMITTED, to_status=TRStatus.RECEIVED, at=NOW, actor=STAFF_ACTOR
+    )
+    return submission(
+        **{
+            **dict(sub),
+            "status": TRStatus.RECEIVED,
+            "receipt": receipt,
+            "status_history": (*sub.status_history, event),
+        }
+    )
 
 
 def test_service_date_uses_slowest_sample():
-    sub = submission(samples=(sample(1, processing_time=ProcessingTime.TWO_DAYS),
-                              sample(2, processing_time=ProcessingTime.FIVE_DAYS)))
+    sub = submission(
+        samples=(
+            sample(1, processing_time=ProcessingTime.TWO_DAYS),
+            sample(2, processing_time=ProcessingTime.FIVE_DAYS),
+        )
+    )
     assert _received(sub).effective_service_date == date(2026, 10, 16)
 
 
@@ -151,13 +165,17 @@ def test_wafer_sample_rules():
 def test_chemical_sample_rules():
     with pytest.raises(ValidationError, match="wafer samples only"):
         submission(samples=(sample(1, wafer_size=1, reporting_unit=1),))
-    assert submission(samples=(sample(1, chemical_id=None, chemical_name="IPA, unlisted"),))  # unmatched is fine
+    assert submission(
+        samples=(sample(1, chemical_id=None, chemical_name="IPA, unlisted"),)
+    )  # unmatched is fine
     with pytest.raises(ValidationError, match="chemical_name is required"):
         submission(samples=(sample(1, chemical_id=None, chemical_name=" "),))
 
 
 def test_water_package_only_on_water():
-    assert submission(request_type=RequestType.WATER, samples=(sample(1, water_package=WaterPackage.PREMIUM),))
+    assert submission(
+        request_type=RequestType.WATER, samples=(sample(1, water_package=WaterPackage.PREMIUM),)
+    )
     with pytest.raises(ValidationError, match="water samples only"):
         submission(samples=(sample(1, water_package=WaterPackage.PREMIUM),))
 
@@ -189,7 +207,9 @@ def test_status_must_match_history():
 
 def test_received_status_requires_receipt():
     sub = submission()
-    event = TRStatusEvent(from_status=TRStatus.SUBMITTED, to_status=TRStatus.RECEIVED, at=NOW, actor=STAFF_ACTOR)
+    event = TRStatusEvent(
+        from_status=TRStatus.SUBMITTED, to_status=TRStatus.RECEIVED, at=NOW, actor=STAFF_ACTOR
+    )
     with pytest.raises(ValidationError, match="requires a receipt"):
         submission(status=TRStatus.RECEIVED, status_history=(*sub.status_history, event))
 
@@ -198,13 +218,20 @@ def test_json_dump_round_trips():
     sub = _received(submission())
     data = sub.model_dump(mode="json")
     assert data["effective_service_date"] == "2026-10-14"
-    rebuilt = type(sub).model_validate({k: v for k, v in data.items() if k not in {"effective_service_date", "estimated_service_date", "is_rush"}})
+    rebuilt = type(sub).model_validate(
+        {
+            k: v
+            for k, v in data.items()
+            if k not in {"effective_service_date", "estimated_service_date", "is_rush"}
+        }
+    )
     assert rebuilt == sub
 
 
 def test_estimated_service_date_until_received():
-    sub = submission(expected_arrival_date=date(2026, 10, 9),
-                     samples=(sample(1, processing_time=ProcessingTime.TWO_DAYS),))
+    sub = submission(
+        expected_arrival_date=date(2026, 10, 9), samples=(sample(1, processing_time=ProcessingTime.TWO_DAYS),)
+    )
     assert sub.estimated_service_date == date(2026, 10, 13)  # Fri + 2 working days
     assert sub.effective_service_date is None
     received = _received(sub, day=date(2026, 10, 12))

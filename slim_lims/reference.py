@@ -62,7 +62,16 @@ class AnalysisRef:
 WATER_CHEMICAL_NAME = "Water"
 
 # Display order of analysis groups in the form; unknown groups sort last, alphabetically.
-GROUP_ORDER = ("Metals", "Anions", "Cations", "Organics", "Physical", "Silicon", "Microbiology", "Assay & titration")
+GROUP_ORDER = (
+    "Metals",
+    "Anions",
+    "Cations",
+    "Organics",
+    "Physical",
+    "Silicon",
+    "Microbiology",
+    "Assay & titration",
+)
 
 
 class ReferenceData(Protocol):

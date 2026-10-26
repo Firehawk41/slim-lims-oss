@@ -49,11 +49,15 @@ def to_slim_v1(submission: TRSubmission, lab_timezone: str = "America/Chicago"):
 
     if submission.receipt is None:
         raise NotReadyForReport(f"{submission.tr_number or 'submission'} has not been received yet")
-    unmatched = [s.sample_name for s in submission.samples
-                 if submission.request_type is not RequestType.WAFER and s.chemical_id is None]
+    unmatched = [
+        s.sample_name
+        for s in submission.samples
+        if submission.request_type is not RequestType.WAFER and s.chemical_id is None
+    ]
     if unmatched:
         raise NotReadyForReport(
-            f"{submission.tr_number}: chemical not yet matched to SLIM for sample(s) {', '.join(unmatched)}")
+            f"{submission.tr_number}: chemical not yet matched to SLIM for sample(s) {', '.join(unmatched)}"
+        )
     tz = ZoneInfo(lab_timezone)
     wafer = submission.request_type is RequestType.WAFER
 

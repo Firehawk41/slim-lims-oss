@@ -25,10 +25,15 @@ def migrate_invoicing(engine: Engine) -> None:
         invoicing_migrate.upgrade(connection)
 
 
-def billable(session: Session, submission: TRSubmission, reference: ReferenceData, today) -> slim_invoicing.BillableRequest:
+def billable(
+    session: Session, submission: TRSubmission, reference: ReferenceData, today
+) -> slim_invoicing.BillableRequest:
     """The TR as it was reported: every (sample, analysis) any report issue showed (amendments included)."""
-    reported = {(line.sample.position, line.analyte.analysis_id)
-                for issue in issues_for_tr(session, submission.tr_number) for line in issue.lines}
+    reported = {
+        (line.sample.position, line.analyte.analysis_id)
+        for issue in issues_for_tr(session, submission.tr_number)
+        for line in issue.lines
+    }
     analyses = {a for s in submission.samples for a in s.analysis_ids}
     return slim_invoicing.BillableRequest(
         tr_number=submission.tr_number,
@@ -42,9 +47,12 @@ def billable(session: Session, submission: TRSubmission, reference: ReferenceDat
         date_received=submission.receipt.date_received if submission.receipt else today,
         service_date=submission.service_date_override or today,
         samples=tuple(
-            slim_invoicing.BillableSample(position=s.position, name=s.sample_name,
-                                          processing_time=slim_invoicing.ProcessingTime(int(s.processing_time)),
-                                          analysis_ids=s.analysis_ids)
+            slim_invoicing.BillableSample(
+                position=s.position,
+                name=s.sample_name,
+                processing_time=slim_invoicing.ProcessingTime(int(s.processing_time)),
+                analysis_ids=s.analysis_ids,
+            )
             for s in submission.samples
         ),
         reported=frozenset(reported),
@@ -54,13 +62,17 @@ def billable(session: Session, submission: TRSubmission, reference: ReferenceDat
 
 def latest_invoices(session: Session, submission_ids) -> dict[int, TRInvoiceRow]:
     """submission ID -> its newest invoice."""
-    rows = session.scalars(select(TRInvoiceRow).where(TRInvoiceRow.submission_id.in_(list(submission_ids)))
-                           .order_by(TRInvoiceRow.id)).all()
+    rows = session.scalars(
+        select(TRInvoiceRow)
+        .where(TRInvoiceRow.submission_id.in_(list(submission_ids)))
+        .order_by(TRInvoiceRow.id)
+    ).all()
     return {row.submission_id: row for row in rows}
 
 
-def mark_sent(session: Session, service: SubmissionService, tr_number: str, user: User,
-              reference: ReferenceData) -> TRInvoiceRow:
+def mark_sent(
+    session: Session, service: SubmissionService, tr_number: str, user: User, reference: ReferenceData
+) -> TRInvoiceRow:
     """Invoices a complete TR (V5 prices it into a sales order), moves it to invoiced and records the
     invoice as sent. Staff only. Refused (Conflict) when V5 refuses: already invoiced, nothing
     reported, or an analysis no quote prices."""
@@ -70,12 +82,18 @@ def mark_sent(session: Session, service: SubmissionService, tr_number: str, user
     if submission.status is not TRStatus.COMPLETE_REPORT:
         raise Conflict(f"{tr_number} is {submission.status.label.lower()}: invoice a complete report")
     try:
-        slim_invoicing.invoice(session, billable(session, submission, reference, service.lab_today()),
-                               created_by=user.initials or user.email, on=service.lab_today())
+        slim_invoicing.invoice(
+            session,
+            billable(session, submission, reference, service.lab_today()),
+            created_by=user.initials or user.email,
+            on=service.lab_today(),
+        )
     except slim_invoicing.InvoiceRefused as e:
         raise Conflict(str(e)) from e
     service.change_status(tr_number, StatusChangeIn(to_status=TRStatus.INVOICED, note="invoice sent"), user)
-    row = TRInvoiceRow(submission_id=submission.id, sent_on=service.lab_today(), sent_by=user.initials or user.email)
+    row = TRInvoiceRow(
+        submission_id=submission.id, sent_on=service.lab_today(), sent_by=user.initials or user.email
+    )
     session.add(row)
     session.flush()
     return row
