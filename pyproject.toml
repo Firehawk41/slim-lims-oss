@@ -29,7 +29,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "httpx>=0.27", "ruff>=0.6"]
+dev = ["pytest>=8", "httpx>=0.27", "ruff==0.16.9"]
 # The demo seed (scripts/seed_demo.py) also needs slim-report-engine-oss, installed from a local
 # checkout: pip install -e ../slim-report-engine-oss
 
