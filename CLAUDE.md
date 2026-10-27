@@ -103,8 +103,9 @@ never change the private slim-lims from here. Env vars keep their `PORTAL_` name
    `publish_demo_prep` = demo prep rules + stock + the metals rules under each prep method, `chemicals` for the
    run list, `send` = register or send the correction, then re-evaluate) and `prep_routes.py`: /prep (batches,
    standards book, make a standard), /prep/new-batch (the grid: one row per cup), /prep/batches/{code} (figures,
-   versions, "Send to results", run list CSV), /api/prep/*. Nav: Prep. `cli migrate` and the seed run its
-   migrations. Slice 1 ✅; next: correcting a batch on screen (the API does it), demo scenarios.
+   versions, "Send to results", "Correct this batch", run list CSV), /api/prep/*. Nav: Prep. `cli migrate` and the seed run its
+   migrations. Slice 1 ✅; slice 2 ✅ correcting a batch on screen (/prep/batches/{code}/edit: the grid filled
+   from the current version, a reason required, the next version; who prepped it stays); next: demo scenarios.
    slim-data and slim-prep are pinned to `claude/intelligent-planck-fhq1bc` until merged, then `@main`.
 
 Done: A, B, link-ready (9), the board (13), invoicing (14), instrument data in (15). What comes next follows `docs/ROADMAP.md`;

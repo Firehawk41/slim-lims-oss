@@ -181,3 +181,38 @@ def test_the_api_makes_standards_and_refuses_an_expired_source(client, prep):
 def test_prep_is_staff_only(client, prep, customer_user):
     login_api(client, customer_user.email)
     assert client.get("/api/prep/standards").status_code == 403
+
+
+def test_a_batch_is_corrected_on_screen_with_a_reason_then_the_correction_is_sent(client, prep):
+    login(client, "staff@lab.example")
+    token = csrf_from(client.get("/prep").text)
+    _standards(client, token)
+    client.post("/prep/batches", data=_grid(token))
+    client.post("/prep/batches/PB-P1/send", data={"csrf_token": token})
+
+    edit = client.get("/prep/batches/PB-P1/edit")
+    assert edit.status_code == 200 and "Correct prep batch PB-P1 (version 1)" in edit.text
+    assert (
+        'name="c_0_2_final" value="2.6000"' in edit.text and 'name="expected_version" value="1"' in edit.text
+    )
+
+    fixed = _grid(token) | {"expected_version": "1", "c_0_2_final": "2.7000"}
+    no_reason = client.post("/prep/batches", data=fixed)
+    assert no_reason.status_code == 422 and "a correction needs a reason" in no_reason.text
+
+    done = client.post("/prep/batches", data=fixed | {"reason": "cup 2 final misread"})
+    assert done.status_code == 200 and "PB-P1 corrected (version 2)" in done.text
+    assert "Send the correction to results" in done.text and "cup 2 final misread" in done.text
+    batch = client.get("/api/prep/batches/PB-P1").json()
+    assert batch["version"] == 2 and batch["batch"]["prep"]["analyst"] == "JM"  # who prepped it stays
+
+    stale = client.post("/prep/batches", data=fixed | {"reason": "again"})
+    assert stale.status_code == 409 and "the latest is 2" in stale.text
+
+    sent = client.post("/prep/batches/PB-P1/send", data={"csrf_token": token})
+    assert "PB-P1 correction sent (1 changed)." in sent.text
+
+
+def test_editing_an_unknown_batch_is_404(client, prep):
+    login(client, "staff@lab.example")
+    assert client.get("/prep/batches/PB-X/edit").status_code == 404

@@ -1,9 +1,11 @@
 {% extends "base.html" %}
 
-{% block title %}New prep batch {{ code }} — YourLab{% endblock %}
+{% block title %}{% if version %}Correct{% else %}New{% endif %} prep batch {{ code }} — YourLab{% endblock %}
 
 {% block content %}
-  <h1>Prep batch {{ code }}: {{ method.name }}</h1>
+  <h1>{% if version %}Correct prep batch {{ code }} (version {{ version }}){% else %}Prep batch {{ code }}{% endif %}: {{ method.name }}</h1>
+  {% if version %}<p class="hint">The record keeps version {{ version }} as it was; this becomes the next version, with your reason.
+    If it was sent to results, send the correction from the batch page afterwards.</p>{% endif %}
   <p class="hint">One row per cup, in grams. {% if method.tared_vessel %}The vial is tared: Gross is the sample, Final the solution.{% else %}Net = Gross − Tare{% if method.weighs_cap %} − Cap{% endif %}; dilution = (Final − Tare) ÷ Net.{% endif %}
     Spike level = volume × the standard's concentration ÷ the spike cup's net.</p>
 
@@ -18,6 +20,7 @@
     <input type="hidden" name="code" value="{{ code }}">
     <input type="hidden" name="method" value="{{ method.name }}">
     <input type="hidden" name="analysis" value="{{ analysis }}">
+    {% if version %}<input type="hidden" name="expected_version" value="{{ version }}">{% endif %}
     <div class="stack-form">
       <label>Balance (all weights unless a cup says otherwise)
         <select name="balance">{% for b in rules.balances %}<option value="{{ b }}"{% if values.balance == b %} selected{% endif %}>{{ b }}</option>{% endfor %}</select>
@@ -61,7 +64,9 @@
         {% endfor %}
       </tbody>
     </table>
-    <div class="stack-form"><label>Note on the batch <input type="text" name="note" maxlength="1000" value="{{ values.note or '' }}"></label></div>
-    <div class="choice-row"><button type="submit" class="btn btn--primary">Record the batch</button></div>
+    <div class="stack-form"><label>Note on the batch <input type="text" name="note" maxlength="1000" value="{{ values.note or '' }}"></label>
+      {% if version %}<label>Why it is corrected <input type="text" name="reason" maxlength="1000" required value="{{ values.reason or '' }}"></label>{% endif %}
+    </div>
+    <div class="choice-row"><button type="submit" class="btn btn--primary">{% if version %}Record the correction{% else %}Record the batch{% endif %}</button></div>
   </form>
 {% endblock %}

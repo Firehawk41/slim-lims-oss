@@ -197,14 +197,18 @@ def _run_list(db: Session, codes: list[str]):
 # ---------------------------------------------------------------- a new batch: the grid
 
 
-def _grid(db: Session, method: str, analysis: str, code: str, samples: list[str]) -> dict[str, Any]:
+def _grid(
+    db: Session, method: str, analysis: str, code: str, samples: list[str], used: frozenset = frozenset()
+) -> dict[str, Any]:
+    """The grid's context. Standards still in date are offered, and those the batch already used (a
+    correction keeps them, whether or not they have expired since)."""
     current = rules(db).rules
     found = current.method(method)
     if found is None:
         raise LookupError(f"no prep method {method!r}")
     standards = [
-        r.item for r in books.list_standards(db) if r.item.expires >= date.today()
-    ]  # only standards still in date are offered
+        r.item for r in books.list_standards(db) if r.item.expires >= date.today() or r.item.ref in used
+    ]
     return {
         "method": found,
         "analysis": analysis,
@@ -253,8 +257,47 @@ def _decimal(values: dict[str, str], key: str, problems: list[str], label: str) 
     return value
 
 
+def _values(batch: PrepBatch) -> dict[str, str]:
+    """A recorded batch as the grid's fields: what a correction starts from."""
+    values = {"balance": batch.balance, "pour_out": batch.pour_out.analyst if batch.pour_out else "",
+              "note": batch.note or ""}  # fmt: skip
+    for i, sample in enumerate(batch.samples):
+        values[f"sample_{i}"] = sample.sample
+        for cup in sample.cups:
+            k = f"c_{i}_{cup.number}"
+            w = cup.weighing
+            for name in ("tare", "cap", "gross", "final"):
+                value = getattr(w, name)
+                values[f"{k}_{name}"] = "" if value is None else str(value)
+            values[f"{k}_balance"] = cup.balance or ""
+            values[f"{k}_note"] = cup.note or ""
+            for line in cup.spikes[:1]:  # the grid has one spike line per cup
+                values[f"{k}_standard"] = f"{line.standard.name}|{line.standard.prepared.isoformat()}"
+                values[f"{k}_volume"] = str(line.volume_ul)
+                values[f"{k}_pipette"] = line.pipette
+    return values
+
+
+def _used(batch: PrepBatch) -> frozenset:
+    return frozenset(line.standard for s in batch.samples for c in s.cups for line in c.spikes)
+
+
+@router.get("/prep/batches/{code}/edit", name="prep_edit_batch")
+def prep_edit_batch(request: Request, code: str, user: RequireStaff, db: DB):
+    try:
+        recorded = books.get_batch(db, code)
+    except NotFound:
+        return render(request, "error.html", {"message": f"No prep batch {code}."}, 404)
+    b = recorded.item
+    grid = _grid(db, b.method, b.analysis, code, [s.sample for s in b.samples], _used(b))
+    context = {**grid, "values": _values(b), "problems": [], "version": recorded.version}
+    return render(request, "prep/new_batch.html", context)
+
+
 def _batch_from_grid(values: dict[str, str], db: Session, user) -> PrepBatch:
-    """The grid's fields -> a PrepBatch, or PrepRefused-style problems via ValueError."""
+    """The grid's fields -> a PrepBatch, or PrepRefused with every problem. A correction keeps who
+    prepped it and when (and who poured out, unless the initials changed): its own author and reason
+    go on the version."""
     current = rules(db).rules
     method = current.method(values.get("method", ""))
     if method is None:
@@ -302,13 +345,20 @@ def _batch_from_grid(values: dict[str, str], db: Session, user) -> PrepBatch:
     if problems:
         raise PrepRefused([Problem(where="", message=p) for p in problems])
     pour_out = values.get("pour_out", "").strip()
+    prep = StepRecord(analyst=user.initials or user.email, at=now)
+    poured = StepRecord(analyst=pour_out, at=now) if pour_out else None
+    if _expected(values):
+        before = books.get_batch(db, values.get("code", "")).item
+        prep = before.prep
+        if before.pour_out is not None and poured is not None and before.pour_out.analyst == pour_out:
+            poured = before.pour_out
     return PrepBatch(
         code=values.get("code", ""),
         method=method.name,
         analysis=values.get("analysis", ""),
         balance=values.get("balance", ""),
-        pour_out=StepRecord(analyst=pour_out, at=now) if pour_out else None,
-        prep=StepRecord(analyst=user.initials or user.email, at=now),
+        pour_out=poured,
+        prep=prep,
         samples=tuple(samples),
         note=values.get("note") or None,
     )
@@ -316,26 +366,40 @@ def _batch_from_grid(values: dict[str, str], db: Session, user) -> PrepBatch:
 
 @router.post("/prep/batches", name="prep_save_batch")
 def prep_save_batch(request: Request, user: RequireStaff, db: DB, values: Form_):
+    expected = _expected(values)
+
     def save():
         batch = _batch_from_grid(values, db, user)
-        return record_batch(db, batch, rules(db).id, prep_actor_for(user))
+        reason = values.get("reason") or None
+        return record_batch(db, batch, rules(db).id, prep_actor_for(user), expected, reason)
 
     try:
-        _guard(db, save)
+        recorded, _ = _guard(db, save)
     except Refused as refused:
         ids = [
             values[k]
             for k in sorted((k for k in values if k.startswith("sample_")), key=lambda k: int(k[7:]))
         ]
-        grid = _grid(db, values.get("method", ""), values.get("analysis", ""), values.get("code", ""), ids)
-        return render(
-            request,
-            "prep/new_batch.html",
-            {**grid, "values": values, "problems": refused.problems},
-            refused.status,
+        try:
+            used = _used(books.get_batch(db, values.get("code", "")).item) if expected else frozenset()
+        except NotFound:
+            used = frozenset()
+        grid = _grid(
+            db, values.get("method", ""), values.get("analysis", ""), values.get("code", ""), ids, used
         )
-    flash(request, f"Prep batch {values.get('code')} recorded.", "success")
+        context = {**grid, "values": values, "problems": refused.problems}
+        if expected:
+            context["version"] = expected
+        return render(request, "prep/new_batch.html", context, refused.status)
+    what = f"corrected (version {recorded.version})" if expected else "recorded"
+    flash(request, f"Prep batch {values.get('code')} {what}.", "success")
     return RedirectResponse(request.url_for("prep_batch", code=values.get("code", "")), status_code=303)
+
+
+def _expected(values: dict[str, str]) -> int:
+    """The version a correction was made from; 0 for a new batch."""
+    text = values.get("expected_version", "0").strip()
+    return int(text) if text.isdigit() else 0
 
 
 @router.post("/prep/batches/{code}/send", name="prep_send")

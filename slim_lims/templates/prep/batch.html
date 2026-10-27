@@ -37,6 +37,7 @@
         <button type="submit" class="btn btn--primary">{% if b.sent_version %}Send the correction to results{% else %}Send to results{% endif %}</button>
       </form>
     {% endif %}
+    <a class="btn btn--secondary" href="{{ url_for('prep_edit_batch', code=b.code) }}">Correct this batch</a>
     <a class="btn btn--secondary" href="{{ url_for('prep_run_list') }}?code={{ b.code|urlencode }}">Run list (CSV)</a>
   </div>
 
