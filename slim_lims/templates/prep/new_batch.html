@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}New prep batch {{ code }} — YourLab{% endblock %}
+
+{% block content %}
+  <h1>Prep batch {{ code }}: {{ method.name }}</h1>
+  <p class="hint">One row per cup, in grams. {% if method.tared_vessel %}The vial is tared: Gross is the sample, Final the solution.{% else %}Net = Gross − Tare{% if method.weighs_cap %} − Cap{% endif %}; dilution = (Final − Tare) ÷ Net.{% endif %}
+    Spike level = volume × the standard's concentration ÷ the spike cup's net.</p>
+
+  {% if problems %}
+    <div class="form-error" role="alert"><p>Nothing was recorded:</p>
+      <ul>{% for p in problems %}<li>{{ p }}</li>{% endfor %}</ul>
+    </div>
+  {% endif %}
+
+  <form method="post" action="{{ url_for('prep_save_batch') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+    <input type="hidden" name="code" value="{{ code }}">
+    <input type="hidden" name="method" value="{{ method.name }}">
+    <input type="hidden" name="analysis" value="{{ analysis }}">
+    <div class="stack-form">
+      <label>Balance (all weights unless a cup says otherwise)
+        <select name="balance">{% for b in rules.balances %}<option value="{{ b }}"{% if values.balance == b %} selected{% endif %}>{{ b }}</option>{% endfor %}</select>
+      </label>
+      {% if method.pour_out_step %}
+        <label>Poured out by (initials) <input type="text" name="pour_out" maxlength="10" required value="{{ values.pour_out or '' }}"></label>
+      {% endif %}
+    </div>
+    <table class="table prep-grid">
+      <thead><tr>
+        <th scope="col">Sample</th><th scope="col">Cup</th>
+        {% if not method.tared_vessel %}<th scope="col">Tare</th>{% endif %}
+        {% if method.weighs_cap %}<th scope="col">Cap</th>{% endif %}
+        <th scope="col">Gross</th><th scope="col">Final</th>
+        <th scope="col">Spike: standard</th><th scope="col">Volume (µL)</th><th scope="col">Pipette</th>
+        <th scope="col">Balance</th><th scope="col">Note</th>
+      </tr></thead>
+      <tbody>
+        {% for s in samples %}{% set i = loop.index0 %}
+          {% for n in cups + spike_cups %}{% set k = 'c_' ~ i ~ '_' ~ n %}
+            <tr>
+              <td>{% if loop.first %}{{ s }}<input type="hidden" name="sample_{{ i }}" value="{{ s }}">{% endif %}</td>
+              <td>{{ n }}{% if n in spike_cups %} spike{% endif %}</td>
+              {% if not method.tared_vessel %}<td><input type="text" inputmode="decimal" name="{{ k }}_tare" value="{{ values[k ~ '_tare'] or '' }}" aria-label="{{ s }} cup {{ n }} tare"></td>{% endif %}
+              {% if method.weighs_cap %}<td><input type="text" inputmode="decimal" name="{{ k }}_cap" value="{{ values[k ~ '_cap'] or '' }}" aria-label="{{ s }} cup {{ n }} cap"></td>{% endif %}
+              <td><input type="text" inputmode="decimal" name="{{ k }}_gross" value="{{ values[k ~ '_gross'] or '' }}" aria-label="{{ s }} cup {{ n }} gross"></td>
+              <td><input type="text" inputmode="decimal" name="{{ k }}_final" value="{{ values[k ~ '_final'] or '' }}" aria-label="{{ s }} cup {{ n }} final"></td>
+              {% if n in spike_cups %}
+                <td><select name="{{ k }}_standard" aria-label="{{ s }} cup {{ n }} standard">
+                  {% for st in standards %}{% set ref = st.name ~ '|' ~ st.prepared.isoformat() %}
+                    <option value="{{ ref }}"{% if values[k ~ '_standard'] == ref %} selected{% endif %}>{{ st.name }} ({{ st.prepared }}, expires {{ st.expires }})</option>
+                  {% endfor %}
+                </select></td>
+                <td><input type="text" inputmode="decimal" name="{{ k }}_volume" value="{{ values[k ~ '_volume'] or '' }}" aria-label="{{ s }} cup {{ n }} spike volume"></td>
+                <td><select name="{{ k }}_pipette" aria-label="{{ s }} cup {{ n }} pipette">{% for p in rules.pipettes %}<option value="{{ p }}"{% if values[k ~ '_pipette'] == p %} selected{% endif %}>{{ p }}</option>{% endfor %}</select></td>
+              {% else %}<td></td><td></td><td></td>{% endif %}
+              <td><select name="{{ k }}_balance" aria-label="{{ s }} cup {{ n }} balance"><option value="">batch's</option>{% for b in rules.balances %}<option value="{{ b }}"{% if values[k ~ '_balance'] == b %} selected{% endif %}>{{ b }}</option>{% endfor %}</select></td>
+              <td><input type="text" name="{{ k }}_note" maxlength="1000" value="{{ values[k ~ '_note'] or '' }}" aria-label="{{ s }} cup {{ n }} note"></td>
+            </tr>
+          {% endfor %}
+        {% endfor %}
+      </tbody>
+    </table>
+    <div class="stack-form"><label>Note on the batch <input type="text" name="note" maxlength="1000" value="{{ values.note or '' }}"></label></div>
+    <div class="choice-row"><button type="submit" class="btn btn--primary">Record the batch</button></div>
+  </form>
+{% endblock %}

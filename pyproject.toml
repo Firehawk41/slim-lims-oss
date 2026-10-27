@@ -21,7 +21,10 @@ dependencies = [
     "psycopg2-binary>=2.9",
     "tzdata",  # zoneinfo data for LAB_TIMEZONE on slim container images
     # Analytical results module (D-70). Not on PyPI; co-developing: pip install -e ../slim-data-oss
-    "slim-data @ git+https://github.com/Firehawk41/slim-data-oss@main",
+    # On D-95/D-96's branch until it is merged (slim-prep needs it), then @main.
+    "slim-data @ git+https://github.com/Firehawk41/slim-data-oss@claude/intelligent-planck-fhq1bc",
+    # The prep book (slim-prep P6). Co-developing: pip install -e ../slim-prep-oss
+    "slim-prep @ git+https://github.com/Firehawk41/slim-prep-oss@claude/intelligent-planck-fhq1bc",
     # slim-domain: its hash-chained audit log over the shared database (slim-data D-77), and the bridge.
     "slim-domain @ git+https://github.com/Firehawk41/slim-domain-oss@main",
     # Invoicing V5 (slim-data D-83): a subfolder of the invoicing repo. Co-developing: pip install -e ../SLIM-Invoicing-Program/V5-LIMS-Module

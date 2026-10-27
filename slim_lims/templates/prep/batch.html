@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}Prep batch {{ b.code }} — YourLab{% endblock %}
+
+{% block content %}
+  <h1>Prep batch {{ b.code }}</h1>
+  <dl class="kv">
+    <dt>Method</dt><dd>{{ b.batch.method }}</dd>
+    <dt>Analysis</dt><dd>{{ b.batch.analysis }}</dd>
+    <dt>Balance</dt><dd>{{ b.batch.balance }}</dd>
+    {% if b.batch.pour_out %}<dt>Poured out</dt><dd>{{ b.batch.pour_out.analyst }}, {{ b.batch.pour_out.at }}</dd>{% endif %}
+    <dt>Prepped</dt><dd>{{ b.batch.prep.analyst }}, {{ b.batch.prep.at }}</dd>
+    <dt>Version</dt><dd>{{ b.version }} by {{ b.by }}{% if b.reason %}: {{ b.reason }}{% endif %}</dd>
+    <dt>Sent to results</dt><dd>{% if b.sent_version %}version {{ b.sent_version }}{% else %}not yet{% endif %}</dd>
+    {% if b.batch.note %}<dt>Note</dt><dd>{{ b.batch.note }}</dd>{% endif %}
+  </dl>
+
+  <table class="table">
+    <thead><tr><th scope="col">Sample</th><th scope="col">Cup</th><th scope="col">Net (g)</th>
+      <th scope="col">Solution (g)</th><th scope="col">Dilution</th><th scope="col">Spike level</th></tr></thead>
+    <tbody>
+      {% for c in b.figures %}
+        <tr>
+          <td>{{ c.sample }}</td><td>{{ c.cup }}{% if c.kind == "spike" %} spike{% endif %}</td>
+          <td>{{ c.net }}</td><td>{{ c.solution }}</td><td>{{ c.dilution }}</td>
+          <td>{% for a in c.added %}{{ a.element }} {{ a.amount }}{% if not loop.last %}, {% endif %}{% endfor %}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="hint">Unrounded, as slim-data receives them.</p>
+
+  <div class="choice-row">
+    {% if b.sent_version != b.version %}
+      <form method="post" action="{{ url_for('prep_send', code=b.code) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+        <button type="submit" class="btn btn--primary">{% if b.sent_version %}Send the correction to results{% else %}Send to results{% endif %}</button>
+      </form>
+    {% endif %}
+    <a class="btn btn--secondary" href="{{ url_for('prep_run_list') }}?code={{ b.code|urlencode }}">Run list (CSV)</a>
+  </div>
+
+  {% if history|length > 1 %}
+    <h2>Versions</h2>
+    <ol>{% for h in history %}<li>Version {{ h.version }}, {{ h.created_by.display }}, {{ h.created_at }}{% if h.reason %}: {{ h.reason }}{% endif %}</li>{% endfor %}</ol>
+  {% endif %}
+{% endblock %}

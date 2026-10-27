@@ -13,6 +13,8 @@ from slim_lims.auth import LoginRequired, StaffRequired, login_redirect
 from slim_lims.auth import router as auth_router
 from slim_lims.config import Settings, load_settings
 from slim_lims.db import make_engine, make_session_factory
+from slim_lims.prep_routes import api_router as prep_api_router
+from slim_lims.prep_routes import router as prep_router
 from slim_lims.reference import ReferenceData
 from slim_lims.reference_cache import ReferenceCache
 from slim_lims.reports import engine_renderer
@@ -79,6 +81,8 @@ def create_app(
     app.include_router(reference_router)
     app.include_router(results_router)
     app.include_router(results_api_router)
+    app.include_router(prep_router)
+    app.include_router(prep_api_router)
     register_error_handlers(app)
 
     @app.exception_handler(LoginRequired)

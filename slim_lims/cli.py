@@ -24,6 +24,7 @@ from slim_lims.db import make_engine, make_session_factory
 from slim_lims.invoices import migrate_invoicing
 from slim_lims.models import LAB_ROLES, ROLE_CUSTOMER, ROLE_STAFF, User
 from slim_lims.personas import sync_personas
+from slim_lims.prep import migrate_slim_prep
 from slim_lims.results import migrate_slim_data
 from slim_lims.security import hash_password
 
@@ -99,10 +100,11 @@ def _migrate() -> int:
     command.upgrade(config, "head")
     engine = make_engine(settings.database_url)
     migrate_slim_data(engine)
+    migrate_slim_prep(engine)
     migrate_invoicing(engine)
     audited = install_audit_log(engine)
     print(
-        "slim-lims, slim-data and invoicing migrations applied."
+        "slim-lims, slim-data, slim-prep and invoicing migrations applied."
         + (
             f" Audit log on {len(audited)} tables."
             if audited

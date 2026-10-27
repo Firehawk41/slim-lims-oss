@@ -99,6 +99,14 @@ never change the private slim-lims from here. Env vars keep their `PORTAL_` name
    (`results.READERS`, `make_reader`, `import_analyses`); the preview lists what was left out on purpose.
    The API takes the same choice (`kind`, `prep_batch`, `analysis`, `prep_method` query parameters).
 
+16. ◐ slim-prep (the prep book, `slim-prep-oss` P6), a required library: `prep.py` (host side: `prep_actor_for`,
+   `publish_demo_prep` = demo prep rules + stock + the metals rules under each prep method, `chemicals` for the
+   run list, `send` = register or send the correction, then re-evaluate) and `prep_routes.py`: /prep (batches,
+   standards book, make a standard), /prep/new-batch (the grid: one row per cup), /prep/batches/{code} (figures,
+   versions, "Send to results", run list CSV), /api/prep/*. Nav: Prep. `cli migrate` and the seed run its
+   migrations. Slice 1 ✅; next: correcting a batch on screen (the API does it), demo scenarios.
+   slim-data and slim-prep are pinned to `claude/intelligent-planck-fhq1bc` until merged, then `@main`.
+
 Done: A, B, link-ready (9), the board (13), invoicing (14), instrument data in (15). What comes next follows `docs/ROADMAP.md`;
 C last. The user is token-constrained: small, focused steps,
 short replies.
@@ -144,6 +152,8 @@ slim_lims/
 ├── bridge.py        # to_slim_v1: TR -> slim-domain-oss v1 TRSubmission (location/TR no. in file_name)
 ├── results.py       # slim-data host side: TrSampleTables, SpecReader, StaffDirectory, actor_for, demo rules
 ├── results_routes.py  # /results (upload, batches with every cup, trace, reports) and /api/results — staff only
+├── prep.py          # slim-prep host side: prep_actor_for, publish_demo_prep, chemicals, send (+ re-evaluate)
+├── prep_routes.py   # /prep (batches, standards book, grid, send, run list CSV) and /api/prep — staff only
 ├── personas.py      # demo personas (DEMO_PERSONAS): data/demo_personas.csv -> users.is_persona rows
 ├── demo_scenarios.py  # slim-data's demo scenarios on real TRs (PortalDemoHost, seed_scenarios); demo seed only
 ├── api.py           # /api/submissions JSON API; maps service errors to 422/403/404/409
