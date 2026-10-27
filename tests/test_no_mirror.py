@@ -6,7 +6,13 @@ A tripwire in case a sync from the private repo ever runs again: its files must 
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-MIRRORED = ("app.py", "vba_ping.bas", ".env.template", "deploy/setup_service.ps1", "deploy/watchdog_check.ps1")
+MIRRORED = (
+    "app.py",
+    "vba_ping.bas",
+    ".env.template",
+    "deploy/setup_service.ps1",
+    "deploy/watchdog_check.ps1",
+)
 
 
 def test_nothing_from_the_private_slim_lims_comes_back():

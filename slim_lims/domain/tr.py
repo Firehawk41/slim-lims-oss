@@ -2,11 +2,12 @@
 
 Pure pydantic + standard library: this module must stay liftable into slim-domain unchanged.
 Rules that need reference data (IDs exist, analysis allowed for the request type, customer
-locations) are NOT checked here — see the portal's submission service.
+locations) are NOT checked here — see the app's submission service.
 """
 
 import re
 from datetime import date, time, timedelta
+from itertools import pairwise
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, EmailStr, Field, computed_field, model_validator
 
@@ -25,7 +26,13 @@ from slim_lims.domain.enums import (
 
 TR_NUMBER_RE = re.compile(r"^TR\d{5,}$")
 _RECEIPT_REQUIRED = frozenset(
-    {TRStatus.RECEIVED, TRStatus.IN_PROGRESS, TRStatus.PARTIAL_REPORT, TRStatus.COMPLETE_REPORT, TRStatus.INVOICED}
+    {
+        TRStatus.RECEIVED,
+        TRStatus.IN_PROGRESS,
+        TRStatus.PARTIAL_REPORT,
+        TRStatus.COMPLETE_REPORT,
+        TRStatus.INVOICED,
+    }
 )
 
 
@@ -195,7 +202,9 @@ class TRSubmission(_Frozen):
         for s in self.samples:
             where = f"sample {s.position}"
             if s.processing_time not in allowed:
-                errors.append(f"{where}: {s.processing_time.label} is not offered for {self.request_type.label}")
+                errors.append(
+                    f"{where}: {s.processing_time.label} is not offered for {self.request_type.label}"
+                )
             if wafer:
                 if s.wafer_size is None or s.reporting_unit is None:
                     errors.append(f"{where}: wafer samples need wafer_size and reporting_unit")
@@ -216,7 +225,7 @@ class TRSubmission(_Frozen):
             return ["status_history needs at least the initial event"]
         if self.status_history[0].from_status is not None:
             errors.append("the first status event must start from nothing")
-        for prev, event in zip(self.status_history, self.status_history[1:]):
+        for prev, event in pairwise(self.status_history):
             if event.from_status is not prev.to_status:
                 errors.append("status_history events must chain")
                 break
@@ -226,7 +235,10 @@ class TRSubmission(_Frozen):
             errors.append("a submission that is not yet received cannot have a receipt")
         if self.status in _RECEIPT_REQUIRED and self.receipt is None:
             errors.append(f"status {self.status.label} requires a receipt")
-        if (self.status in _RECEIPT_REQUIRED and self.request_type is RequestType.CHEMICAL
-                and any(s.chemical_id is None for s in self.samples)):
+        if (
+            self.status in _RECEIPT_REQUIRED
+            and self.request_type is RequestType.CHEMICAL
+            and any(s.chemical_id is None for s in self.samples)
+        ):
             errors.append("every chemical must be matched to SLIM once the request is checked in")
         return errors

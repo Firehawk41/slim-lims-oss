@@ -6,10 +6,10 @@ import uuid
 from datetime import date
 from typing import Annotated
 
+import slim_invoicing
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse, Response
 from pydantic import ValidationError
-import slim_invoicing
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -42,37 +42,71 @@ def _int_or_none(value: str | None) -> int | None:
 
 # ---------------------------------------------------------------- requests (customers and staff)
 
+
 @router.get("/", name="index")
-def index(request: Request, user: CurrentUser, db: DB, reference: Reference,
-          customer: str = "", analysis: str = "", rush: str = "", mine: str = ""):
+def index(
+    request: Request,
+    user: CurrentUser,
+    db: DB,
+    reference: Reference,
+    customer: str = "",
+    analysis: str = "",
+    rush: str = "",
+    mine: str = "",
+):
     """The board (spec §13): every live TR where it has got to. Customers see their own, read-only."""
     if user is None:
         return RedirectResponse("/login", status_code=303)
-    filters = {"customer": _int_or_none(customer), "analysis": _int_or_none(analysis),
-               "rush": rush == "1", "mine": mine == "1" and user.is_staff}
-    columns = board.board(db, user, reference, customer_id=filters["customer"], analysis_id=filters["analysis"],
-                          rush=filters["rush"], mine=filters["mine"])
-    analyses = sorted({a for _, _, cards in columns for c in cards for s in c.tr.samples for a in s.analysis_ids})
-    return render(request, "board.html", {
-        "columns": columns,
-        "filters": filters,
-        "customers": reference.customer_choices() if user.is_staff else [],
-        "analyses": [reference.analysis(a) for a in analyses if reference.analysis(a)],
-        "paid_shown": board.PAID_SHOWN,
-        "can_invoice": user.is_staff,
-        "TRStatus": TRStatus,
-    })
+    filters = {
+        "customer": _int_or_none(customer),
+        "analysis": _int_or_none(analysis),
+        "rush": rush == "1",
+        "mine": mine == "1" and user.is_staff,
+    }
+    columns = board.board(
+        db,
+        user,
+        reference,
+        customer_id=filters["customer"],
+        analysis_id=filters["analysis"],
+        rush=filters["rush"],
+        mine=filters["mine"],
+    )
+    analyses = sorted(
+        {a for _, _, cards in columns for c in cards for s in c.tr.samples for a in s.analysis_ids}
+    )
+    return render(
+        request,
+        "board.html",
+        {
+            "columns": columns,
+            "filters": filters,
+            "customers": reference.customer_choices() if user.is_staff else [],
+            "analyses": [reference.analysis(a) for a in analyses if reference.analysis(a)],
+            "paid_shown": board.PAID_SHOWN,
+            "can_invoice": user.is_staff,
+            "TRStatus": TRStatus,
+        },
+    )
 
 
 @router.post("/requests/{tr_number}/invoice", name="invoice_sent")
-def invoice_sent(request: Request, tr_number: str, user: RequireStaff, service: Service, db: DB, reference: Reference):
-    return _invoice(request, db, lambda: invoices.mark_sent(db, service, tr_number, user, reference),
-                    f"{tr_number}: invoiced and sent.")
+def invoice_sent(
+    request: Request, tr_number: str, user: RequireStaff, service: Service, db: DB, reference: Reference
+):
+    return _invoice(
+        request,
+        db,
+        lambda: invoices.mark_sent(db, service, tr_number, user, reference),
+        f"{tr_number}: invoiced and sent.",
+    )
 
 
 @router.post("/requests/{tr_number}/invoice/paid", name="invoice_paid")
 def invoice_paid(request: Request, tr_number: str, user: RequireStaff, service: Service, db: DB):
-    return _invoice(request, db, lambda: invoices.mark_paid(db, service, tr_number, user), f"{tr_number}: paid.")
+    return _invoice(
+        request, db, lambda: invoices.mark_paid(db, service, tr_number, user), f"{tr_number}: paid."
+    )
 
 
 def _invoice(request: Request, db: Session, action, done: str) -> RedirectResponse:
@@ -87,17 +121,26 @@ def _invoice(request: Request, db: Session, action, done: str) -> RedirectRespon
 
 
 @router.get("/requests/{tr_number}/reports", name="issued_reports")
-def issued_reports(request: Request, tr_number: str, user: RequireUser, service: Service, db: DB,
-                   reference: Reference):
+def issued_reports(
+    request: Request, tr_number: str, user: RequireUser, service: Service, db: DB, reference: Reference
+):
     """Every report issued for a TR, newest first, each exactly as it was issued (spec §13): rebuilt as
     of its issue and checked against the hash recorded then (D-73). Customers see their own."""
     try:
         submission = service.get(tr_number, user)
     except NotFound:
-        return render(request, "error.html", {"status": 404, "message": f"Testing Request {tr_number} not found."}, 404)
-    return render(request, "requests/reports.html", {
-        "s": submission, "reports": issued_documents(db, tr_number), "reference": reference,
-    })
+        return render(
+            request, "error.html", {"status": 404, "message": f"Testing Request {tr_number} not found."}, 404
+        )
+    return render(
+        request,
+        "requests/reports.html",
+        {
+            "s": submission,
+            "reports": issued_documents(db, tr_number),
+            "reference": reference,
+        },
+    )
 
 
 @router.get("/requests/{tr_number}/invoice", name="invoice_page")
@@ -106,19 +149,30 @@ def invoice_page(request: Request, tr_number: str, user: RequireUser, service: S
     try:
         submission = service.get(tr_number, user)
     except NotFound:
-        return render(request, "error.html", {"status": 404, "message": f"Testing Request {tr_number} not found."}, 404)
+        return render(
+            request, "error.html", {"status": 404, "message": f"Testing Request {tr_number} not found."}, 404
+        )
     order = slim_invoicing.sales_order_for(db, tr_number)
     if order is None:
-        return render(request, "error.html", {"status": 404, "message": f"{tr_number} has not been invoiced."}, 404)
+        return render(
+            request, "error.html", {"status": 404, "message": f"{tr_number} has not been invoiced."}, 404
+        )
     paid = invoices.latest_invoices(db, [submission.id]).get(submission.id)
     return render(request, "requests/invoice.html", {"s": submission, "order": order, "invoice": paid})
 
 
 @router.get("/invoices", name="invoices_home")
 def invoices_home(request: Request, user: RequireStaff, db: DB, reference: Reference):
-    return render(request, "invoices.html", {"orders": slim_invoicing.sales_orders(db),
-                                             "quotes": invoices.price_lists(db, reference), "reference": reference,
-                                             "five_days": slim_invoicing.ProcessingTime.FIVE_DAYS})
+    return render(
+        request,
+        "invoices.html",
+        {
+            "orders": slim_invoicing.sales_orders(db),
+            "quotes": invoices.price_lists(db, reference),
+            "reference": reference,
+            "five_days": slim_invoicing.ProcessingTime.FIVE_DAYS,
+        },
+    )
 
 
 @router.get("/invoices.csv", name="invoices_csv")
@@ -126,8 +180,11 @@ def invoices_csv(user: RequireStaff, db: DB):
     """Every sales order as the accounting import file (V4's columns)."""
     out = io.StringIO()
     slim_invoicing.write_csv(slim_invoicing.sales_orders(db), out)
-    return Response(out.getvalue(), media_type="text/csv",
-                    headers={"Content-Disposition": 'attachment; filename="sales_orders.csv"'})
+    return Response(
+        out.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="sales_orders.csv"'},
+    )
 
 
 @router.get("/requests", name="my_requests")
@@ -144,20 +201,28 @@ def new_request(request: Request, user: RequireUser):
 
 
 @router.get("/requests/{tr_number}", name="request_detail")
-def request_detail(request: Request, tr_number: str, user: RequireUser, service: Service, reference: Reference):
+def request_detail(
+    request: Request, tr_number: str, user: RequireUser, service: Service, reference: Reference
+):
     try:
         submission = service.get(tr_number, user)
     except NotFound:
-        return render(request, "error.html", {"status": 404, "message": f"Testing Request {tr_number} not found."}, 404)
+        return render(
+            request, "error.html", {"status": 404, "message": f"Testing Request {tr_number} not found."}, 404
+        )
     actor_type = ActorType.STAFF if user.is_staff else ActorType.CUSTOMER_USER
-    return render(request, "requests/detail.html", {
-        "s": submission,
-        "samples": _describe_samples(submission, reference),
-        "next_statuses": allowed_next_statuses(submission.status, actor_type),
-        "lab_today": service.lab_today(),
-        "chemicals": reference.chemical_choices() if user.is_staff else [],
-        "TRStatus": TRStatus,
-    })
+    return render(
+        request,
+        "requests/detail.html",
+        {
+            "s": submission,
+            "samples": _describe_samples(submission, reference),
+            "next_statuses": allowed_next_statuses(submission.status, actor_type),
+            "lab_today": service.lab_today(),
+            "chemicals": reference.chemical_choices() if user.is_staff else [],
+            "TRStatus": TRStatus,
+        },
+    )
 
 
 @router.post("/requests/{tr_number}/status", name="change_status_form")
@@ -192,21 +257,29 @@ def change_status_form(
 
 
 @router.get("/requests/{tr_number}/check-in", name="check_in_page")
-def check_in_page(request: Request, tr_number: str, user: RequireStaff, service: Service, reference: Reference):
+def check_in_page(
+    request: Request, tr_number: str, user: RequireStaff, service: Service, reference: Reference
+):
     try:
         submission = service.get(tr_number, user)
     except NotFound:
-        return render(request, "error.html", {"status": 404, "message": f"Testing Request {tr_number} not found."}, 404)
+        return render(
+            request, "error.html", {"status": 404, "message": f"Testing Request {tr_number} not found."}, 404
+        )
     if submission.status is not TRStatus.SUBMITTED:
         flash(request, f"{submission.tr_number} is already {submission.status.label.lower()}.", "error")
         return _redirect(request, "request_detail", tr_number=tr_number)
-    return render(request, "requests/check_in.html", {
-        "s": submission,
-        "samples": _describe_samples(submission, reference),
-        "chemicals": reference.chemical_choices(),
-        "lab_today": service.lab_today(),
-        "TRStatus": TRStatus,
-    })
+    return render(
+        request,
+        "requests/check_in.html",
+        {
+            "s": submission,
+            "samples": _describe_samples(submission, reference),
+            "chemicals": reference.chemical_choices(),
+            "lab_today": service.lab_today(),
+            "TRStatus": TRStatus,
+        },
+    )
 
 
 async def form_fields(request: Request) -> dict[str, str]:
@@ -225,8 +298,11 @@ def check_in_form(
     form: Annotated[dict[str, str], Depends(form_fields)],
 ):
     try:
-        matches = {int(k.removeprefix("chemical_")): int(v)
-                   for k, v in form.items() if k.startswith("chemical_") and v.strip().isdigit()}
+        matches = {
+            int(k.removeprefix("chemical_")): int(v)
+            for k, v in form.items()
+            if k.startswith("chemical_") and v.strip().isdigit()
+        }
         data = CheckInIn(
             date_received=date.fromisoformat(form.get("date_received", "")),
             received_by=form.get("received_by") or None,
@@ -235,7 +311,10 @@ def check_in_form(
         )
         submission = service.check_in(tr_number, data, user)
         db.commit()
-        flash(request, f"{submission.tr_number} checked in: {len(submission.samples)} sample(s) logged into the LIMS.")
+        flash(
+            request,
+            f"{submission.tr_number} checked in: {len(submission.samples)} sample(s) logged into the LIMS.",
+        )
         return _redirect(request, "request_detail", tr_number=tr_number)
     except (ValidationError, ValueError, Conflict, SubmissionRejected) as e:
         db.rollback()
@@ -259,7 +338,9 @@ def match_chemical_form(
     try:
         if not chemical_id.isdigit():
             raise ValueError("Choose a SLIM chemical.")
-        submission = service.match_chemical(tr_number, position, ChemicalMatchIn(chemical_id=int(chemical_id)), user)
+        submission = service.match_chemical(
+            tr_number, position, ChemicalMatchIn(chemical_id=int(chemical_id)), user
+        )
         db.commit()
         sample = next(s for s in submission.samples if s.position == position)
         flash(request, f"Sample {position} ({sample.sample_name}) matched.")
@@ -284,14 +365,27 @@ def _describe_samples(submission: TRSubmission, reference: ReferenceData) -> lis
     described = []
     for s in submission.samples:
         chemical = reference.chemical(s.chemical_id) if s.chemical_id is not None else None
-        analyses = [(reference.analysis(a).name if reference.analysis(a) else f"Analysis #{a}") for a in s.analysis_ids]
-        elements = [(reference.element(e).symbol if reference.element(e) else f"#{e}") for e in s.additional_element_ids]
-        described.append({"sample": s, "analyses": analyses, "elements": elements,
-                          "slim_chemical": chemical.name if chemical else None})
+        analyses = [
+            (reference.analysis(a).name if reference.analysis(a) else f"Analysis #{a}")
+            for a in s.analysis_ids
+        ]
+        elements = [
+            (reference.element(e).symbol if reference.element(e) else f"#{e}")
+            for e in s.additional_element_ids
+        ]
+        described.append(
+            {
+                "sample": s,
+                "analyses": analyses,
+                "elements": elements,
+                "slim_chemical": chemical.name if chemical else None,
+            }
+        )
     return described
 
 
 # ---------------------------------------------------------------- staff
+
 
 @router.get("/admin", name="admin_home")
 def admin_home(
@@ -306,8 +400,11 @@ def admin_home(
     result = service.list(
         user,
         status=TRStatus(filters["status"]) if filters["status"] in TRStatus._value2member_map_ else None,
-        request_type=(RequestType(filters["request_type"])
-                      if filters["request_type"] in RequestType._value2member_map_ else None),
+        request_type=(
+            RequestType(filters["request_type"])
+            if filters["request_type"] in RequestType._value2member_map_
+            else None
+        ),
         page=max(page, 1),
         per_page=PER_PAGE,
     )
@@ -316,10 +413,17 @@ def admin_home(
     if hasattr(reference, "status"):
         reference.snapshot()  # the cache loads lazily; make sure the page reports a real load
         reference_status = reference.status()
-    return render(request, "admin/home.html", {
-        "result": result, "filters": filters, "statuses": TRStatus, "request_types": RequestType,
-        "reference_status": reference_status,
-    })
+    return render(
+        request,
+        "admin/home.html",
+        {
+            "result": result,
+            "filters": filters,
+            "statuses": TRStatus,
+            "request_types": RequestType,
+            "reference_status": reference_status,
+        },
+    )
 
 
 @router.post("/admin/reference/refresh", name="refresh_reference")
@@ -338,7 +442,9 @@ def refresh_reference(request: Request, user: RequireStaff):
 def admin_users(request: Request, user: RequireStaff, db: DB, reference: Reference):
     users = db.scalars(select(User).order_by(User.role.desc(), User.email)).all()
     customers = {c.id: c.name for c in reference.customer_choices()}
-    return render(request, "admin/users.html", {"users": users, "customers": customers, "lab_roles": LAB_ROLES})
+    return render(
+        request, "admin/users.html", {"users": users, "customers": customers, "lab_roles": LAB_ROLES}
+    )
 
 
 @router.post("/admin/users", name="create_user")
@@ -387,12 +493,16 @@ def create_user(
     except ValueError as e:
         flash(request, str(e), "error")
         return _redirect(request, "admin_users")
-    db.add(User(
-        email=email, password_hash=password_hash, role=role,
-        initials=initials if role == ROLE_STAFF else None,
-        lab_role=role_id if role == ROLE_STAFF else None,
-        customer_id=cid if role == ROLE_CUSTOMER else None,
-    ))
+    db.add(
+        User(
+            email=email,
+            password_hash=password_hash,
+            role=role,
+            initials=initials if role == ROLE_STAFF else None,
+            lab_role=role_id if role == ROLE_STAFF else None,
+            customer_id=cid if role == ROLE_CUSTOMER else None,
+        )
+    )
     db.commit()
     flash(request, f"Created {role} user {email}.")
     return _redirect(request, "admin_users")
@@ -418,7 +528,9 @@ def toggle_user_active(request: Request, user_id: str, user: RequireStaff, db: D
 
 
 @router.post("/admin/users/{user_id}/lab-role", name="set_lab_role")
-def set_lab_role(request: Request, user_id: str, user: RequireStaff, db: DB, lab_role: Annotated[int, Form()]):
+def set_lab_role(
+    request: Request, user_id: str, user: RequireStaff, db: DB, lab_role: Annotated[int, Form()]
+):
     """Supervisors only: lab roles decide who may review, accept and release results (D-70)."""
     try:
         target = db.get(User, uuid.UUID(user_id))

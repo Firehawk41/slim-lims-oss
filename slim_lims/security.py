@@ -60,7 +60,7 @@ async def csrf_protect(request: Request) -> None:
     if "authorization" in request.headers:
         # Bearer-token clients (slim-lims, spec §12). Such requests are authenticated by the
         # token only -- auth.current_user ignores the session cookie for them -- and a browser
-        # cannot add this header to a cross-site request without a CORS preflight the portal
+        # cannot add this header to a cross-site request without a CORS preflight the app
         # never allows. So there is no cookie to ride on and nothing for CSRF to protect.
         return
     expected = request.session.get(CSRF_SESSION_KEY)
@@ -118,6 +118,7 @@ class SecurityHeadersMiddleware:
 
 # ---------------------------------------------------------------- request size
 
+
 class BodySizeLimitMiddleware:
     """Rejects request bodies over `max_bytes` with 413, whether or not Content-Length is sent."""
 
@@ -166,9 +167,11 @@ class BodySizeLimitMiddleware:
 
 async def _send_413(send: Send) -> None:
     body = b'{"detail":"Request body too large."}'
-    await send({
-        "type": "http.response.start",
-        "status": 413,
-        "headers": [(b"content-type", b"application/json"), (b"content-length", str(len(body)).encode())],
-    })
+    await send(
+        {
+            "type": "http.response.start",
+            "status": 413,
+            "headers": [(b"content-type", b"application/json"), (b"content-length", str(len(body)).encode())],
+        }
+    )
     await send({"type": "http.response.body", "body": body})

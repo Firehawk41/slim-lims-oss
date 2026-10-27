@@ -36,8 +36,10 @@ directly — no Excel in between.
   and manage users.
 - **SLIM reference data** (customers, chemicals, elements, analyses) is read from the shared
   database through a periodically refreshed cache.
-- **Results** (staff, `/results`), through slim-data: upload an instrument CSV (preview, then all or
-  nothing), and a versioned rules engine decides each result. Then review the batch, accept, send to
+- **Results** (staff, `/results`), through slim-data: bring in a run as a CSV, a Thermo Qtegra export
+  (samples named in Qtegra's Comment) or a table pasted from Excel (preview, then all or nothing),
+  and a versioned rules engine decides each result, with suggestions from the instrument's own
+  evidence (replicate RSD, internal standard recovery) and the run's calibration. Then review the batch, accept, send to
   rerun, record exceptions, release, and issue the report. Four-eyes and role rules come from slim-data's
   policy, and the request's status follows what actually happened: first readings → in progress,
   issued report → partial / complete report. Batches carry method blanks, check standards and CRMs.

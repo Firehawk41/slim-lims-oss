@@ -1,14 +1,13 @@
 """FastAPI application factory. Run with: uvicorn --factory slim_lims.main:create_app"""
 
 from fastapi import FastAPI, Request
-from starlette.exceptions import HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException
 from starlette.middleware.sessions import SessionMiddleware
 
 from slim_lims import __version__
-from slim_lims.api import register_error_handlers
-from slim_lims.api import reference_router
+from slim_lims.api import reference_router, register_error_handlers
 from slim_lims.api import router as submissions_router
 from slim_lims.auth import LoginRequired, StaffRequired, login_redirect
 from slim_lims.auth import router as auth_router
@@ -92,17 +91,20 @@ def create_app(
     async def _staff_required(request: Request, _exc: StaffRequired):
         if _wants_json(request):
             return JSONResponse({"detail": "Staff only."}, status_code=403)
-        return render(request, "error.html", {"status": 403, "message": "This page is for lab staff only."}, 403)
+        return render(
+            request, "error.html", {"status": 403, "message": "This page is for lab staff only."}, 403
+        )
 
     @app.exception_handler(HTTPException)
     async def _http_exception(request: Request, exc: HTTPException):
         if _wants_json(request) or exc.status_code < 400:
             return JSONResponse({"detail": exc.detail}, status_code=exc.status_code, headers=exc.headers)
-        return render(request, "error.html", {"status": exc.status_code, "message": exc.detail}, exc.status_code)
+        return render(
+            request, "error.html", {"status": exc.status_code, "message": exc.detail}, exc.status_code
+        )
 
     @app.get("/health", include_in_schema=False)
     def health():
         return {"status": "ok", "version": __version__}
 
     return app
-

@@ -13,9 +13,12 @@ import pytest
 
 pytest.importorskip("slim_report_engine")
 
+from slim_data.domain.enums import Qualifier  # noqa: E402
+from slim_data.domain.values import AnalyteRef, SampleRef  # noqa: E402
 from slim_data.persistence import migrate  # noqa: E402
-from slim_invoicing.persistence import migrate as invoicing_migrate  # noqa: E402
 from slim_data.persistence.results import issues_for_tr  # noqa: E402
+from slim_data.service.views import ReportLineView, ReportView, report_view  # noqa: E402
+from slim_invoicing.persistence import migrate as invoicing_migrate  # noqa: E402
 
 from slim_lims import reports  # noqa: E402
 from slim_lims.catalog import sync_analysis_catalog  # noqa: E402
@@ -23,12 +26,9 @@ from slim_lims.db import Base, make_engine, make_session_factory  # noqa: E402
 from slim_lims.demo_scenarios import seed_scenarios  # noqa: E402
 from slim_lims.personas import sync_personas  # noqa: E402
 from slim_lims.reference_cache import load_reference  # noqa: E402
+from slim_lims.reports import plain_renderer  # noqa: E402
 from slim_lims.repositories import TRSubmissionRepository  # noqa: E402
 from slim_lims.results import SpecReader, publish_demo_rules  # noqa: E402
-from slim_data.domain.enums import Qualifier  # noqa: E402
-from slim_data.domain.values import AnalyteRef, SampleRef  # noqa: E402
-from slim_data.service.views import ReportLineView, ReportView, report_view  # noqa: E402
-from slim_lims.reports import plain_renderer  # noqa: E402
 
 OSS_DEMO = Path(__file__).resolve().parents[2] / "slim-report-engine-oss" / "demo" / "demo.py"
 
@@ -57,13 +57,17 @@ def issued(tmp_path_factory):
         session.commit()
         trs = seed_scenarios(session, reference, SpecReader(engine), renderer=reports.engine_renderer)
         session.commit()
-        files = {name: [reports.stored(session, i.file_sha256) for i in issues_for_tr(session, tr)]
-                 for name, tr in trs.items()}
+        files = {
+            name: [reports.stored(session, i.file_sha256) for i in issues_for_tr(session, tr)]
+            for name, tr in trs.items()
+        }
         hashes = {name: [i.file_sha256 for i in issues_for_tr(session, tr)] for name, tr in trs.items()}
         # below_mdl and cups_disagree are released but never issued: render what their reports would be
         for name in ("below_mdl", "cups_disagree"):
             tr = TRSubmissionRepository(session).get_by_tr_number(trs[name])
-            files[name] = [reports.engine_renderer(session, tr, report_view(session, tr.tr_number), reference)]
+            files[name] = [
+                reports.engine_renderer(session, tr, report_view(session, tr.tr_number), reference)
+            ]
     engine.dispose()
     return files, hashes
 
@@ -98,7 +102,10 @@ def test_anions_print_the_ql_and_below_mdl_in_blue(issued):
 def test_half_delta_is_printed_beside_the_spec_it_bears_on(issued):
     files, _ = issued
     report = files["cups_disagree"][0]  # Fe 0.295 against B's 0.3 IPA spec (slim-data D-80)
-    assert "Fe: close to the customer&#x27;s specification; half delta 0.010" in report and "<dt>Half delta</dt>" in report
+    assert (
+        "Fe: close to the customer&#x27;s specification; half delta 0.010" in report
+        and "<dt>Half delta</dt>" in report
+    )
     assert "<dt>Decision rule</dt><dd>Simple acceptance" in report
 
 
@@ -113,12 +120,24 @@ def test_the_assay_report_and_its_amendment(issued):
 def test_half_delta_is_noted_beside_the_spec_and_explained():
     """slim-data D-80: a line carries ½Δ only near a spec limit; the report then says what it is."""
     line = ReportLineView(
-        sample=SampleRef(tr_number="TR00001", position=1), analyte=AnalyteRef(analysis_id=5, code="Fe"),
-        version=1, text="10.050", reported=None, qualifier=Qualifier.DETECTED, uncertainty=Decimal("0.050"),
-        recovery=None, mdl=Decimal("0.050"), half_delta=Decimal("0.050"), shown_flags=("ABOVE_SPEC",),
+        sample=SampleRef(tr_number="TR00001", position=1),
+        analyte=AnalyteRef(analysis_id=5, code="Fe"),
+        version=1,
+        text="10.050",
+        reported=None,
+        qualifier=Qualifier.DETECTED,
+        uncertainty=Decimal("0.050"),
+        recovery=None,
+        mdl=Decimal("0.050"),
+        half_delta=Decimal("0.050"),
+        shown_flags=("ABOVE_SPEC",),
     )
-    html = plain_renderer(None, SimpleNamespace(tr_number="TR00001"), ReportView(tr_number="TR00001", lines=(line,)),
-                          SimpleNamespace(analysis=lambda _id: None))
+    html = plain_renderer(
+        None,
+        SimpleNamespace(tr_number="TR00001"),
+        ReportView(tr_number="TR00001", lines=(line,)),
+        SimpleNamespace(analysis=lambda _id: None),
+    )
     assert "Fe: above the customer&#x27;s specification; half delta 0.050" in html
     assert "<dt>Half delta</dt><dd>Half the difference between the two measurements" in html
     assert "<dt>MDL</dt>" in html

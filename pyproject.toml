@@ -29,7 +29,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "httpx>=0.27"]
+dev = ["pytest>=8", "httpx>=0.27", "ruff==0.16.9"]
 # The demo seed (scripts/seed_demo.py) also needs slim-report-engine-oss, installed from a local
 # checkout: pip install -e ../slim-report-engine-oss
 
@@ -38,6 +38,19 @@ include = ["slim_lims*"]
 
 [tool.setuptools.package-data]
 slim_lims = ["templates/**/*", "static/**/*", "migrations/**/*", "alembic.ini", "data/*.csv"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+extend-exclude = ["docs", "*.md"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+# These import test_demo_scenarios' fixtures, which their tests then take as arguments.
+"tests/test_board.py" = ["F811"]
+"tests/test_invoicing.py" = ["F811"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

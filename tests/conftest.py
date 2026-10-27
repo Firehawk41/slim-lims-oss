@@ -3,14 +3,13 @@ import re
 
 import pytest
 from fastapi.testclient import TestClient
-
 from slim_data.persistence import migrate as slim_data_migrate
 from slim_invoicing.persistence import migrate as invoicing_migrate
 
 from slim_lims.config import Settings
 from slim_lims.db import Base, make_engine, make_session_factory
-from slim_lims.main import create_app
 from slim_lims.domain import RequestType
+from slim_lims.main import create_app
 from slim_lims.models import LAB_ROLE_SUPERVISOR, ROLE_CUSTOMER, ROLE_STAFF, User
 from slim_lims.reference import AnalysisRef, ChemicalRef, CustomerRef, ElementRef, StaticReferenceData
 from slim_lims.security import hash_password
@@ -77,8 +76,13 @@ def client(app):
 
 @pytest.fixture
 def staff_user(db):
-    user = User(email="staff@lab.example", password_hash=hash_password(PASSWORD), role=ROLE_STAFF, initials="JM",
-                lab_role=LAB_ROLE_SUPERVISOR)
+    user = User(
+        email="staff@lab.example",
+        password_hash=hash_password(PASSWORD),
+        role=ROLE_STAFF,
+        initials="JM",
+        lab_role=LAB_ROLE_SUPERVISOR,
+    )
     db.add(user)
     db.commit()
     return user
@@ -86,7 +90,9 @@ def staff_user(db):
 
 @pytest.fixture
 def customer_user(db):
-    user = User(email="jane@acme.example", password_hash=hash_password(PASSWORD), role=ROLE_CUSTOMER, customer_id=1)
+    user = User(
+        email="jane@acme.example", password_hash=hash_password(PASSWORD), role=ROLE_CUSTOMER, customer_id=1
+    )
     db.add(user)
     db.commit()
     return user
@@ -129,7 +135,9 @@ def demo_reference() -> StaticReferenceData:
             AnalysisRef(1, "36 Elements", "36_elements_icpms", "Metals", request_types=frozenset({C, W, F})),
             AnalysisRef(2, "pH", "ph", "Physical", request_types=frozenset({C, W})),
             AnalysisRef(3, "TOC", "toc", "Organics", request_types=frozenset({W})),
-            AnalysisRef(4, "Additional Element", "additional_element_icpms", "Metals", portal_selectable=False),
+            AnalysisRef(
+                4, "Additional Element", "additional_element_icpms", "Metals", portal_selectable=False
+            ),
         ],
         customer_locations={2: ("SX5N", "SX5S")},
     )

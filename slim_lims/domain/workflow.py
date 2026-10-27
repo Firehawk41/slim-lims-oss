@@ -52,25 +52,37 @@ def transition(
     """
     current = submission.status
     if to_status not in allowed_next_statuses(current, actor.type):
-        raise TransitionNotAllowed(f"cannot move {submission.tr_number or 'submission'} from "
-                                   f"{current.label} to {to_status.label}")
+        raise TransitionNotAllowed(
+            f"cannot move {submission.tr_number or 'submission'} from {current.label} to {to_status.label}"
+        )
 
     receipt = submission.receipt
     if to_status is TRStatus.RECEIVED:
-        unmatched = [str(s.position) for s in submission.samples
-                     if submission.request_type is RequestType.CHEMICAL and s.chemical_id is None]
+        unmatched = [
+            str(s.position)
+            for s in submission.samples
+            if submission.request_type is RequestType.CHEMICAL and s.chemical_id is None
+        ]
         if unmatched:
-            raise TransitionNotAllowed(f"match the chemical for sample(s) {', '.join(unmatched)} before checking in")
+            raise TransitionNotAllowed(
+                f"match the chemical for sample(s) {', '.join(unmatched)} before checking in"
+            )
         if date_received is None or not received_by:
             raise TransitionNotAllowed("receiving samples needs date_received and received_by")
         if today is not None and date_received > today:
-            raise TransitionNotAllowed(f"date_received {date_received} is in the future (lab date is {today})")
-        receipt = TRReceipt(date_received=date_received, received_by=received_by, recorded_at=at, recorded_by=actor)
+            raise TransitionNotAllowed(
+                f"date_received {date_received} is in the future (lab date is {today})"
+            )
+        receipt = TRReceipt(
+            date_received=date_received, received_by=received_by, recorded_at=at, recorded_by=actor
+        )
     elif date_received is not None or received_by is not None:
         raise TransitionNotAllowed("date_received and received_by are only for receiving samples")
 
     event = TRStatusEvent(from_status=current, to_status=to_status, at=at, actor=actor, note=note)
-    return replace(submission, status=to_status, receipt=receipt, status_history=(*submission.status_history, event))
+    return replace(
+        submission, status=to_status, receipt=receipt, status_history=(*submission.status_history, event)
+    )
 
 
 def replace(model, **changes):
@@ -84,7 +96,9 @@ def match_chemical(submission: TRSubmission, position: int, chemical_id: int) ->
         raise ValueError("only Chemical requests have chemicals to match")
     if not any(s.position == position for s in submission.samples):
         raise ValueError(f"sample {position} does not exist")
-    samples = tuple(replace(s, chemical_id=chemical_id) if s.position == position else s for s in submission.samples)
+    samples = tuple(
+        replace(s, chemical_id=chemical_id) if s.position == position else s for s in submission.samples
+    )
     return replace(submission, samples=samples)
 
 
@@ -104,5 +118,13 @@ def check_in(
     every Chemical sample ends up matched."""
     for position, chemical_id in (chemical_matches or {}).items():
         submission = match_chemical(submission, position, chemical_id)
-    return transition(submission, TRStatus.RECEIVED, actor=actor, at=at, note=note,
-                      date_received=date_received, received_by=received_by, today=today)
+    return transition(
+        submission,
+        TRStatus.RECEIVED,
+        actor=actor,
+        at=at,
+        note=note,
+        date_received=date_received,
+        received_by=received_by,
+        today=today,
+    )

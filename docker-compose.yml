@@ -1,5 +1,5 @@
-# The portal the way it runs in the SLIM ecosystem: one Postgres shared with SLIM, holding
-# SLIM's reference tables (fictional OSS demo data) and the portal's own tables.
+# The app the way it runs in the SLIM ecosystem: one Postgres shared with SLIM, holding
+# SLIM's reference tables (fictional OSS demo data) and the app's own tables.
 #
 #   docker compose up --build        then http://127.0.0.1:8000
 #
@@ -20,7 +20,7 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
 
-  # One-shot: portal migrations, SLIM demo reference data (only if SLIM's tables are empty),
+  # One-shot: the app's migrations, SLIM demo reference data (only if SLIM's tables are empty),
   # analysis catalog. Safe to re-run.
   seed:
     build: .

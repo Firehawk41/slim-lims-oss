@@ -77,18 +77,30 @@ _RUSH = frozenset({ProcessingTime.SAME_DAY_RUSH, ProcessingTime.CALL_IN_RUSH, Pr
 # Offered in the portal, slowest first. EXTENDED_TIME is accepted only from legacy xlsx forms.
 ALLOWED_PROCESSING_TIMES: dict[RequestType, tuple[ProcessingTime, ...]] = {
     RequestType.CHEMICAL: (
-        ProcessingTime.FIVE_DAYS, ProcessingTime.THREE_DAYS, ProcessingTime.TWO_DAYS,
-        ProcessingTime.NEXT_DAY, ProcessingTime.TIME_LIMITED,
-        ProcessingTime.SAME_DAY_RUSH, ProcessingTime.CALL_IN_RUSH,
+        ProcessingTime.FIVE_DAYS,
+        ProcessingTime.THREE_DAYS,
+        ProcessingTime.TWO_DAYS,
+        ProcessingTime.NEXT_DAY,
+        ProcessingTime.TIME_LIMITED,
+        ProcessingTime.SAME_DAY_RUSH,
+        ProcessingTime.CALL_IN_RUSH,
     ),
     RequestType.WATER: (
-        ProcessingTime.FIVE_DAYS, ProcessingTime.THREE_DAYS, ProcessingTime.TWO_DAYS,
-        ProcessingTime.NEXT_DAY, ProcessingTime.TIME_LIMITED,
-        ProcessingTime.SAME_DAY_RUSH, ProcessingTime.CALL_IN_RUSH,
+        ProcessingTime.FIVE_DAYS,
+        ProcessingTime.THREE_DAYS,
+        ProcessingTime.TWO_DAYS,
+        ProcessingTime.NEXT_DAY,
+        ProcessingTime.TIME_LIMITED,
+        ProcessingTime.SAME_DAY_RUSH,
+        ProcessingTime.CALL_IN_RUSH,
     ),
     RequestType.WAFER: (
-        ProcessingTime.FIVE_DAYS, ProcessingTime.THREE_DAYS, ProcessingTime.TWO_DAYS,
-        ProcessingTime.NEXT_DAY_RUSH, ProcessingTime.SAME_DAY_RUSH, ProcessingTime.CALL_IN_RUSH,
+        ProcessingTime.FIVE_DAYS,
+        ProcessingTime.THREE_DAYS,
+        ProcessingTime.TWO_DAYS,
+        ProcessingTime.NEXT_DAY_RUSH,
+        ProcessingTime.SAME_DAY_RUSH,
+        ProcessingTime.CALL_IN_RUSH,
     ),
 }
 
@@ -117,7 +129,9 @@ class PaymentMethod(IntEnum):
 
     @property
     def label(self) -> str:
-        return {PaymentMethod.PURCHASE_ORDER: "Purchase order", PaymentMethod.CREDIT_CARD: "Credit card"}[self]
+        return {PaymentMethod.PURCHASE_ORDER: "Purchase order", PaymentMethod.CREDIT_CARD: "Credit card"}[
+            self
+        ]
 
 
 class WaferSize(IntEnum):
@@ -135,7 +149,9 @@ class ReportingUnit(IntEnum):
 
     @property
     def label(self) -> str:
-        return {ReportingUnit.ATOMS_PER_CM2: "atoms/cm²", ReportingUnit.E10_ATOMS_PER_CM2: "10¹⁰ atoms/cm²"}[self]
+        return {ReportingUnit.ATOMS_PER_CM2: "atoms/cm²", ReportingUnit.E10_ATOMS_PER_CM2: "10¹⁰ atoms/cm²"}[
+            self
+        ]
 
 
 class WaterPackage(IntEnum):

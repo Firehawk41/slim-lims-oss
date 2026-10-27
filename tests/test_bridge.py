@@ -1,7 +1,7 @@
-"""Step A: portal submissions feed the OSS report engine unchanged.
+"""Step A: slim-lims submissions feed the OSS report engine unchanged.
 
 Seeds the fictional OSS demo data (slim-report-engine-oss/demo/demo.py) into a temp SQLite file,
-converts portal TRs with bridge.to_slim_v1 and runs the report engine's own sheet builder.
+converts TRs with bridge.to_slim_v1 and runs the report engine's own sheet builder.
 Skipped when the OSS packages or the checkout aren't available.
 """
 
@@ -59,14 +59,19 @@ def _ids(services, *names):
 
 
 def _received(sub):
-    return transition(sub, TRStatus.RECEIVED, actor=STAFF_ACTOR, at=NOW,
-                      date_received=date(2026, 10, 9), received_by="JM")
+    return transition(
+        sub, TRStatus.RECEIVED, actor=STAFF_ACTOR, at=NOW, date_received=date(2026, 10, 9), received_by="JM"
+    )
 
 
 def _sheets(services, v1):
     return build_submission_sheets(
-        v1, services.customer_svc.load_customer(v1.customer_id), services.chemical_svc,
-        services.analysis_svc, services.element_svc, services.specification_svc,
+        v1,
+        services.customer_svc.load_customer(v1.customer_id),
+        services.chemical_svc,
+        services.analysis_svc,
+        services.element_svc,
+        services.specification_svc,
     )
 
 
@@ -76,21 +81,36 @@ def _text(sheets) -> str:
     for sheet in sheets:
         ws = wb.create_sheet(sheet.name)
         report_writer.write_sections(ws, list(sheet.sections), start_row=1, limit_columns=sheet.limit_columns)
-    return "\n".join(str(c.value) for ws in wb.worksheets for row in ws.iter_rows() for c in row
-                     if c.value is not None)
+    return "\n".join(
+        str(c.value) for ws in wb.worksheets for row in ws.iter_rows() for c in row if c.value is not None
+    )
 
 
 def test_chemical_submission_builds_report_sheets(services):
     chem = services.chemical_svc.get_by_name("IPA")
-    sub = _received(submission(
-        tr_number="TR00042", id=42, customer_id=2,  # demo customer "B" has specification limits
-        samples=(
-            sample(1, chemical_id=chem.id, chemical_name=chem.name,
-                   analysis_ids=_ids(services, "36 Elements", "pH")),
-            sample(2, chemical_id=chem.id, chemical_name=chem.name, analysis_ids=_ids(services, "4 Anions"),
-                   processing_time=ProcessingTime.TIME_LIMITED, requested_time=time(15, 0)),
-        ),
-    ))
+    sub = _received(
+        submission(
+            tr_number="TR00042",
+            id=42,
+            customer_id=2,  # demo customer "B" has specification limits
+            samples=(
+                sample(
+                    1,
+                    chemical_id=chem.id,
+                    chemical_name=chem.name,
+                    analysis_ids=_ids(services, "36 Elements", "pH"),
+                ),
+                sample(
+                    2,
+                    chemical_id=chem.id,
+                    chemical_name=chem.name,
+                    analysis_ids=_ids(services, "4 Anions"),
+                    processing_time=ProcessingTime.TIME_LIMITED,
+                    requested_time=time(15, 0),
+                ),
+            ),
+        )
+    )
     v1 = to_slim_v1(sub)
     assert v1.date_received == date(2026, 10, 9)
     assert v1.technician_initials == "JM"
@@ -102,12 +122,23 @@ def test_chemical_submission_builds_report_sheets(services):
 
 def test_water_submission_builds_report_sheets(services):
     water = services.chemical_svc.get_by_name("Water")
-    sub = _received(submission(
-        tr_number="TR00043", id=43, request_type=RequestType.WATER,
-        payment_method=PaymentMethod.CREDIT_CARD, po_number="",
-        samples=(sample(1, chemical_id=water.id, chemical_name=water.name,
-                        analysis_ids=_ids(services, "TOC", "Conductivity")),),
-    ))
+    sub = _received(
+        submission(
+            tr_number="TR00043",
+            id=43,
+            request_type=RequestType.WATER,
+            payment_method=PaymentMethod.CREDIT_CARD,
+            po_number="",
+            samples=(
+                sample(
+                    1,
+                    chemical_id=water.id,
+                    chemical_name=water.name,
+                    analysis_ids=_ids(services, "TOC", "Conductivity"),
+                ),
+            ),
+        )
+    )
     v1 = to_slim_v1(sub)
     assert v1.po_information == "" and "lab to call" in v1.credit_card_information
     assert _sheets(services, v1)
@@ -115,12 +146,24 @@ def test_water_submission_builds_report_sheets(services):
 
 @pytest.mark.parametrize("unit", list(ReportingUnit))
 def test_wafer_submission_builds_report_sheets(services, unit):
-    sub = _received(submission(
-        tr_number="TR00044", id=44, request_type=RequestType.WAFER,
-        samples=(sample(1, chemical_id=None, chemical_name="", processing_time=ProcessingTime.NEXT_DAY_RUSH,
-                        wafer_size=WaferSize.MM_300, reporting_unit=unit,
-                        analysis_ids=_ids(services, "36 Elements")),),
-    ))
+    sub = _received(
+        submission(
+            tr_number="TR00044",
+            id=44,
+            request_type=RequestType.WAFER,
+            samples=(
+                sample(
+                    1,
+                    chemical_id=None,
+                    chemical_name="",
+                    processing_time=ProcessingTime.NEXT_DAY_RUSH,
+                    wafer_size=WaferSize.MM_300,
+                    reporting_unit=unit,
+                    analysis_ids=_ids(services, "36 Elements"),
+                ),
+            ),
+        )
+    )
     v1 = to_slim_v1(sub)
     assert v1.samples[0].form_chemical_name == "300mm"
     content = _text(_sheets(services, v1))
@@ -130,11 +173,21 @@ def test_wafer_submission_builds_report_sheets(services, unit):
 
 
 def test_stored_submission_round_trips_into_report(services, db):
-    """Through the portal's own storage, as the real flow will be."""
+    """Through the app's own storage, as the real flow will be."""
     chem = services.chemical_svc.get_by_name("HNO3")
     repo = TRSubmissionRepository(db)
-    stored = repo.add(submission(samples=(sample(1, chemical_id=chem.id, chemical_name=chem.name,
-                                                 analysis_ids=_ids(services, "36 Elements")),)))
+    stored = repo.add(
+        submission(
+            samples=(
+                sample(
+                    1,
+                    chemical_id=chem.id,
+                    chemical_name=chem.name,
+                    analysis_ids=_ids(services, "36 Elements"),
+                ),
+            )
+        )
+    )
     received = repo.record_transition(stored, _received(stored))
     db.commit()
     assert _sheets(services, to_slim_v1(repo.get_by_tr_number(received.tr_number)))
@@ -156,4 +209,8 @@ def test_unmatched_chemical_cannot_be_checked_in():
     from slim_lims.domain import TransitionNotAllowed
 
     with pytest.raises(TransitionNotAllowed, match="match the chemical"):
-        _received(submission(tr_number="TR00047", id=47, samples=(sample(1, chemical_id=None, chemical_name="IPA"),)))
+        _received(
+            submission(
+                tr_number="TR00047", id=47, samples=(sample(1, chemical_id=None, chemical_name="IPA"),)
+            )
+        )

@@ -30,8 +30,13 @@ def test_the_demo_invoices_are_sales_orders_priced_from_the_price_list(db, seede
     assert order is not None and order.created_by == sue(db).initials
     [line] = order.line_items
     assert line.quantity == 1 and line.item.startswith("36 Elements - ")
-    assert line.rate >= BASE["Metals"] * Decimal("0.9")  # customer A's price: 10 % off the five-day base or more
-    assert {o.tr_number for o in slim_invoicing.sales_orders(db)} == {seeded["clean_pass"], seeded["rerun_exception"]}
+    assert line.rate >= BASE["Metals"] * Decimal(
+        "0.9"
+    )  # customer A's price: 10 % off the five-day base or more
+    assert {o.tr_number for o in slim_invoicing.sales_orders(db)} == {
+        seeded["clean_pass"],
+        seeded["rerun_exception"],
+    }
     assert not seed_demo_quotes(db, None, None)  # the price list is published once
 
 
@@ -55,14 +60,20 @@ def test_billable_requests_carry_only_reported_analyses(db, seeded, reference):
     assert not request.complete and request.reported == frozenset() and request.billable_samples() == ()
     amended = service.get(seeded["amended"], sue(db))  # its original and its amendment show one result
     assert invoices.billable(db, amended, reference, service.lab_today()).reported == {
-        (s.position, a) for s in amended.samples for a in s.analysis_ids}
+        (s.position, a) for s in amended.samples for a in s.analysis_ids
+    }
 
 
 def test_invoice_pages_and_the_accounting_csv(engine, db, seeded, reference):
     from slim_lims.main import create_app
 
-    app = create_app(make_settings(str(engine.url), demo_personas=True), engine=engine, reference=reference,
-                     specs=specs, report_renderer=plain_renderer)
+    app = create_app(
+        make_settings(str(engine.url), demo_personas=True),
+        engine=engine,
+        reference=reference,
+        specs=specs,
+        report_renderer=plain_renderer,
+    )
     staff = str(sue(db).id)
     customer = db.scalars(select(User).where(User.is_persona.is_(True), User.customer_id.is_not(None))).one()
     customer_id = str(customer.id)
@@ -83,14 +94,16 @@ def test_invoice_pages_and_the_accounting_csv(engine, db, seeded, reference):
         response = client.get("/invoices.csv")
         assert response.headers["content-type"].startswith("text/csv")
         rows = list(csv.reader(io.StringIO(response.text)))
-        assert rows[0][0] == "Customer" and {r[-1] for r in rows[1:]} == {seeded["clean_pass"], seeded["rerun_exception"]}
+        assert rows[0][0] == "Customer" and {r[-1] for r in rows[1:]} == {
+            seeded["clean_pass"],
+            seeded["rerun_exception"],
+        }
     with TestClient(app) as client:
         as_persona(client, customer_id)
         assert client.get(f"/requests/{seeded['clean_pass']}/invoice").status_code == 200  # their own
         assert client.get(f"/requests/{seeded['cups_disagree']}/invoice").status_code == 404  # customer B's
         assert client.get("/invoices", follow_redirects=False).status_code == 403
         assert client.get("/invoices.csv", follow_redirects=False).status_code == 403
-
 
 
 def test_customer_as_own_quote_comes_first_and_sets_its_terms(db, seeded, reference):
@@ -100,6 +113,11 @@ def test_customer_as_own_quote_comes_first_and_sets_its_terms(db, seeded, refere
     assert order.payment_terms == 45
     default, *own = invoices.price_lists(db, reference)
     assert default.is_default and [q.customer_ids for q in own] == [(order.customer_id,)]
-    listed = next(p.regular_price for li in default.line_items if li.analysis_ids == (THIRTY_SIX,)
-                  for p in li.prices if p.processing_time == line.processing_time)
+    listed = next(
+        p.regular_price
+        for li in default.line_items
+        if li.analysis_ids == (THIRTY_SIX,)
+        for p in li.prices
+        if p.processing_time == line.processing_time
+    )
     assert line.rate < listed  # its own price, not the list's

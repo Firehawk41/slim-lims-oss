@@ -1,4 +1,4 @@
-// Browser run-through of the demo flow. Needs a running portal seeded with the OSS demo data
+// Browser run-through of the demo flow. Needs a running app seeded with the OSS demo data
 // (scripts/seed_demo.py) plus a customer user a@demo.example (customer 1), password demo-password-123.
 // Run: NODE_PATH=$(npm root -g) node e2e/request_flow.js [shots-dir]     (PORTAL_URL to override the URL)
 // Customer enters 10 samples: sets up row 1 and two analyses, pastes 9 IDs, selects two samples and gives

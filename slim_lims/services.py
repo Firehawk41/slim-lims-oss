@@ -4,7 +4,7 @@ Callers commit."""
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from zoneinfo import ZoneInfo
 
 from pydantic import ValidationError
@@ -65,7 +65,7 @@ def actor_for(user: User) -> Actor:
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class SubmissionService:
@@ -94,7 +94,9 @@ class SubmissionService:
         if customer is None:
             raise SubmissionRejected([FieldError(("customer_id",), f"unknown customer {customer_id}")])
         if customer.is_group:
-            errors.append(FieldError(("customer_id",), "a customer group cannot submit; choose one of its sites"))
+            errors.append(
+                FieldError(("customer_id",), "a customer group cannot submit; choose one of its sites")
+            )
 
         if data.expected_arrival_date is not None and data.expected_arrival_date < self.lab_today():
             errors.append(FieldError(("expected_arrival_date",), "expected arrival cannot be in the past"))
@@ -142,7 +144,9 @@ class SubmissionService:
                     _to_sample(i + 1, sample_in, chemical_id, chemical_name)
                     for i, sample_in, chemical_id, chemical_name in samples
                 ),
-                status_history=(TRStatusEvent(from_status=None, to_status=TRStatus.SUBMITTED, at=now, actor=actor),),
+                status_history=(
+                    TRStatusEvent(from_status=None, to_status=TRStatus.SUBMITTED, at=now, actor=actor),
+                ),
             )
         except ValidationError as e:
             raise SubmissionRejected(_field_errors(e)) from e
@@ -157,7 +161,9 @@ class SubmissionService:
             raise Forbidden("customers can only submit for their own company")
         return user.customer_id
 
-    def _check_sample(self, s: SampleIn, request_type: RequestType) -> tuple[list[FieldError], int | None, str]:
+    def _check_sample(
+        self, s: SampleIn, request_type: RequestType
+    ) -> tuple[list[FieldError], int | None, str]:
         errors: list[FieldError] = []
         chemical_id, chemical_name = None, ""
 
@@ -173,7 +179,9 @@ class SubmissionService:
         elif request_type is RequestType.WATER:
             water = self.reference.chemical_by_name(WATER_CHEMICAL_NAME)
             if water is None:
-                errors.append(FieldError(("chemical_id",), "the lab's Water chemical is not set up; contact the lab"))
+                errors.append(
+                    FieldError(("chemical_id",), "the lab's Water chemical is not set up; contact the lab")
+                )
             else:
                 chemical_id, chemical_name = water.id, water.name
 
@@ -184,8 +192,12 @@ class SubmissionService:
             if analysis is None or not analysis.portal_selectable:
                 errors.append(FieldError(("analysis_ids", j), f"unknown analysis {analysis_id}"))
             elif request_type not in analysis.request_types:
-                errors.append(FieldError(("analysis_ids", j),
-                                         f"{analysis.name} is not offered for {request_type.label} samples"))
+                errors.append(
+                    FieldError(
+                        ("analysis_ids", j),
+                        f"{analysis.name} is not offered for {request_type.label} samples",
+                    )
+                )
         for j, element_id in enumerate(s.additional_element_ids):
             if self.reference.element(element_id) is None:
                 errors.append(FieldError(("additional_element_ids", j), f"unknown element {element_id}"))
@@ -213,7 +225,9 @@ class SubmissionService:
         before = self.get(tr_number, user)
         unknown = [cid for cid in data.chemicals.values() if self.reference.chemical(cid) is None]
         if unknown:
-            raise SubmissionRejected([FieldError(("chemicals",), f"unknown chemical {cid}") for cid in unknown])
+            raise SubmissionRejected(
+                [FieldError(("chemicals",), f"unknown chemical {cid}") for cid in unknown]
+            )
         try:
             after = check_in(
                 before,
@@ -257,10 +271,11 @@ class SubmissionService:
         except StaleSubmission as e:
             raise Conflict(f"{tr_number} was changed by someone else; reload and try again") from e
 
-
     # ------------------------------------------------------------ chemical matching (staff)
 
-    def match_chemical(self, tr_number: str, position: int, data: ChemicalMatchIn, user: User) -> TRSubmission:
+    def match_chemical(
+        self, tr_number: str, position: int, data: ChemicalMatchIn, user: User
+    ) -> TRSubmission:
         """Links one Chemical sample's free-text chemical to a SLIM chemical (staff only)."""
         if not user.is_staff:
             raise Forbidden("only lab staff can match chemicals")

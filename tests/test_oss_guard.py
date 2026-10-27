@@ -1,4 +1,4 @@
-"""The portal attaches to the OSS demo ecosystem only (slim_lims/oss_guard.py)."""
+"""The app attaches to the OSS demo ecosystem only (slim_lims/oss_guard.py)."""
 
 import re
 from pathlib import Path
@@ -13,23 +13,29 @@ from slim_lims.oss_guard import NotAnOssDatabase, assert_oss_database
 REPO = Path(slim_lims.__file__).resolve().parent.parent
 
 
-@pytest.mark.parametrize("url", [
-    "sqlite:///demo.db",
-    "sqlite://",
-    "postgresql+psycopg2://postgres:postgres@localhost:5432/slim",
-    "postgresql+psycopg2://postgres@127.0.0.1:5433/slim_demo",
-    "postgresql+psycopg2://postgres:postgres@db:5432/slim",  # docker-compose service
-])
+@pytest.mark.parametrize(
+    "url",
+    [
+        "sqlite:///demo.db",
+        "sqlite://",
+        "postgresql+psycopg2://postgres:postgres@localhost:5432/slim",
+        "postgresql+psycopg2://postgres@127.0.0.1:5433/slim_demo",
+        "postgresql+psycopg2://postgres:postgres@db:5432/slim",  # docker-compose service
+    ],
+)
 def test_demo_databases_are_allowed(url):
     assert_oss_database(url)
 
 
-@pytest.mark.parametrize("url", [
-    "postgresql+psycopg2://u:p@precilab-prod.example.com/slim",
-    "postgresql+psycopg2://u:p@localhost/PreciLab_production",
-    "sqlite:///C:/PreciLab/slim.db",
-    "postgresql+psycopg2://precilab_app:p@localhost/slim",
-])
+@pytest.mark.parametrize(
+    "url",
+    [
+        "postgresql+psycopg2://u:p@precilab-prod.example.com/slim",
+        "postgresql+psycopg2://u:p@localhost/PreciLab_production",
+        "sqlite:///C:/PreciLab/slim.db",
+        "postgresql+psycopg2://precilab_app:p@localhost/slim",
+    ],
+)
 def test_precilab_is_always_refused(url, monkeypatch):
     monkeypatch.setenv("PORTAL_ALLOWED_DB_HOSTS", "precilab-prod.example.com")  # no override exists
     with pytest.raises(NotAnOssDatabase, match="precilab"):

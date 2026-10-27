@@ -1,27 +1,25 @@
-"""slim-data's named demo scenarios on real portal TRs (slim-data D-75)."""
+"""slim-data's named demo scenarios on real TRs (slim-data D-75)."""
 
 from decimal import Decimal
-import pytest
-
 from hashlib import sha256
 
-from slim_lims import reports
-from slim_lims.reports import plain_renderer
+import pytest
 from fastapi.testclient import TestClient
 from infrastructure import audit as slim_audit
-from slim_domain.domain.report_log.report_log_repository import _ReportGenerationLogRow
-from slim_data.service.verify import verify
-from sqlalchemy import text
 from slim_data.persistence import migrate
 from slim_data.persistence.results import issues_for_tr
+from slim_data.service.verify import verify
 from slim_data.service.views import batch_view, report_view
+from slim_domain.domain.report_log.report_log_repository import _ReportGenerationLogRow
+from sqlalchemy import text
 
-from slim_lims import cli
+from slim_lims import cli, reports
 from slim_lims.audit import chain_check, install_audit_log
 from slim_lims.demo_scenarios import seed_scenarios
 from slim_lims.domain import RequestType, TRStatus
 from slim_lims.personas import sync_personas
 from slim_lims.reference import AnalysisRef, ChemicalRef, CustomerRef, ElementRef, StaticReferenceData
+from slim_lims.reports import plain_renderer
 from slim_lims.repositories import TRSubmissionRepository
 from slim_lims.results import publish_demo_rules
 from tests.conftest import make_settings, postgres_only
@@ -37,11 +35,15 @@ def reference():
         customers=[CustomerRef(1, "A", "1 A Street"), CustomerRef(2, "B", "2 B Street")],
         chemicals=[ChemicalRef(2, "IPA"), ChemicalRef(3, "HNO3")],
         elements=[ElementRef(i, s, s) for i, s in ELEMENTS.items()],
-        analyses=[AnalysisRef(id, name, code, group, request_types=frozenset({RequestType.CHEMICAL}))
-                  for id, name, code, group in ((TEN, "10 Elements", "10_elements_icpms", "Metals"),
-                                                (THIRTY_SIX, "36 Elements", "36_elements_icpms", "Metals"),
-                                                (ANIONS, "5 Anions", "5_anions", "Anions"),
-                                                (ASSAY, "Assay", "assay", "Assay & titration"))],
+        analyses=[
+            AnalysisRef(id, name, code, group, request_types=frozenset({RequestType.CHEMICAL}))
+            for id, name, code, group in (
+                (TEN, "10 Elements", "10_elements_icpms", "Metals"),
+                (THIRTY_SIX, "36 Elements", "36_elements_icpms", "Metals"),
+                (ANIONS, "5 Anions", "5_anions", "Anions"),
+                (ASSAY, "Assay", "assay", "Assay & titration"),
+            )
+        ],
     )
 
 
@@ -62,13 +64,27 @@ def seeded(engine, db, reference):
 
 
 def test_every_scenario_runs_on_its_own_received_tr(db, seeded):
-    assert list(seeded) == ["clean_pass", "cups_disagree", "scale_fault", "pooled_spike", "below_mdl",
-                            "rerun_exception", "accepted", "amended", "line_by_line", "qc_failed"]
+    assert list(seeded) == [
+        "clean_pass",
+        "cups_disagree",
+        "scale_fault",
+        "pooled_spike",
+        "below_mdl",
+        "rerun_exception",
+        "accepted",
+        "amended",
+        "line_by_line",
+        "qc_failed",
+    ]
     assert list(seeded.values()) == [f"TR{n:05d}" for n in range(1, 11)]
     tr = TRSubmissionRepository(db).get_by_tr_number(seeded["cups_disagree"])
-    assert tr.customer_id == 2 and tr.samples[0].analysis_ids == (TEN,) and tr.samples[0].chemical_name == "IPA"
-    analyses = {name: TRSubmissionRepository(db).get_by_tr_number(number).samples[0].analysis_ids
-                for name, number in seeded.items()}  # D-78
+    assert (
+        tr.customer_id == 2 and tr.samples[0].analysis_ids == (TEN,) and tr.samples[0].chemical_name == "IPA"
+    )
+    analyses = {
+        name: TRSubmissionRepository(db).get_by_tr_number(number).samples[0].analysis_ids
+        for name, number in seeded.items()
+    }  # D-78
     assert analyses["clean_pass"] == (THIRTY_SIX,) and analyses["below_mdl"] == (ANIONS,)
     assay = TRSubmissionRepository(db).get_by_tr_number(seeded["amended"])
     assert assay.samples[0].analysis_ids == (ASSAY,) and assay.samples[0].chemical_name == "HNO3"
@@ -77,7 +93,9 @@ def test_every_scenario_runs_on_its_own_received_tr(db, seeded):
 def test_statuses_follow_d71(db, seeded):
     status = {name: TRSubmissionRepository(db).get_by_tr_number(tr).status for name, tr in seeded.items()}
     assert status["amended"] == TRStatus.COMPLETE_REPORT
-    assert status["clean_pass"] == status["rerun_exception"] == TRStatus.INVOICED  # the demo's invoices (spec §13)
+    assert (
+        status["clean_pass"] == status["rerun_exception"] == TRStatus.INVOICED
+    )  # the demo's invoices (spec §13)
     assert status["scale_fault"] == status["line_by_line"] == status["accepted"] == TRStatus.IN_PROGRESS
 
 
@@ -103,8 +121,13 @@ def test_runs_once(db, seeded, reference):
 def test_a_visitor_sees_the_history(engine, reference, seeded):
     from slim_lims.main import create_app
 
-    app = create_app(make_settings(str(engine.url), demo_personas=True), engine=engine, reference=reference,
-                     specs=specs, report_renderer=plain_renderer)
+    app = create_app(
+        make_settings(str(engine.url), demo_personas=True),
+        engine=engine,
+        reference=reference,
+        specs=specs,
+        report_renderer=plain_renderer,
+    )
     with TestClient(app) as client:
         page = client.get("/demo/personas").text
         rob = page.split('name="user_id" value="')[2].split('"')[0]  # customer, ana, rob, sue

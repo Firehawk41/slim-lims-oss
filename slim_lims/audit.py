@@ -1,9 +1,10 @@
 """slim-domain's hash-chained change log on the shared database (slim-data D-77). Postgres only.
 
-`install_audit_log` attaches it to every public table (SLIM's, the portal's, slim-data's); re-run
+`install_audit_log` attaches it to every public table (SLIM's, the app's, slim-data's); re-run
 after migrations so new tables are covered. It also locks SLIM's `report_generation_log`, so it
-waits until SLIM's tables exist (the demo seed creates them first); the portal never creates them. `chain_check` is what `cli verify` hands slim-data's
-`verify` (D-76): None when the database has no log, so the report says "not checked".
+waits until SLIM's tables exist (the demo seed creates them first); the app never creates them.
+`chain_check` is what `cli verify` hands slim-data's `verify` (D-76):
+None when the database has no log, so the report says "not checked".
 """
 
 from infrastructure import audit as slim_audit

@@ -1,17 +1,17 @@
 """The host side of slim-data, the analytical results module (slim-data D-70, M6 part 2).
 
-slim-data is a library: it sees the outside world through two ports, and the portal (its host)
+slim-data is a library: it sees the outside world through two ports, and this app (its host)
 implements them over its own tables and SLIM's:
 
 * `ReferenceLookup` -- slim-data's `SlimReferenceLookup`, fed with the analysis catalog (code ->
-  SLIM analysis), SLIM's elements, the portal's TR samples (`TrSampleTables`) and SLIM's spec
+  SLIM analysis), SLIM's elements, the app's TR samples (`TrSampleTables`) and SLIM's spec
   limits (`SpecReader`). Built per request, on the request's session.
 * `StaffDirectory` -- active staff users, found by initials (the `analyst` column of a result file).
 
 People reach slim-data as an `Actor`: the user's UUID (what four-eyes compares; stable if initials
 change), initials for display, their lab role, AUTHENTICATED (a real login).
 
-slim-data flushes; the portal owns the transaction and commits (slim-data D-23).
+slim-data flushes; the app owns the transaction and commits (slim-data D-23).
 
 Issuing a report (D-73): until the report engine renders a file, the "file" is a canonical JSON
 form of the report view; its sha256 is what slim-data records, and `report_view(as_of=...)`
@@ -20,12 +20,10 @@ rebuilds it exactly. The TR moves to partial or complete report in the same tran
 
 import json
 from collections.abc import Mapping
-from hashlib import sha256
 from enum import StrEnum
 from functools import cache
-
-from sqlalchemy import Engine, select
-from sqlalchemy.orm import Session
+from hashlib import sha256
+from zoneinfo import ZoneInfo
 
 from slim_data.adapters.slim import SlimReferenceLookup, TrSampleInfo
 from slim_data.demo.scenarios import publish_demo_rules as publish_rules
@@ -36,11 +34,17 @@ from slim_data.domain.values import AnalyteRef, SampleRef
 from slim_data.domain.workflow import WorkflowError
 from slim_data.persistence import migrate
 from slim_data.persistence.results import issues_for_tr
+from slim_data.persistence.rulesets import ruleset_for
 from slim_data.pipeline.generic_csv import GenericCsv
-from slim_data.service.imports import ImportReceipt, import_run
+from slim_data.pipeline.paste import Paste
+from slim_data.pipeline.qtegra import Qtegra
+from slim_data.pipeline.reader import ResultReader
 from slim_data.service import workflow as wf
+from slim_data.service.imports import ImportReceipt, import_run
 from slim_data.service.views import ReportView, report_view
 from slim_data.service.workflow import EvaluationReceipt, evaluate_batch
+from sqlalchemy import Engine, select
+from sqlalchemy.orm import Session
 
 from slim_lims import reports
 from slim_lims import slim_tables as t
@@ -79,7 +83,7 @@ def actor_for(user: User) -> Actor:
 
 
 class TrSampleTables:
-    """slim-data's `TrSamples` over the portal's TR tables (until they move to slim-domain, D-45)."""
+    """slim-data's `TrSamples` over the app's TR tables (until they move to slim-domain, D-45)."""
 
     def __init__(self, session: Session) -> None:
         self._session = session
@@ -175,8 +179,10 @@ def demo_analyses(reference: ReferenceData) -> dict[str, tuple[str, int]]:
     by_code = {a.code: a.id for a in reference.catalog_analyses()}
     missing = [code for code in DEMO_ANALYSES.values() if code not in by_code]
     if missing:
-        raise LookupError(f"analyses {', '.join(missing)} are not in the analysis catalog; "
-                          "sync the catalog against SLIM first")
+        raise LookupError(
+            f"analyses {', '.join(missing)} are not in the analysis catalog; "
+            "sync the catalog against SLIM first"
+        )
     return {key: (code, by_code[code]) for key, code in DEMO_ANALYSES.items()}
 
 
@@ -190,15 +196,68 @@ def publish_demo_rules(session: Session, reference: ReferenceData) -> dict[str, 
 
 # ---------------------------------------------------------------- data in
 
+# How readings come in (slim-data D-88): the upload page's choices, in the order shown.
+READERS = {
+    "csv": "Result file (CSV, generic_csv/1)",
+    "qtegra": "Thermo Qtegra export (qtegra/1)",
+    "paste": "Pasted from Excel (paste/1)",
+}
+
+
+class ReaderChoiceError(ValueError):
+    """The upload form doesn't say enough to read the data, e.g. a Qtegra export with no batch."""
+
+
+def make_reader(
+    kind: str,
+    user: User,
+    lab_timezone: str,
+    prep_batch: str = "",
+    analysis: str = "",
+    prep_method: str = "",
+) -> ResultReader:
+    """The reader for the upload form's choice. Qtegra doesn't know the prep batch or analysis, so the
+    form gives them; whoever imports is the analyst, as the file's user is the shared PC login (D-89)."""
+    if kind == "csv":
+        return GenericCsv()
+    if kind == "paste":
+        return Paste()
+    if kind != "qtegra":
+        raise ReaderChoiceError(f"unknown kind of data: {kind!r}")
+    if not prep_batch.strip() or not analysis.strip():
+        raise ReaderChoiceError("a Qtegra export needs its prep batch and analysis")
+    return Qtegra(
+        prep_batch=prep_batch.strip(),
+        analysis_code=analysis.strip(),
+        analyst_id=user.initials or "",
+        timezone=ZoneInfo(lab_timezone),
+        prep_method=prep_method.strip() or None,
+    )
+
+
+def import_analyses(session: Session, reference: ReferenceData) -> list[tuple[str, str]]:
+    """(code, name) of the catalog analyses with a published ruleset: what an import can evaluate."""
+    return [
+        (a.code, a.name) for a in reference.catalog_analyses() if ruleset_for(session, a.id, "") is not None
+    ]
+
+
 def import_and_evaluate(
-    session: Session, content: bytes, filename: str, actor: Actor, lookup: SlimReferenceLookup, staff
+    session: Session,
+    content: bytes,
+    filename: str,
+    actor: Actor,
+    lookup: SlimReferenceLookup,
+    staff,
+    reader: ResultReader | None = None,
 ) -> tuple[ImportReceipt, dict[str, EvaluationReceipt], tuple[str, ...]]:
     """Imports a result file (all or nothing; refused with `ImportRefused`), then evaluates every
     prep batch it touches, so the batch page shows decided results straight away. A batch with no
     published ruleset raises slim-data's NotFound: the caller rolls the whole upload back.
     Also returns the TR numbers the file has readings for (the caller starts work on them, D-71)."""
-    receipt = import_run(session, content, filename, actor, lookup, staff)
-    rows = GenericCsv().parse(content).rows
+    reader = reader or GenericCsv()
+    receipt = import_run(session, content, filename, actor, lookup, staff, reader)
+    rows = reader.parse(content).rows
     codes = sorted({row.prep_batch for row in rows})
     trs = tuple(sorted({row.sample.tr_number for row in rows if row.sample is not None}))
     return receipt, {code: evaluate_batch(session, code, actor, lookup) for code in codes}, trs
@@ -219,6 +278,7 @@ def start_work(service, tr_numbers, user: User) -> list[str]:
 
 # ---------------------------------------------------------------- people's actions on results
 
+
 class ResultAction(StrEnum):
     ACCEPT = "accept"
     RERUN = "rerun"
@@ -228,8 +288,13 @@ class ResultAction(StrEnum):
 
 
 def act_on_result(
-    session: Session, action: ResultAction, sample: SampleRef, analyte: AnalyteRef, actor: Actor,
-    reason_category: str = "", note: str = "",
+    session: Session,
+    action: ResultAction,
+    sample: SampleRef,
+    analyte: AnalyteRef,
+    actor: Actor,
+    reason_category: str = "",
+    note: str = "",
 ):
     """One person's decision on one result, under the published policy. Raises slim-data's
     WorkflowError (not allowed), NotFound, or a ValidationError (e.g. a missing reason)."""
@@ -248,6 +313,7 @@ def act_on_result(
 
 # ---------------------------------------------------------------- report issues (D-73)
 
+
 class NothingToIssue(WorkflowError):
     """No released results, or nothing changed since the last issue."""
 
@@ -259,13 +325,19 @@ def report_document(view: ReportView) -> dict:
         "tr_number": view.tr_number,
         "lines": [
             {
-                "sample": str(line.sample), "analysis_id": line.analyte.analysis_id, "analyte": line.analyte.code,
-                "version": line.version, "text": line.text,
-                "unit": line.reported.unit if line.reported else None, "qualifier": line.qualifier.name,
+                "sample": str(line.sample),
+                "analysis_id": line.analyte.analysis_id,
+                "analyte": line.analyte.code,
+                "version": line.version,
+                "text": line.text,
+                "unit": line.reported.unit if line.reported else None,
+                "qualifier": line.qualifier.name,
                 "uncertainty": None if line.uncertainty is None else str(line.uncertainty),
                 "mdl": None if line.mdl is None else str(line.mdl),
                 "recovery": None if line.recovery is None else str(line.recovery),
-                "notes": list(line.notes), "shown_flags": list(line.shown_flags), "amended": line.amended,
+                "notes": list(line.notes),
+                "shown_flags": list(line.shown_flags),
+                "amended": line.amended,
             }
             for line in view.lines
         ],
@@ -282,7 +354,13 @@ def issued_documents(session: Session, tr_number: str) -> list[dict]:
     is rebuilt as of its issue and checked against its canonical-JSON hash instead (D-73)."""
     out = []
     for issue in reversed(issues_for_tr(session, tr_number)):
-        entry = {"id": issue.id, "amends": issue.amends, "at": issue.created_at, "html": None, "document": None}
+        entry = {
+            "id": issue.id,
+            "amends": issue.amends,
+            "at": issue.created_at,
+            "html": None,
+            "document": None,
+        }
         html = reports.stored(session, issue.file_sha256)
         if html is not None:
             entry.update(html=html, verified=sha256(html.encode()).hexdigest() == issue.file_sha256)
@@ -301,7 +379,9 @@ def report_complete(view: ReportView, submission) -> bool:
     return not view.waiting and ordered <= reported
 
 
-def issue_report(session: Session, service, tr_number: str, user: User, renderer, reference: ReferenceData) -> dict:
+def issue_report(
+    session: Session, service, tr_number: str, user: User, renderer, reference: ReferenceData
+) -> dict:
     """Renders the report as it stands now (every released result, latest versions), stores the file
     and records the issue by its sha256 (D-73, slim-data D-79), then moves the TR to partial or
     complete report (D-71). A report carrying a corrected result amends the latest issue. Raises
@@ -315,7 +395,9 @@ def issue_report(session: Session, service, tr_number: str, user: User, renderer
     if previous and previous[-1].file_sha256 == digest:
         raise NothingToIssue(f"nothing has changed since report issue {previous[-1].id}")
     amends = previous[-1].id if previous and any(line.amended for line in view.lines) else None
-    lines = tuple(ReportLine(sample=line.sample, analyte=line.analyte, version=line.version) for line in view.lines)
+    lines = tuple(
+        ReportLine(sample=line.sample, analyte=line.analyte, version=line.version) for line in view.lines
+    )
     issued = wf.record_issue(session, tr_number, lines, digest, actor_for(user), amends)
 
     target = TRStatus.COMPLETE_REPORT if report_complete(view, submission) else TRStatus.PARTIAL_REPORT
@@ -324,5 +406,11 @@ def issue_report(session: Session, service, tr_number: str, user: User, renderer
         note = f"report issue {issued.issue_id}" + (" (amended)" if issued.amended else "")
         service.change_status(tr_number, StatusChangeIn(to_status=target, note=note), user)
         moved = target
-    return {"issue_id": issued.issue_id, "amended": issued.amended, "amends": amends, "sha256": digest,
-            "lines": len(lines), "status": int(moved) if moved else None}
+    return {
+        "issue_id": issued.issue_id,
+        "amended": issued.amended,
+        "amends": amends,
+        "sha256": digest,
+        "lines": len(lines),
+        "status": int(moved) if moved else None,
+    }

@@ -1,7 +1,7 @@
-"""SQLAlchemy models for portal-owned tables — persistence only, no business logic."""
+"""SQLAlchemy models for app-owned tables — persistence only, no business logic."""
 
 import uuid
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from datetime import time as time_type
 
 from sqlalchemy import (
@@ -16,8 +16,9 @@ from sqlalchemy import (
     Time,
     UniqueConstraint,
     Uuid,
+    event,
+    false,
 )
-from sqlalchemy import event, false
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from slim_lims.db import Base
@@ -32,17 +33,19 @@ LAB_ROLES = {LAB_ROLE_ANALYST: "Analyst", LAB_ROLE_REVIEWER: "Reviewer", LAB_ROL
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class User(Base):
-    """A portal login. Customer users belong to one SLIM customer; staff users have initials."""
+    """A login. Customer users belong to one SLIM customer; staff users have initials."""
 
     __tablename__ = "users"
     __table_args__ = (
         CheckConstraint("role IN ('customer', 'staff')", name="role_valid"),
         CheckConstraint("role <> 'customer' OR customer_id IS NOT NULL", name="customer_has_customer_id"),
-        CheckConstraint("role <> 'staff' OR (initials IS NOT NULL AND initials <> '')", name="staff_has_initials"),
+        CheckConstraint(
+            "role <> 'staff' OR (initials IS NOT NULL AND initials <> '')", name="staff_has_initials"
+        ),
         CheckConstraint("role <> 'staff' OR lab_role IS NOT NULL", name="staff_has_lab_role"),
         CheckConstraint("lab_role IS NULL OR lab_role IN (1, 2, 3)", name="lab_role_valid"),
     )
@@ -128,7 +131,9 @@ class TRSampleRow(Base):
     __table_args__ = (UniqueConstraint("submission_id", "position"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    submission_id: Mapped[int] = mapped_column(ForeignKey("tr_submissions.id", ondelete="CASCADE"), index=True)
+    submission_id: Mapped[int] = mapped_column(
+        ForeignKey("tr_submissions.id", ondelete="CASCADE"), index=True
+    )
     position: Mapped[int] = mapped_column(Integer)
     sample_name: Mapped[str] = mapped_column(String(100))
     chemical_id: Mapped[int | None] = mapped_column(Integer)
@@ -168,10 +173,14 @@ class TRSampleAdditionalElementRow(Base):
 class TRSubmissionEmailRow(Base):
     __tablename__ = "tr_submission_emails"
     __table_args__ = (
-        CheckConstraint("kind IN ('results_to', 'results_cc', 'invoice_to', 'invoice_cc')", name="kind_valid"),
+        CheckConstraint(
+            "kind IN ('results_to', 'results_cc', 'invoice_to', 'invoice_cc')", name="kind_valid"
+        ),
     )
 
-    submission_id: Mapped[int] = mapped_column(ForeignKey("tr_submissions.id", ondelete="CASCADE"), primary_key=True)
+    submission_id: Mapped[int] = mapped_column(
+        ForeignKey("tr_submissions.id", ondelete="CASCADE"), primary_key=True
+    )
     kind: Mapped[str] = mapped_column(String(10), primary_key=True)
     position: Mapped[int] = mapped_column(Integer, primary_key=True)
     email: Mapped[str] = mapped_column(String(254))
@@ -181,7 +190,9 @@ class TRStatusEventRow(Base):
     __tablename__ = "tr_status_events"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    submission_id: Mapped[int] = mapped_column(ForeignKey("tr_submissions.id", ondelete="CASCADE"), index=True)
+    submission_id: Mapped[int] = mapped_column(
+        ForeignKey("tr_submissions.id", ondelete="CASCADE"), index=True
+    )
     from_status: Mapped[int | None] = mapped_column(Integer)
     to_status: Mapped[int] = mapped_column(Integer)
     at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
@@ -205,7 +216,9 @@ def _seed_counter(target, connection, **_kw) -> None:
 class AnalysisCatalogRow(Base):
     __tablename__ = "analysis_catalog"
 
-    analysis_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)  # SLIM analyses."ID"
+    analysis_id: Mapped[int] = mapped_column(
+        Integer, primary_key=True, autoincrement=False
+    )  # SLIM analyses."ID"
     code: Mapped[str] = mapped_column(String(60), unique=True)
     group_name: Mapped[str] = mapped_column(String(60))
     request_types: Mapped[str] = mapped_column(String(20))  # comma-separated RequestType values, e.g. "1,2"
@@ -222,12 +235,14 @@ class TRInvoiceRow(Base):
     __tablename__ = "tr_invoices"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    submission_id: Mapped[int] = mapped_column(ForeignKey("tr_submissions.id", ondelete="CASCADE"), index=True)
+    submission_id: Mapped[int] = mapped_column(
+        ForeignKey("tr_submissions.id", ondelete="CASCADE"), index=True
+    )
     sent_on: Mapped[date] = mapped_column(Date)
     sent_by: Mapped[str] = mapped_column(String(254))
     paid_on: Mapped[date | None] = mapped_column(Date, nullable=True)
     paid_by: Mapped[str] = mapped_column(String(254), default="")
-    recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
 
 
 class ReportFileRow(Base):
@@ -240,4 +255,4 @@ class ReportFileRow(Base):
     tr_number: Mapped[str] = mapped_column(String(20), index=True)
     sha256: Mapped[str] = mapped_column(String(64), unique=True)
     html: Mapped[str] = mapped_column(Text)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))

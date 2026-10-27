@@ -1,8 +1,8 @@
-"""Fills the portal's analysis_catalog from data/analysis_catalog.csv (spec §8).
+"""Fills the app's analysis_catalog from data/analysis_catalog.csv (spec §8).
 
 Rows are matched to SLIM's analyses table by analysis_name (case-insensitive, trimmed), so the
 same file works against any SLIM database — the OSS demo one or, later, the lab's. Only the
-portal-owned analysis_catalog table is written; SLIM's tables are read.
+app-owned analysis_catalog table is written; SLIM's tables are read.
 """
 
 import csv
@@ -52,7 +52,9 @@ def read_catalog(path: Path = CATALOG_CSV) -> list[CatalogEntry]:
         ]
 
 
-def sync_analysis_catalog(slim_engine: Engine, portal_session: Session, path: Path = CATALOG_CSV) -> SyncReport:
+def sync_analysis_catalog(
+    slim_engine: Engine, portal_session: Session, path: Path = CATALOG_CSV
+) -> SyncReport:
     """Replaces analysis_catalog with the CSV's entries that exist in SLIM. The caller commits."""
     with slim_engine.connect() as conn:
         slim_ids = {r.analysis_name.strip().lower(): r.id for r in conn.execute(select(t.analyses))}
@@ -64,14 +66,16 @@ def sync_analysis_catalog(slim_engine: Engine, portal_session: Session, path: Pa
         if analysis_id is None:
             not_in_slim.append(entry.slim_name)
             continue
-        portal_session.add(AnalysisCatalogRow(
-            analysis_id=analysis_id,
-            code=entry.code,
-            group_name=entry.group,
-            request_types=",".join(str(int(rt)) for rt in entry.request_types),
-            portal_selectable=entry.portal_selectable,
-            sort_order=entry.sort_order,
-        ))
+        portal_session.add(
+            AnalysisCatalogRow(
+                analysis_id=analysis_id,
+                code=entry.code,
+                group_name=entry.group,
+                request_types=",".join(str(int(rt)) for rt in entry.request_types),
+                portal_selectable=entry.portal_selectable,
+                sort_order=entry.sort_order,
+            )
+        )
         matched += 1
     portal_session.flush()
     catalog_names = {e.slim_name.lower() for e in entries}

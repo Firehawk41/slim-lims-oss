@@ -37,8 +37,9 @@ def get_service(
     db: Annotated[Session, Depends(get_db)],
     reference: Annotated[ReferenceData, Depends(get_reference)],
 ) -> SubmissionService:
-    return SubmissionService(TRSubmissionRepository(db), reference,
-                             lab_timezone=request.app.state.settings.lab_timezone)
+    return SubmissionService(
+        TRSubmissionRepository(db), reference, lab_timezone=request.app.state.settings.lab_timezone
+    )
 
 
 Service = Annotated[SubmissionService, Depends(get_service)]
@@ -66,8 +67,12 @@ def list_submissions(
     per_page: Annotated[int, Query(ge=1, le=100)] = 25,
 ):
     result = service.list(user, status=status, request_type=request_type, page=page, per_page=per_page)
-    return {"items": [_dump(s) for s in result.items], "total": result.total, "page": result.page,
-            "per_page": result.per_page}
+    return {
+        "items": [_dump(s) for s in result.items],
+        "total": result.total,
+        "page": result.page,
+        "per_page": result.per_page,
+    }
 
 
 @router.get("/{tr_number}", summary="Get one Testing Request")
@@ -90,8 +95,9 @@ def check_in_submission(tr_number: str, data: CheckInIn, user: RequireUser, serv
 
 
 @router.post("/{tr_number}/samples/{position}/chemical", summary="Match a sample's chemical to SLIM (staff)")
-def match_sample_chemical(tr_number: str, position: int, data: ChemicalMatchIn, user: RequireUser,
-                          service: Service, db: DB):
+def match_sample_chemical(
+    tr_number: str, position: int, data: ChemicalMatchIn, user: RequireUser, service: Service, db: DB
+):
     submission = service.match_chemical(tr_number, position, data, user)
     db.commit()
     return _dump(submission)
@@ -118,7 +124,9 @@ def register_error_handlers(app) -> None:
 
 # ---------------------------------------------------------------- reference data for the form
 
-reference_router = APIRouter(prefix="/api/reference", tags=["reference"], dependencies=[Depends(csrf_protect)])
+reference_router = APIRouter(
+    prefix="/api/reference", tags=["reference"], dependencies=[Depends(csrf_protect)]
+)
 
 
 def _choice(enum_member, label: str | None = None) -> dict[str, Any]:
@@ -129,14 +137,22 @@ def _choice(enum_member, label: str | None = None) -> dict[str, Any]:
 def reference_data(user: RequireUser, reference: Annotated[ReferenceData, Depends(get_reference)]):
     request_types = []
     for rt in RequestType:
-        request_types.append({
-            **_choice(rt),
-            "processing_times": [_choice(pt, pt.portal_label) for pt in ALLOWED_PROCESSING_TIMES[rt]],
-            "analyses": [
-                {"id": a.id, "code": a.code, "name": a.name, "group": a.group, "description": a.description}
-                for a in reference.analyses_for(rt)
-            ],
-        })
+        request_types.append(
+            {
+                **_choice(rt),
+                "processing_times": [_choice(pt, pt.portal_label) for pt in ALLOWED_PROCESSING_TIMES[rt]],
+                "analyses": [
+                    {
+                        "id": a.id,
+                        "code": a.code,
+                        "name": a.name,
+                        "group": a.group,
+                        "description": a.description,
+                    }
+                    for a in reference.analyses_for(rt)
+                ],
+            }
+        )
     body: dict[str, Any] = {
         "request_types": request_types,
         "chemicals": [{"id": c.id, "name": c.name} for c in reference.chemical_choices()],
@@ -147,8 +163,10 @@ def reference_data(user: RequireUser, reference: Annotated[ReferenceData, Depend
         "processing_time_requiring_requested_time": int(ProcessingTime.TIME_LIMITED),
     }
     if user.is_staff:
-        body["customers"] = [{"id": c.id, "name": c.name, "locations": list(reference.locations(c.id))}
-                             for c in reference.customer_choices()]
+        body["customers"] = [
+            {"id": c.id, "name": c.name, "locations": list(reference.locations(c.id))}
+            for c in reference.customer_choices()
+        ]
     else:
         body["locations"] = list(reference.locations(user.customer_id))
     return body

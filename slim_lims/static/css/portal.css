@@ -1,4 +1,4 @@
-/* Shared components for the rebuilt portal pages. Uses the colour tokens from style.css,
+/* Shared components for the app's pages. Uses the colour tokens from style.css,
    which admin.css redefines for the dark staff theme. */
 
 .muted { color: var(--color-text-muted); }
