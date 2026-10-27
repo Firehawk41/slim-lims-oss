@@ -23,6 +23,7 @@ from collections.abc import Mapping
 from enum import StrEnum
 from functools import cache
 from hashlib import sha256
+from zoneinfo import ZoneInfo
 
 from slim_data.adapters.slim import SlimReferenceLookup, TrSampleInfo
 from slim_data.demo.scenarios import publish_demo_rules as publish_rules
@@ -33,7 +34,11 @@ from slim_data.domain.values import AnalyteRef, SampleRef
 from slim_data.domain.workflow import WorkflowError
 from slim_data.persistence import migrate
 from slim_data.persistence.results import issues_for_tr
+from slim_data.persistence.rulesets import ruleset_for
 from slim_data.pipeline.generic_csv import GenericCsv
+from slim_data.pipeline.paste import Paste
+from slim_data.pipeline.qtegra import Qtegra
+from slim_data.pipeline.reader import ResultReader
 from slim_data.service import workflow as wf
 from slim_data.service.imports import ImportReceipt, import_run
 from slim_data.service.views import ReportView, report_view
@@ -191,16 +196,68 @@ def publish_demo_rules(session: Session, reference: ReferenceData) -> dict[str, 
 
 # ---------------------------------------------------------------- data in
 
+# How readings come in (slim-data D-88): the upload page's choices, in the order shown.
+READERS = {
+    "csv": "Result file (CSV, generic_csv/1)",
+    "qtegra": "Thermo Qtegra export (qtegra/1)",
+    "paste": "Pasted from Excel (paste/1)",
+}
+
+
+class ReaderChoiceError(ValueError):
+    """The upload form doesn't say enough to read the data, e.g. a Qtegra export with no batch."""
+
+
+def make_reader(
+    kind: str,
+    user: User,
+    lab_timezone: str,
+    prep_batch: str = "",
+    analysis: str = "",
+    prep_method: str = "",
+) -> ResultReader:
+    """The reader for the upload form's choice. Qtegra doesn't know the prep batch or analysis, so the
+    form gives them; whoever imports is the analyst, as the file's user is the shared PC login (D-89)."""
+    if kind == "csv":
+        return GenericCsv()
+    if kind == "paste":
+        return Paste()
+    if kind != "qtegra":
+        raise ReaderChoiceError(f"unknown kind of data: {kind!r}")
+    if not prep_batch.strip() or not analysis.strip():
+        raise ReaderChoiceError("a Qtegra export needs its prep batch and analysis")
+    return Qtegra(
+        prep_batch=prep_batch.strip(),
+        analysis_code=analysis.strip(),
+        analyst_id=user.initials or "",
+        timezone=ZoneInfo(lab_timezone),
+        prep_method=prep_method.strip() or None,
+    )
+
+
+def import_analyses(session: Session, reference: ReferenceData) -> list[tuple[str, str]]:
+    """(code, name) of the catalog analyses with a published ruleset: what an import can evaluate."""
+    return [
+        (a.code, a.name) for a in reference.catalog_analyses() if ruleset_for(session, a.id, "") is not None
+    ]
+
 
 def import_and_evaluate(
-    session: Session, content: bytes, filename: str, actor: Actor, lookup: SlimReferenceLookup, staff
+    session: Session,
+    content: bytes,
+    filename: str,
+    actor: Actor,
+    lookup: SlimReferenceLookup,
+    staff,
+    reader: ResultReader | None = None,
 ) -> tuple[ImportReceipt, dict[str, EvaluationReceipt], tuple[str, ...]]:
     """Imports a result file (all or nothing; refused with `ImportRefused`), then evaluates every
     prep batch it touches, so the batch page shows decided results straight away. A batch with no
     published ruleset raises slim-data's NotFound: the caller rolls the whole upload back.
     Also returns the TR numbers the file has readings for (the caller starts work on them, D-71)."""
-    receipt = import_run(session, content, filename, actor, lookup, staff)
-    rows = GenericCsv().parse(content).rows
+    reader = reader or GenericCsv()
+    receipt = import_run(session, content, filename, actor, lookup, staff, reader)
+    rows = reader.parse(content).rows
     codes = sorted({row.prep_batch for row in rows})
     trs = tuple(sorted({row.sample.tr_number for row in rows if row.sample is not None}))
     return receipt, {code: evaluate_batch(session, code, actor, lookup) for code in codes}, trs

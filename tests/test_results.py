@@ -651,3 +651,130 @@ def test_report_page_issues_and_is_staff_only(app, lab, customer_user):
         login_api(client, "jane@acme.example")
         assert client.get("/api/results/reports/TR00001").status_code == 403
         assert client.post("/api/results/reports/TR00001/issue").status_code == 403
+
+
+# ---------------------------------------------------------------- other ways in (slim-data D-88, D-89)
+
+
+def qtegra_export() -> bytes:
+    """An invented Qtegra export: TR00001's two samples, cups A and B, a method blank, and Li, which
+    10 Elements doesn't have (left out and listed)."""
+    from slim_data.demo import qtegra_export as q
+
+    calibrated = {e: ("0.9999", "0.9998", "0.05", "0.01") for e in ("56Fe", "7Li")}
+    run = (
+        q.measurement("BLK", "Blank", values={"56Fe": "0", "7Li": "0"}, istd="100"),
+        q.measurement(
+            "STD", "10 ppb", standard="10 ppb", values={"56Fe": "10", "7Li": "10"}, calibration=calibrated
+        ),
+        q.measurement("UNKNOWN", "Prep blank", comment="BLANK", values={"56Fe": "0.010", "7Li": "0.02"}),
+        q.measurement(
+            "UNKNOWN",
+            "S1a",
+            comment="TR00001-01 A",
+            values={"56Fe": "10.10", "7Li": "1"},
+            rsd={"56Fe": "1.1"},
+        ),
+        q.measurement(
+            "UNKNOWN",
+            "S1b",
+            comment="TR00001-01 B",
+            values={"56Fe": "10.00", "7Li": "1"},
+            rsd={"56Fe": "0.9"},
+        ),
+        q.measurement("UNKNOWN", "S2a", comment="TR00001-02 A", values={"56Fe": "5.10", "7Li": "1"}),
+        q.measurement("UNKNOWN", "S2b", comment="TR00001-02 B", values={"56Fe": "5.00", "7Li": "1"}),
+        q.measurement("UNKNOWN", "Rinse", values={"56Fe": "0.001"}),
+    )
+    return q.export(run, elements=("7Li", "56Fe"))
+
+
+QTEGRA_FORM = {
+    "kind": "qtegra",
+    "prep_batch": "PB-Q",
+    "analysis": "10_elements_icpms",
+    "prep_method": "microwave HNO3",
+}
+
+
+def test_the_upload_page_offers_each_way_in_and_the_analyses_with_rules(client, lab):
+    login(client, "staff@lab.example")
+    page = client.get("/results").text
+    assert "Thermo Qtegra export (qtegra/1)" in page and "Pasted from Excel (paste/1)" in page
+    assert 'value="10_elements_icpms"' in page and 'value="26_elements_icpms"' not in page  # no ruleset
+
+
+def test_a_qtegra_export_previews_with_what_it_left_out_then_imports(client, lab):
+    login(client, "staff@lab.example")
+    token = csrf_from(client.get("/results").text)
+    files = {"file": ("labbook.xml", qtegra_export(), "application/xml")}
+    preview = client.post(
+        "/results/upload", data={"csrf_token": token, "action": "preview", **QTEGRA_FORM}, files=files
+    )
+    assert preview.status_code == 200 and "ready to import" in preview.text
+    assert (
+        "Li is not an analyte of 10_elements_icpms" in preview.text
+        and "no sample ID in the comment" in preview.text
+    )
+    assert 'value="PB-Q"' in preview.text  # the form keeps what was filled in
+
+    imported = client.post(
+        "/results/upload", data={"csrf_token": token, "action": "import", **QTEGRA_FORM}, files=files
+    )
+    assert imported.status_code == 200 and "Imported labbook.xml: 5 readings" in imported.text
+    batch = client.get("/results/batches/PB-Q")
+    assert batch.status_code == 200 and "TR00001-02" in batch.text
+
+
+def test_a_qtegra_export_needs_its_batch_and_analysis(client, lab):
+    login(client, "staff@lab.example")
+    token = csrf_from(client.get("/results").text)
+    files = {"file": ("labbook.xml", qtegra_export(), "application/xml")}
+    refused = client.post(
+        "/results/upload", data={"csrf_token": token, "action": "preview", "kind": "qtegra"}, files=files
+    )
+    assert refused.status_code == 422 and "needs its prep batch and analysis" in refused.text
+
+
+def test_a_pasted_table_imports_and_stays_in_the_box_after_a_preview(client, lab):
+    login(client, "staff@lab.example")
+    token = csrf_from(client.get("/results").text)
+    pasted = csv().decode().replace(",", "\t")
+    data = {"csrf_token": token, "kind": "paste", "pasted": pasted}
+    preview = client.post("/results/upload", data={**data, "action": "preview"})
+    assert (
+        preview.status_code == 200 and "ready to import" in preview.text and "Press Import." in preview.text
+    )
+    assert "TR00001-01\t10_elements_icpms" in preview.text
+    imported = client.post("/results/upload", data={**data, "action": "import"})
+    assert imported.status_code == 200 and "Imported pasted table: 6 readings" in imported.text
+
+
+def test_nothing_to_read_is_a_form_error(client, lab):
+    login(client, "staff@lab.example")
+    token = csrf_from(client.get("/results").text)
+    no_file = client.post("/results/upload", data={"csrf_token": token, "action": "preview"})
+    assert no_file.status_code == 422 and "Choose a file." in no_file.text
+    no_paste = client.post(
+        "/results/upload", data={"csrf_token": token, "action": "preview", "kind": "paste"}
+    )
+    assert no_paste.status_code == 422 and "Paste the table." in no_paste.text
+    blank = client.post(
+        "/results/upload", data={"csrf_token": token, "action": "preview", "kind": "paste", "pasted": "  "}
+    )
+    assert blank.status_code == 422 and "Paste the table." in blank.text
+    odd = client.post("/results/upload", data={"csrf_token": token, "action": "preview", "kind": "pdf"})
+    assert odd.status_code == 422 and "unknown kind of data" in odd.text
+
+
+def test_the_api_takes_a_qtegra_export_with_its_options(client, lab):
+    login_api(client, "staff@lab.example")
+    query = "&".join(f"{k}={v}" for k, v in QTEGRA_FORM.items())
+    files = {"file": ("labbook.xml", qtegra_export(), "application/xml")}
+    plan = client.post(f"/api/results/imports?preview=true&{query}", files=files).json()
+    assert plan["ok"] and plan["readings"] == 5 and plan["run"]["analyst"] == "JM"
+    assert {"line": 0, "column": "analyte", "message": "Li is not an analyte of 10_elements_icpms"} in plan[
+        "ignored"
+    ]
+    missing = client.post("/api/results/imports?kind=qtegra", files=files)
+    assert missing.status_code == 422 and "prep batch" in missing.json()["detail"]

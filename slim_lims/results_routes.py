@@ -44,12 +44,16 @@ from slim_lims.auth import RequireStaff
 from slim_lims.db import get_db
 from slim_lims.reference import ReferenceData
 from slim_lims.results import (
+    READERS,
+    ReaderChoiceError,
     ResultAction,
     StaffDirectory,
     act_on_result,
     actor_for,
+    import_analyses,
     import_and_evaluate,
     issue_report,
+    make_reader,
     reference_lookup,
     report_complete,
     report_document,
@@ -90,15 +94,16 @@ def _plan_json(plan: ImportPlan) -> dict[str, Any]:
         "rejected": len(plan.rejected) + len(plan.rejected_stored),
         "skipped": plan.skipped,
         "errors": [{"line": e.line, "column": e.column, "message": e.message} for e in plan.errors],
+        "ignored": [{"line": e.line, "column": e.column, "message": e.message} for e in plan.ignored],
     }
 
 
-def _import(request, db, reference, service, user, content: bytes, filename: str):
+def _import(request, db, reference, service, user, content: bytes, filename: str, reader=None):
     """(status, body): 201 with the receipt, or 422 with the reason; commits only on success."""
     lookup = _lookup(request, db, reference)
     try:
         receipt, evaluations, trs = import_and_evaluate(
-            db, content, filename, actor_for(user), lookup, StaffDirectory(db)
+            db, content, filename, actor_for(user), lookup, StaffDirectory(db), reader
         )
         started = start_work(service, trs, user)
     except ImportRefused as refused:
@@ -271,9 +276,20 @@ def _batch_rows(reference: ReferenceData, db: Session) -> list[dict[str, Any]]:
 # ---------------------------------------------------------------- pages
 
 
+def _home(request: Request, db: Session, reference: ReferenceData, form: dict | None = None, **context):
+    """The results page: the upload form (kept as the user filled it in) and the prep batches."""
+    return {
+        "batches": _batch_rows(reference, db),
+        "readers": READERS,
+        "analyses": import_analyses(db, reference),
+        "form": form or {"kind": "csv"},
+        **context,
+    }
+
+
 @router.get("/results", name="results_home")
 def results_home(request: Request, user: RequireStaff, db: DB, reference: Reference):
-    return render(request, "results/index.html", {"batches": _batch_rows(reference, db)})
+    return render(request, "results/index.html", _home(request, db, reference))
 
 
 @router.post("/results/upload", name="results_upload")
@@ -283,12 +299,36 @@ def results_upload(
     db: DB,
     reference: Reference,
     service: Service,
-    file: Annotated[UploadFile, File()],
+    file: Annotated[UploadFile | None, File()] = None,
     action: Annotated[str, Form()] = "preview",
+    kind: Annotated[str, Form()] = "csv",
+    pasted: Annotated[str, Form(max_length=900_000)] = "",
+    prep_batch: Annotated[str, Form(max_length=50)] = "",
+    analysis: Annotated[str, Form(max_length=50)] = "",
+    prep_method: Annotated[str, Form(max_length=100)] = "",
 ):
-    content, filename = file.file.read(), file.filename or "upload.csv"  # already spooled by FastAPI
+    form = {"kind": kind, "pasted": pasted, "prep_batch": prep_batch, "analysis": analysis}
+    form["prep_method"] = prep_method
+    settings = request.app.state.settings
+    try:
+        reader = make_reader(kind, user, settings.lab_timezone, prep_batch, analysis, prep_method)
+    except ReaderChoiceError as error:
+        return render(
+            request, "results/index.html", _home(request, db, reference, form, error=f"{error}."), 422
+        )
+    if kind == "paste" and pasted.strip():
+        content, filename = pasted.encode(), "pasted table"
+    elif kind != "paste" and file is not None and file.filename:
+        content, filename = file.file.read(), file.filename  # already spooled by FastAPI
+    else:
+        message = "Paste the table." if kind == "paste" else "Choose a file."
+        return render(request, "results/index.html", _home(request, db, reference, form, error=message), 422)
+    if not content.strip():
+        return render(
+            request, "results/index.html", _home(request, db, reference, form, error="It's empty."), 422
+        )
     if action == "import":
-        status, body = _import(request, db, reference, service, user, content, filename)
+        status, body = _import(request, db, reference, service, user, content, filename, reader)
         if status == 201:
             evaluated = ", ".join(body["evaluated"]) or "none"
             started = f" Started work on {', '.join(body['started'])}." if body["started"] else ""
@@ -298,15 +338,13 @@ def results_upload(
                 f"({body['skipped']} already imported); batches evaluated: {evaluated}.{started}",
             )
             return RedirectResponse(request.url_for("results_home").path, status_code=303)
-        context = {"batches": _batch_rows(reference, db), "error": body["detail"], "plan": body.get("plan")}
+        context = _home(request, db, reference, form, error=body["detail"], plan=body.get("plan"))
         return render(request, "results/index.html", context, 422)
     plan = preview_import(
-        db, content, filename, actor_for(user), _lookup(request, db, reference), StaffDirectory(db)
+        db, content, filename, actor_for(user), _lookup(request, db, reference), StaffDirectory(db), reader
     )
     db.rollback()  # a preview writes nothing
-    return render(
-        request, "results/index.html", {"batches": _batch_rows(reference, db), "plan": _plan_json(plan)}
-    )
+    return render(request, "results/index.html", _home(request, db, reference, form, plan=_plan_json(plan)))
 
 
 @router.get("/results/batches/{code}", name="results_batch")
@@ -444,7 +482,11 @@ def results_release(
 # ---------------------------------------------------------------- JSON API
 
 
-@api_router.post("/imports", summary="Import a result file (generic_csv/1), or preview it with ?preview=true")
+@api_router.post(
+    "/imports",
+    summary="Import result data (kind: csv, qtegra or paste; qtegra needs prep_batch and analysis), "
+    "or preview it with ?preview=true",
+)
 def api_import(
     request: Request,
     user: RequireStaff,
@@ -453,15 +495,31 @@ def api_import(
     service: Service,
     file: Annotated[UploadFile, File()],
     preview: bool = False,
+    kind: str = "csv",
+    prep_batch: str = "",
+    analysis: str = "",
+    prep_method: str = "",
 ):
-    content, filename = file.file.read(), file.filename or "upload.csv"
+    try:
+        reader = make_reader(
+            kind, user, request.app.state.settings.lab_timezone, prep_batch, analysis, prep_method
+        )
+    except ReaderChoiceError as error:
+        return JSONResponse({"detail": f"{error}."}, status_code=422)
+    content, filename = file.file.read(), file.filename or "upload"
     if preview:
         plan = preview_import(
-            db, content, filename, actor_for(user), _lookup(request, db, reference), StaffDirectory(db)
+            db,
+            content,
+            filename,
+            actor_for(user),
+            _lookup(request, db, reference),
+            StaffDirectory(db),
+            reader,
         )
         db.rollback()
         return _plan_json(plan)
-    status, body = _import(request, db, reference, service, user, content, filename)
+    status, body = _import(request, db, reference, service, user, content, filename, reader)
     return JSONResponse(body, status_code=status)
 
 

@@ -94,7 +94,12 @@ never change the private slim-lims from here. Env vars keep their `PORTAL_` name
    `migrate_invoicing` in `cli migrate` / the seed. Slice 3 ✅: customer A's own quote in the demo (10 % off,
    45-day terms) and the price lists on `/invoices` (`invoices.price_lists`); "Mark paid" stays a portal row.
 
-Done: A, B, link-ready (9), the board (13), invoicing (14). What comes next follows `docs/ROADMAP.md`;
+15. slim-data D-88 / D-89, instrument data in: /results takes a CSV, a Thermo Qtegra export (prep batch, analysis
+   and prep method from the form; the importer is the analyst) or a table pasted from Excel
+   (`results.READERS`, `make_reader`, `import_analyses`); the preview lists what was left out on purpose.
+   The API takes the same choice (`kind`, `prep_batch`, `analysis`, `prep_method` query parameters).
+
+Done: A, B, link-ready (9), the board (13), invoicing (14), instrument data in (15). What comes next follows `docs/ROADMAP.md`;
 C last. The user is token-constrained: small, focused steps,
 short replies.
 
