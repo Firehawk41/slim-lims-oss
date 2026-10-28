@@ -99,7 +99,7 @@ never change the private slim-lims from here. Env vars keep their `PORTAL_` name
    (`results.READERS`, `make_reader`, `import_analyses`); the preview lists what was left out on purpose.
    The API takes the same choice (`kind`, `prep_batch`, `analysis`, `prep_method` query parameters).
 
-16. ◐ slim-prep (the prep book, `slim-prep-oss` P6), a required library: `prep.py` (host side: `prep_actor_for`,
+16. ✅ slim-prep (the prep book, `slim-prep-oss` P6), a required library: `prep.py` (host side: `prep_actor_for`,
    `publish_demo_prep` = demo prep rules + stock + the metals rules under each prep method, `chemicals` for the
    run list, `send` = register or send the correction, then re-evaluate) and `prep_routes.py`: /prep (batches,
    standards book, make a standard), /prep/new-batch (the grid: one row per cup), /prep/batches/{code} (figures,
@@ -108,7 +108,6 @@ never change the private slim-lims from here. Env vars keep their `PORTAL_` name
    from the current version, a reason required, the next version; who prepped it stays). P7 ✅: `demo_prep.py`
    (the seed's prep scenario: standards → evaporation batch → sent → bracketed run → released → a corrected weighing
    sent again, the released result left waiting for its correction); `cli verify` also runs slim-prep's verify.
-   slim-data and slim-prep are pinned to `claude/intelligent-planck-fhq1bc` until merged, then `@main`.
 
 Done: A, B, link-ready (9), the board (13), invoicing (14), instrument data in (15). What comes next follows `docs/ROADMAP.md`;
 C last. The user is token-constrained: small, focused steps,
