@@ -56,6 +56,15 @@ Tally and themes are updated now and then at the bottom.
 | C→C | D-104 TR history: Claude proposed change events, then built whole versions (as the modules keep theirs): no replay code to get wrong. | Logged as a change of Claude's own proposal. |
 | F | Claude's review listed the Qtegra DOCTYPE as open; it was already refused (a byte check Claude wrote, which a UTF-16 file could pass). | The review was wrong; the fix still mattered. |
 
+## 2026-10-28: how we work
+
+| Kind | What | Notes |
+|---|---|---|
+| J | Asked why the hardening cost so many tokens, and invited criticism of his prompting. | |
+| C✓ | Working defaults: settle design first, one approval per batch, one PR per repo, merge on green unwatched, quiet test runs, docs once per batch, a fresh session per batch. | Claude's overhead (PR event boilerplate, noisy logs, its own slips) was most of the cost; long "continue until input" runs and mid-build decisions the rest. |
+| C✓ | `docs/REVIEW_CHECKLIST.md`: ten fixed lenses; a module review when wired, an app review every two or three modules; every fixed finding ends in a guard test. | Reviews look for new holes, not old ones. |
+| C✓ | The three CLAUDE.md files say only what is true now; history stays in DECISIONS, the diary and git. | slim-lims's went from 22.7 kB to about 9 kB. |
+
 ## Themes so far
 - **Domain facts are Jamie's, and they overrule Claude's defaults:** DF < 1, MDL averaging, standards as
   recipes, spike placement. Claude's "cautious" engineering defaults were wrong more than once where

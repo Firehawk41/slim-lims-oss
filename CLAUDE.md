@@ -1,267 +1,139 @@
 # slim-lims-oss — Claude Context
 
 > ## ⚠️ OSS ONLY — read first
-> This app is a **portfolio demo** that uses the **open-source** SLIM repos only:
-> `slim-domain-oss`, `slim-report-engine-oss`, `slim-data-oss` and their fictional demo data.
-> **Never connect it to PreciLab (or any real lab) production databases, shares or services.**
-> Enforced in code: `slim_lims/oss_guard.py` refuses any database URL containing
-> "precilab" (no override) and any host other than localhost / 127.0.0.1 / `db` / `postgres`
-> unless listed in `PORTAL_ALLOWED_DB_HOSTS`. Every connection goes through `db.make_engine`;
-> `tests/test_oss_guard.py` fails if anything calls `create_engine` elsewhere. `.env` is read
-> from the current directory only. Do not weaken any of this.
+> A **portfolio demo** on the **open-source** SLIM repos only (`slim-domain-oss`, `slim-report-engine-oss`,
+> `slim-data-oss`, `slim-prep-oss`) and their fictional demo data. **Never connect it to PreciLab (or any
+> real lab) production databases, shares or services.** Enforced: `slim_lims/oss_guard.py` refuses any URL
+> containing "precilab" and any host but localhost / 127.0.0.1 / `db` / `postgres` unless listed in
+> `PORTAL_ALLOWED_DB_HOSTS`; every connection goes through `db.make_engine` (`tests/test_oss_guard.py`);
+> `.env` is read from the current directory only. Do not weaken any of this.
 >
-> **Scope:** modular but narrow. Don't modify slim-domain / slim-report-engine yet, and never the
-> private slim-lims (production) — this app must fit them, not the other way round. Ideas worth having later go in the spec's
-> "Parked ideas" list (docs/SLIM_DOMAIN_V2.md §11) and get raised with the user, not built.
+> **Scope:** don't modify slim-domain / slim-report-engine without Jamie's explicit go-ahead, and never the
+> private slim-lims (production); never sync production code here. Ideas for later go in the spec's
+> "Parked ideas" (docs/SLIM_DOMAIN_V2.md §11) and are raised with Jamie, not built.
 
-**Roadmap:** `docs/ROADMAP.md` (departments Admin · Lab · Quality · IT, phases, portfolio). Read it first.
+Jamie is the **designer**; Claude builds and explains. **Short replies; Jamie is token-constrained.**
 
-**Dev diary:** `docs/DEV_DIARY.md` records who decided what (Jamie / Claude / found), across every SLIM repo.
-Add a line whenever a decision is made, amended, overruled or argued; keep it short; update the tally now and then.
+## Documents
 
-## What This Is
+| File | What |
+|---|---|
+| `docs/ROADMAP.md` | Departments (Admin · Lab · Quality · IT), phases. Read first. |
+| `docs/SLIM_DOMAIN_V2.md` | The domain spec. Read before touching `slim_lims/domain/`, TR tables, enums or statuses. |
+| slim-data-oss `docs/DECISIONS.md` | Decisions D-01…, host ones included. |
+| `docs/DEV_DIARY.md` | Who decided what, across every SLIM repo. Add a line per decision made, amended or argued. |
+| `docs/REVIEW_CHECKLIST.md` | The lenses every review uses; past reviews in `docs/REVIEW_<date>.md`. |
 
-SLIM's host app (OSS demo) for an ISO 17025 accredited analytical chemistry lab: the composition
-root and the screens for the modules (slim-domain, slim-data, slim-report-engine, invoicing V5).
-Customers log in and submit Testing Requests (TRs); staff check samples in, upload readings, review
-and release results, issue reports and invoice; the lab board (`/`) shows it all. Its request form
-replaces the Excel Testing Request form as the primary intake path; emailed `.xlsx` forms stay
-supported by slim-domain's parsers. The app never produces Excel — it produces TR domain objects.
+## Working defaults (Jamie, 2026-10-28)
 
-**The domain spec is `docs/SLIM_DOMAIN_V2.md`. Read it before changing anything under
-`slim_lims/domain/`, the TR tables, enums or statuses.**
+- **Batches:** settle design in a short turn first; then one approval covers the batch: build, one PR per
+  repo, merge on green. Check CI once when it should be done; don't subscribe to PR events.
+- **Quiet runs:** `pytest -q -p no:warnings`, summary lines only; silence migration logs in seeds.
+- **Docs once per batch:** DECISIONS, diary, CLAUDE.md at the end, not per change.
+- **Fresh session per batch.** CLAUDE.md says what is true now; history lives in DECISIONS, the diary, git.
+- **Reviews:** a module review when a module is wired in, an app review every two or three modules, with
+  `docs/REVIEW_CHECKLIST.md`. Every fixed finding ends in a guard test.
 
-## Rebuild status
+## What this is
 
-This repo is SLIM's host app, open-source demo (Jamie, 2026-10-24): LabPortal (a Flask form, rebuilt
-on FastAPI) was folded into `slim-lims-oss`, and its package renamed `slim_lims`. LabPortal's history is
-merged in. The VBA-facing report API this repo used to mirror from the lab's **private, production**
-slim-lims is retired here (git history only); never sync production code into this repo again, and
-never change the private slim-lims from here. Env vars keep their `PORTAL_` names (Render's settings use them).
+SLIM's host app for an ISO 17025 analytical chemistry lab: the composition root and the screens for the
+modules. Customers submit Testing Requests (TRs); staff check samples in, prep, import readings, review
+and release results, issue reports and invoice; the lab board (`/`) shows it all. The request form
+replaces the Excel TR form; emailed `.xlsx` forms stay supported by slim-domain's parsers.
 
-1. ✅ Spec: `docs/SLIM_DOMAIN_V2.md`
-2. ✅ FastAPI skeleton: config, SQLAlchemy 2, Alembic, session auth, CSRF, security headers, pytest
-3. ✅ Domain objects (pydantic, per spec §3–4), input models, repository, TR number counter, JSON API
-4. ✅ Reference-data cache over SLIM tables, analysis catalog, `scripts/seed_demo.py` (OSS demo data)
-5. ✅ (A) Bridge: portal-side adapter TRSubmission v2 -> slim-domain-oss v1 TRSubmission, plus a
-   test feeding it to slim-report-engine-oss's report builder on OSS demo data. Portal only.
-   `slim_lims/bridge.py` (`to_slim_v1`, received TRs only); `tests/test_bridge.py` renders
-   Chemical/Water/Wafer reports with the engine's own writer (skipped without the OSS packages).
-6. ✅ (B) Screens, reviewed with the user: customer form (per-request-type fields, choices from
-   /api/reference), request list/detail, staff receive + status changes + chemical matching, users,
-   JSON view. routes.py pages, templates/requests/*, admin/home + users, static/js/request_form.js
-   (vanilla JS), static/css/portal.css, e2e/request_flow.js. Not done (parked): customer profiles
-   (saved defaults, SX5-style locations) — the form pre-fills from the customer's last request.
-7. ◐ (D) Deeper connectivity with the other repos. Done: real reports (spec §13 "The report itself", slim-data
-   D-79): `reports.py` renders slim-report-engine's template as HTML filled with released results (MDL, not ±),
-   stored in `report_files`, issue hash = file hash; ½Δ only near a spec + a key (D-80); the batch page shows
-   every cup and links each result's trace (D-81). Still open (report engine accepts a submission object,
-   slim-lims "generate report for TR", slim-domain adopts v2, status flows back). Modifies other
-   repos — **needs the user's explicit go-ahead.** Includes: the report engine should print actual
-   results from the DB instead of a blank report, generated once results exist ("data is in") —
-   to be designed in a separate conversation.
-8. ⏸ (C) Ecosystem docker-compose (the app + Postgres + Caddy) for the portfolio VPS.
-   **DEFERRED — do not start.** Waits until the other modules are ready to bolt in, so the demo
-   launches with several modules and can take one submission end to end: submission → receipt →
-   analysis/report → delivery → invoice.
-9. ✅ Link-ready (portal only): shared-Postgres `docker-compose.yml` with a seed step; slim-lims bearer
-   token (`LIMS_API_TOKEN`, `auth.ServiceClient`, `ActorType.SYSTEM`, limited to list/get/status and to
-   in progress / partial / complete report); contract in spec §12 + `tests/test_lims_contract.py`.
-10. ✅ slim-data (results module) wiring — slim-data's M6 part 2, decisions in slim-data-oss
-   `docs/DECISIONS.md` D-70, three slices. Slice 1 ✅: `results.py` (ReferenceLookup / StaffDirectory over
-   portal + SLIM tables, actor_for, demo ruleset bound to `10_elements_icpms` by code), `results_routes.py`
-   (/results upload preview/import → evaluate, batch page, /api/results), staff `lab_role` (supervisor sets
-   roles), `cli migrate`. Slice 2 ✅: batch page + API actions (review batch, accept, rerun, exception,
-   reject, correct, re-evaluate, release per sample + analysis; 409 when role / four-eyes / state refuse);
-   first readings move a received TR to in progress (D-71; a release never moves the TR); reason categories
-   from the policy's list (D-72). Slice 3: /results/reports/{tr} + "Issue report" ✅ (D-73: sha256 of the
-   canonical report JSON until the report engine is wired; TR → partial / complete report). Personas ✅
-   (D-74: `personas.py`, `users.is_persona`, `DEMO_PERSONAS`, /demo/personas; ASSERTED; no user admin).
-   Demo scenarios ✅ (D-75: `demo_scenarios.py` is slim-data's DemoHost; the seed runs the nine scenarios
-   once on real TRs). Walkthrough ✅.
-11. slim-data M7: `audit.py` installs slim-domain's hash-chained audit log over every table on Postgres
-   (`cli migrate` and the seed, once SLIM's tables exist; slim-data D-77; slim-domain is now required);
-   `cli verify` runs slim-data's `verify` with slim-domain's `verify_chain` (D-76), exit 1 on a problem. Walkthrough ✅.
-12. slim-data D-78: four demo analyses. `results.DEMO_ANALYSES` binds slim-data's demo rulesets by catalog
-   code (10 and 36 Elements share the metals rules; anions on 5 Anions; acid assay, RSD < 1 %), and
-   `OTHER_ANALYTES` lets NO3 / SO4 / Assay through the lookup. The OSS demo chemicals are now IPA, HNO3,
-   Acetone, H2O2, PGMEA (slim-report-engine-oss); the demo's assay TRs are HNO3, the rest IPA.
-13. ✅ Lab board (spec §13): `board.py` + `templates/board.html` is `/` for everyone. Columns follow TR status +
-   slim-data results; chips per sample × analysis; supervisor-first actions; customers read-only, plain columns,
-   and their issued reports (`/requests/{tr}/reports`). Invoice sent / paid: `invoices.py` + `tr_invoices` (payment is
-   invoice data, not a TR status); the invoicing module will write those rows (item 14).
-14. ✅ Invoicing, integral to the system (Jamie): SLIM-Invoicing-Program's V5 (`V5-LIMS-Module`, package
-   `slim_invoicing`, slim-data D-83/D-84) is a required library. Slice 1 ✅ the library; slice 2 ✅ here:
-   `invoices.mark_sent` builds V5's `BillableRequest` (TR + report issues) and V5 prices it into a sales order;
-   `/requests/{tr}/invoice`, `/invoices` + `/invoices.csv`; `demo_prices.py` (the seed's default price list);
-   `migrate_invoicing` in `cli migrate` / the seed. Slice 3 ✅: customer A's own quote in the demo (10 % off,
-   45-day terms) and the price lists on `/invoices` (`invoices.price_lists`); "Mark paid" stays a portal row.
+**Modules (required libraries):** slim-data (results: import, rules engine, review, release, reports),
+slim-prep (the prep book), invoicing V5 (`slim_invoicing`), slim-domain (SLIM tables, audit log),
+slim-report-engine (the report template). Each keeps its own tables and Alembic version table in the
+shared database; `cli migrate` and the seed run them all.
 
-15. slim-data D-88 / D-89, instrument data in: /results takes a CSV, a Thermo Qtegra export (prep batch, analysis
-   and prep method from the form; the importer is the analyst) or a table pasted from Excel
-   (`results.READERS`, `make_reader`, `import_analyses`); the preview lists what was left out on purpose.
-   The API takes the same choice (`kind`, `prep_batch`, `analysis`, `prep_method` query parameters).
+**Open:** deeper report-engine wiring (spec §13; changes other repos, needs the go-ahead); ecosystem
+docker-compose for the VPS (**deferred, do not start**); next work follows `docs/ROADMAP.md`.
 
-16. ✅ slim-prep (the prep book, `slim-prep-oss` P6), a required library: `prep.py` (host side: `prep_actor_for`,
-   `publish_demo_prep` = demo prep rules + stock + the metals rules under each prep method, `chemicals` for the
-   run list, `send` = register or send the correction, then re-evaluate) and `prep_routes.py`: /prep (batches,
-   standards book, make a standard), /prep/new-batch (the grid: one row per cup), /prep/batches/{code} (figures,
-   versions, "Send to results", "Correct this batch", run list CSV), /api/prep/*. Nav: Prep. `cli migrate` and the seed run its
-   migrations. Slice 1 ✅; slice 2 ✅ correcting a batch on screen (/prep/batches/{code}/edit: the grid filled
-   from the current version, a reason required, the next version; who prepped it stays). P7 ✅: `demo_prep.py`
-   (the seed's prep scenario: standards → evaporation batch → sent → bracketed run → released → a corrected weighing
-   sent again, the released result left waiting for its correction); `cli verify` also runs slim-prep's verify.
-
-Done: A, B, link-ready (9), the board (13), invoicing (14), instrument data in (15). What comes next follows `docs/ROADMAP.md`;
-C last. The user is token-constrained: small, focused steps,
-short replies.
-
-## How to Run
+## How to run
 
 ```bash
 python -m venv .venv && . .venv/bin/activate
-pip install -e ".[dev]"
+pip install -e ".[dev]" -e ../slim-domain-oss[postgres] -e ../slim-report-engine-oss
 cp .env.example .env                     # DATABASE_URL defaults to sqlite:///slim_lims.db
-pip install -e ../slim-domain-oss[postgres] -e ../slim-report-engine-oss   # OSS repos, for the demo seed
-python scripts/seed_demo.py              # migrations (app + slim-data + invoicing) + OSS demo SLIM data + catalog + demo ruleset
+python scripts/seed_demo.py              # every migration + OSS demo data + rules + personas + scenarios
 PORTAL_PASSWORD='at-least-12-chars' python -m slim_lims.cli create-staff --email you@lab.example --initials JM --lab-role supervisor
 uvicorn --factory slim_lims.main:create_app --reload   # http://127.0.0.1:8000, API docs at /api/docs
-python -m slim_lims.cli verify     # replay every result + check the audit chain (Postgres)
-pytest                                   # TEST_DATABASE_URL=postgresql+psycopg2://... pytest  to run on Postgres
+python -m slim_lims.cli verify           # replay every result, recheck the prep book, audit chain (Postgres)
+pytest -q -p no:warnings                 # TEST_DATABASE_URL=postgresql+psycopg2://... for Postgres
+ruff check . && ruff format --check .
 ```
 
-Or `docker compose up --build`: Postgres 16 shared like the ecosystem (SLIM demo tables + the app's
-tables), a one-shot `seed` service (needs `../slim-domain-oss` and `../slim-report-engine-oss`), and the
-app on :8000 with demo personas on (`/demo/personas`). Set `LIMS_API_TOKEN` to let slim-lims call the API.
-Cloud demo: `render.yaml` (Blueprint; the seed runs on every start and is idempotent). CI:
-`.github/workflows/ci.yml` ({SQLite, Postgres 16} × {3.11, 3.12}).
+`docker compose up --build`: Postgres 16 + a one-shot seed + the app with personas. **Render**
+(`render.yaml`): a lab per visitor (`DEMO_LABS`, D-102): public is emptied once (`cli empty-public --yes
+--if-needed`), the shared lab is `DATABASE_SCHEMA=lab_shared`, each visitor's first persona claims a
+seeded schema of their own. The service is `slim-lims-oss`, the database `slim-lims-db` (renaming it makes
+Render create a second; the free plan allows one). CI: {SQLite, Postgres 16} × {3.11, 3.12}.
 
-## File Map
+## File map
 
 ```
 slim_lims/
-├── main.py          # create_app(settings, engine): middleware, routers, exception handlers, /health
-├── config.py        # Settings from env (APP_ENV, SECRET_KEY, DATABASE_URL, ...)
-├── db.py            # Base (app-owned tables only), make_engine (the only way to connect), get_db
-├── oss_guard.py     # OSS-ONLY guard: refuses "precilab" URLs and non-demo hosts (called by make_engine)
-├── domain/          # Spec §3–4: enums.py, tr.py (TRSubmission, TRSample, ...), workflow.py (transitions)
-├── models.py        # SQLAlchemy models: User + TR tables (tr_submissions, tr_samples, ...)
-├── repositories.py  # TRSubmissionRepository: domain <-> rows, gapless TR numbers, stale-update check, tr_versions (as_of, D-104)
-├── schemas.py       # Input models (SubmissionIn, SampleIn, StatusChangeIn) — shape/type validation only
-├── scope.py         # Scope.for_user: whose TRs a listing shows; fails closed (slim-data D-103)
-├── services.py      # SubmissionService: reference-data rules, access rules, submit/list/get/change_status
-├── reference.py     # ReferenceData protocol, StaticReferenceData (snapshot + form choices)
-├── reference_cache.py  # ReferenceCache: loads SLIM tables + analysis_catalog, TTL refresh, keeps last good copy
-├── slim_tables.py   # Read-only Core defs of SLIM's customers/chemicals/elements/analyses (own MetaData)
-├── catalog.py       # sync_analysis_catalog: data/analysis_catalog.csv -> analysis_catalog, matched by SLIM name
-├── data/analysis_catalog.csv  # Spec §8 code/group/request-type table
-├── bridge.py        # to_slim_v1: TR -> slim-domain-oss v1 TRSubmission (location/TR no. in file_name)
-├── results.py       # slim-data host side: TrSampleTables, SpecReader, StaffDirectory, actor_for, demo rules
-├── results_routes.py  # /results (upload, batches with every cup, trace, reports) and /api/results — staff only
-├── prep.py          # slim-prep host side: prep_actor_for, publish_demo_prep, chemicals, send (+ re-evaluate)
-├── prep_routes.py   # /prep (batches, standards book, grid, send, run list CSV) and /api/prep — staff only
-├── personas.py      # demo personas (DEMO_PERSONAS): data/demo_personas.csv -> users.is_persona rows
-├── demo_scenarios.py  # slim-data's demo scenarios on real TRs (PortalDemoHost, seed_scenarios); demo seed only
-├── demo_prep.py     # slim-prep's demo scenario (seed_prep_scenario): one evaporation batch, end to end; demo seed only
-├── api.py           # /api/submissions JSON API; maps service errors to 422/403/404/409
-├── security.py      # bcrypt hashing, CSRF (csrf_token / csrf_protect), LoginThrottle, headers + body-size middleware
-├── labs.py          # a lab per visitor (DEMO_LABS, slim-data D-102): Labs (claim, spares, sweep), with_schema
+├── main.py          # create_app: middleware, routers, error handlers, /health; app.state (labs, lab_clock, throttle)
+├── config.py        # Settings from env (DATABASE_URL, DATABASE_SCHEMA, DEMO_PERSONAS, DEMO_LABS, LAB_TIMEZONE, ...)
+├── db.py            # Base (app tables only), make_engine (the only way to connect), get_db (the visitor's lab)
+├── oss_guard.py     # OSS-only guard (called by make_engine)
+├── domain/          # spec §3–4: enums, tr (TRSubmission, ...), workflow (transitions); pure
+├── models.py        # User, TR tables, tr_versions (append-only, D-104), user_capabilities, invoices, report_files
+├── repositories.py  # TRSubmissionRepository: the only TR writer; gapless numbers; versions / as_of (D-104)
+├── scope.py         # Scope.for_user: whose TRs a listing shows; fails closed (D-103)
+├── services.py      # SubmissionService: submit, check-in, status (facts only, D-99), history
+├── capabilities.py  # manage users: supervisors by default, grantable per person (D-100)
+├── security.py      # bcrypt, CSRF, LoginThrottle (D-101), headers + body-size middleware
+├── labtime.py       # LabClock: the lab's now / today (D-101)
+├── labs.py          # a lab per visitor: Labs (claim, spares, sweep), with_schema (D-102)
 ├── demo_seed.py     # seed_demo(url): the whole demo seed (scripts/seed_demo.py and each lab)
-├── labtime.py       # LabClock: the lab's now / today (LAB_TIMEZONE) for host code; app.state.lab_clock
-├── auth.py          # current_user / require_user / require_staff deps; /login, /logout
-├── board.py         # the lab board (spec §13): TR cards by stage, chips per sample × analysis
-├── invoices.py      # Invoice: TR + report issues -> invoicing V5's sales order; sent / paid (tr_invoices)
-├── demo_prices.py   # the demo's default price list for invoicing V5 (invented); demo seed only
-├── reports.py       # the issued report: engine_renderer (lab template as HTML) / plain_renderer, report_files
-├── routes.py        # Pages: / (board), /requests (customer list), /requests/new|{tr}, status form, /admin, /admin/users
-├── web.py           # Jinja2 templates, render(), flash()
-├── audit.py         # slim-domain's audit log: install_audit_log (Postgres), chain_check for verify
-├── cli.py           # migrate (app + slim-data + slim-prep + invoicing + audit log), verify (results + prep book), create-staff, create-customer-user, sync-analysis-catalog, sync-personas
-├── alembic.ini, migrations/   # Alembic; only manages tables on db.Base
-├── templates/       # base, _macros, login, error, requests/{list,new,detail}, admin/{home,users}
-└── static/          # css/style.css, admin.css (.admin-theme), portal.css (components), js/request_form.js
-scripts/seed_demo.py # Demo DB only: SLIM demo data if empty, catalog, slim-data rules, personas, demo scenarios
-tests/               # pytest; SQLite per test, or Postgres via TEST_DATABASE_URL; factories.py builds domain objects
-docs/SLIM_DOMAIN_V2.md
+├── auth.py          # current_user, require_*; /login, /logout, /demo/personas, fresh lab
+├── reference.py, reference_cache.py, slim_tables.py, catalog.py  # SLIM reference data (read-only) + analysis catalog
+├── bridge.py        # to_slim_v1: TR -> slim-domain v1 TRSubmission
+├── results.py, results_routes.py  # slim-data host side; /results, /api/results (staff)
+├── prep.py, prep_routes.py        # slim-prep host side; /prep, /api/prep (staff)
+├── invoices.py, demo_prices.py    # invoicing V5; /invoices
+├── reports.py       # issued reports: engine_renderer / plain_renderer, report_files
+├── board.py         # the lab board (spec §13)
+├── personas.py, demo_scenarios.py, demo_prep.py  # demo personas and seeded scenarios
+├── api.py           # /api/submissions; service errors -> 422/403/404/409
+├── routes.py, web.py, templates/, static/        # pages
+├── audit.py         # slim-domain's audit log (Postgres; per lab schema)
+├── cli.py           # migrate, verify, create-staff, create-customer-user, sync-*, empty-public
+└── migrations/      # Alembic, app tables only
+scripts/seed_demo.py; tests/ (SQLite per test, or Postgres via TEST_DATABASE_URL)
 ```
 
-## Architecture Rules
+## Architecture rules
 
-- **Layers:** `domain/` (pure pydantic + stdlib, liftable into slim-domain unchanged) ← input
-  models validate HTTP input ← repositories are the only code that touches the DB for TRs.
-- **Data ownership:** one Postgres shared with SLIM. The app only READS SLIM reference tables
-  (customers, chemicals, elements, analyses) and never declares them on `db.Base`; Alembic must
-  never create/alter them. No FKs from the app's tables into SLIM tables.
-- **Portable schema:** must run on SQLite and Postgres (as slim-domain does) — no ARRAY columns,
-  enums stored as ints. App-owned TR tables use integer keys; `users` uses UUIDs.
-- **slim-data:** a required library (git dependency). Its tables share the database, migrated by its own
-  Alembic (`alembic_version_slim_data`; `cli migrate` / seed run both). It flushes; routes commit. Staff
-  act as `results.actor_for(user)` (UUID id, initials, `lab_role`); result files name the analyst by
-  initials (unique). SQLite engines use the explicit-BEGIN recipe so its savepoints work.
-- **Auth:** Starlette signed-cookie sessions (`SameSite=Lax`, `Secure` in production), bcrypt.
-  Roles: `customer` (must have `customer_id`, a SLIM customer ID) and `staff` (must have
-  `initials` and a `lab_role`: analyst / reviewer / supervisor). No self-registration; users are created by staff with the *manage users* capability
-  (`capabilities.py`, slim-data D-100: supervisors by default, grantable per person in `user_capabilities`;
-  nobody acts on a higher lab role or gives a role above their own). Customers must already exist in SLIM.
-  Demo personas (`is_persona`, only with `DEMO_PERSONAS`) are chosen, not logged in: ASSERTED in slim-data,
-  refused by /login, no user or role admin.
-- **Machine access:** slim-lims uses `Authorization: Bearer $LIMS_API_TOKEN` (spec §12). Token
-  requests skip CSRF and never use the session; only `auth.LIMS_ROUTES` are allowed. Keep
-  `tests/test_lims_contract.py` passing — slim-lims is written against it.
-- **CSRF:** every router is created with `dependencies=[Depends(csrf_protect)]`. Forms send
-  `csrf_token`; fetch/JSON sends the `X-CSRF-Token` header (token in `<meta name="csrf-token">`).
-  `tests/test_app.py` fails if any state-changing route accepts a request without a token.
-- **CSP:** no `'unsafe-inline'` — never add inline `<script>`; pass server data via `data-*`
-  attributes. Allowed script hosts: code.jquery.com, cdn.jsdelivr.net.
-- **Errors:** invalid input → 422 with per-field detail (FastAPI default). HTML routes render
-  `error.html`; `/api/*` and `Accept: application/json` get JSON. Unauthenticated: HTML → 303 to
-  `/login?next=...`, API → 401. Non-staff on staff routes → 403.
-- **API:** `POST /api/submissions` (201), `GET /api/submissions[?status&request_type&page]`,
-  `GET /api/submissions/{tr_number}`, `POST /api/submissions/{tr_number}/status`,
-  `POST /api/submissions/{tr_number}/samples/{position}/chemical` (staff: match to SLIM). Responses are
-  `TRSubmission.model_dump(mode="json")` — enums as ints. Customers only see their own customer's
-  TRs (others → 404). Business-rule failures → 422 with `loc` pointing at the field; disallowed or
-  concurrent status changes → 409.
-- **Reference data:** `app.state.reference` is a `ReferenceCache` (TTL `REFERENCE_CACHE_TTL_SECONDS`,
-  default 300 s; staff can force a reload on /admin). A failed refresh keeps the previous snapshot.
-  SLIM analyses with no `analysis_catalog` row are never offered. `GET /api/reference` gives the
-  form its choices (customers only for staff).
-- **OSS only:** see the banner at the top. `PORTAL_ALLOWED_DB_HOSTS` is for other *demo* hosts.
-- **Dates:** "today" means the lab's local date (`LAB_TIMEZONE`, default America/Chicago; `labtime.LabClock`, slim-data D-101). Expected
-  arrival (optional, customer) can't be in the past; `date_received` (staff) can't be in the future.
-- **Demo data only:** dev, tests and the portfolio use the OSS repos' fictional data
-  (`slim-report-engine-oss/demo/demo.py`). `scripts/seed_demo.py` never writes into SLIM tables
-  that already hold data. Never point the app at the lab's production database from here.
-- **Routes are plain `def`** (sync SQLAlchemy), not `async def`.
-- 1 MB request cap (`MAX_BODY_BYTES`), enforced with or without Content-Length.
+- **Layers:** `domain/` pure (liftable into slim-domain) ← input models ← repositories, the only code that
+  touches TR tables. Modules flush; routes commit.
+- **Data:** the app only reads SLIM's reference tables, never declares them on `db.Base`, no FKs into them.
+  Portable schema (SQLite + Postgres): no ARRAY, enums as ints; TR tables integer keys, `users` UUIDs.
+- **Access:** every listing takes a `Scope` (D-103); customers see only their customer's TRs (others 404).
+  Roles: `customer` (needs `customer_id`) and `staff` (needs `initials`, `lab_role`). Managing users is a
+  capability (D-100). Personas (`DEMO_PERSONAS`) are chosen, not logged in: ASSERTED, refused by /login.
+  Staff act in modules as `results.actor_for(user)` / `prep.prep_actor_for(user)`.
+- **Machine access:** `Authorization: Bearer $LIMS_API_TOKEN` (spec §12), only `auth.LIMS_ROUTES`, no CSRF,
+  no session. Keep `tests/test_lims_contract.py` passing.
+- **CSRF:** every router has `dependencies=[Depends(csrf_protect)]`; forms send `csrf_token`, fetch sends
+  `X-CSRF-Token`. `tests/test_app.py` sweeps every state-changing route.
+- **CSP:** no `'unsafe-inline'`, no inline `<script>`; data via `data-*`. Script hosts: code.jquery.com,
+  cdn.jsdelivr.net.
+- **Errors:** 422 per field; HTML routes render `error.html`, `/api/*` JSON; unauthenticated HTML → 303
+  `/login?next=`, API → 401; non-staff on staff routes → 403.
+- **Dates:** "today" is the lab's (`LabClock`, `LAB_TIMEZONE`). **Routes are plain `def`.** 1 MB body cap.
+- **Demo data only:** the seed never writes into SLIM tables that hold data.
 
-## Key Decisions (see the spec for detail)
+## Key decisions (detail in the spec and DECISIONS)
 
-- One request type (Chemical / Water / Wafer) per submission; per-type sample fields.
-- Chemical / matrix is free text from the customer; linked to a SLIM chemical only on an exact name
-  match, otherwise matched (or created in SLIM) by the lab later. The bridge refuses unmatched TRs.
-- Form UX (user-approved): samples table + one grouped analysis panel that applies to the ticked
-  rows (or all rows when none are ticked); Gmail-style selection bar. The analysis-matrix layout
-  was tried and rejected — too many analysis combinations for per-analysis columns.
-- TR numbers `TR00001`… from a gapless counter row locked in the submit transaction.
-- **Check-in** (staff, `/requests/{tr}/check-in`, `POST /api/submissions/{tr}/check-in`) is the only
-  way to RECEIVED: receipt (date, initials, note) + every chemical matched to SLIM, one step —
-  the app's equivalent of the VBA/manual log-in. "Reject" = cancel with a reason.
-- Statuses: submitted → received → in progress → partial report (repeatable) → complete report
-  → invoiced (terminal, staff only); cancelled (customer may cancel only while submitted).
-  Statuses follow the facts (slim-data D-99): partial / complete report only by issuing a report,
-  invoiced only by sending the invoice; a cancel is refused once a report was issued or a result released,
-  and the modules take no new work for a cancelled TR. **Each time a module is wired, re-check which
-  statuses are still set by hand.**
-- Payment: purchase order (PO number, also used for billing codes) or credit card (lab calls;
-  no card data stored).
-- Call-in RUSH = outside business hours. Wafer sizes 200 / 300 mm; units atoms/cm² or
-  10¹⁰ atoms/cm². Water packages exist in the shape but are not offered yet.
-- Hosting target: portfolio VPS running the whole ecosystem via Docker Compose. `render.yaml`
-  names the web service `slim-lims-oss` (the demo URL) and the database `slim-lims-db` (Postgres
-  database and user `slim_lims`). Renaming the database makes Render create a second one, and the
-  free plan allows one: delete the old database first.
-
-## Backlog
-
-See "Parked ideas" in docs/SLIM_DOMAIN_V2.md §11.
+- One request type (Chemical / Water / Wafer) per TR. Chemicals are customer free text, matched to SLIM by
+  staff; check-in (receipt + every chemical matched) is the only way to *received*.
+- Form UX: samples table + one grouped analysis panel for the ticked rows (the matrix layout was rejected).
+- TR numbers `TR00001`… from a gapless counter locked in the submit transaction.
+- Statuses: submitted → received → in progress → partial report → complete report → invoiced; cancelled.
+  They follow the facts (D-99): report statuses only by issuing a report, invoiced only by sending the
+  invoice; a cancel is refused once a report was issued or a result released. **Each time a module is
+  wired, re-check which statuses are still set by hand.**
+- Payment: PO number or credit card (the lab calls; no card data stored). RUSH = outside business hours.
+- Every change to a TR is kept whole in `tr_versions` (D-104).
