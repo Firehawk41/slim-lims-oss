@@ -25,8 +25,8 @@ import argparse
 import importlib.util
 import os
 import sys
-from datetime import date
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from alembic import command
 from alembic.config import Config
@@ -42,6 +42,7 @@ from slim_lims.db import make_engine, make_session_factory
 from slim_lims.demo_prep import seed_prep_scenario
 from slim_lims.demo_scenarios import seed_scenarios
 from slim_lims.invoices import migrate_invoicing
+from slim_lims.labtime import LabClock
 from slim_lims.oss_guard import assert_oss_database
 from slim_lims.personas import sync_personas
 from slim_lims.prep import migrate_slim_prep, publish_demo_prep
@@ -133,17 +134,17 @@ def main(argv: list[str] | None = None) -> int:
     migrate_slim_prep(portal_engine)
     migrate_invoicing(portal_engine)
     audited = install_audit_log(portal_engine)  # before the scenarios, so their writes are chained (D-77)
+    clock = LabClock(ZoneInfo(settings.lab_timezone))  # the demo's dates are the lab's (review A8)
     with make_session_factory(portal_engine)() as session:
         reference = load_reference(slim_engine, portal_engine)
         analyses = publish_demo_rules(session, reference)
-        publish_demo_prep(session, reference, date.today())
+        publish_demo_prep(session, reference, clock.today())
         personas = sync_personas(session)
         session.commit()
-        scenarios = {} if args.no_scenarios else seed_scenarios(session, reference, SpecReader(slim_engine))
+        specs = SpecReader(slim_engine)
+        scenarios = {} if args.no_scenarios else seed_scenarios(session, reference, specs, clock.now())
         session.commit()
-        prepped = (
-            None if args.no_scenarios else seed_prep_scenario(session, reference, SpecReader(slim_engine))
-        )
+        prepped = None if args.no_scenarios else seed_prep_scenario(session, reference, specs, clock.now())
         session.commit()
     print(
         "slim-data: demo rulesets published for "

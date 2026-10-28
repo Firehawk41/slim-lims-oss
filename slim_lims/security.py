@@ -1,11 +1,68 @@
 """Password hashing, CSRF protection, security headers and the request-size cap."""
 
 import hmac
+import math
 import secrets
+import threading
+import time
+from collections import defaultdict, deque
+from collections.abc import Callable
 
 import bcrypt
 from fastapi import HTTPException, Request
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
+
+# ---------------------------------------------------------------- login attempts
+
+
+class LoginThrottle:
+    """Failed logins counted per account and per client address (review A4). Past the limit within the
+    window, a login is refused without checking the password until the oldest failure ages out.
+    In memory, per process: enough for the demo's one process; a restart forgets it."""
+
+    def __init__(
+        self,
+        per_account: int = 5,
+        per_address: int = 20,
+        window_seconds: float = 900,
+        clock: Callable[[], float] = time.monotonic,
+    ):
+        self.limits = {"account": per_account, "address": per_address}
+        self.window = window_seconds
+        self.clock = clock
+        self._failures: dict[tuple[str, str], deque[float]] = defaultdict(deque)
+        self._lock = threading.Lock()
+
+    def _recent(self, key: tuple[str, str], now: float) -> deque[float]:
+        times = self._failures[key]
+        while times and times[0] <= now - self.window:
+            times.popleft()
+        if not times:
+            del self._failures[key]
+            return deque()
+        return times
+
+    def wait_seconds(self, account: str, address: str) -> int:
+        """0 when a login may be tried; otherwise the seconds until it may."""
+        with self._lock:
+            now = self.clock()
+            wait = 0.0
+            for kind, value in (("account", account), ("address", address)):
+                times = self._recent((kind, value), now)
+                if len(times) >= self.limits[kind]:
+                    wait = max(wait, times[0] + self.window - now)
+            return math.ceil(wait)
+
+    def failed(self, account: str, address: str) -> None:
+        with self._lock:
+            now = self.clock()
+            for key in (("account", account), ("address", address)):
+                self._failures[key].append(now)
+
+    def succeeded(self, account: str) -> None:
+        with self._lock:
+            self._failures.pop(("account", account), None)
+
 
 # ---------------------------------------------------------------- passwords
 

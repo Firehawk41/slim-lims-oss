@@ -1,5 +1,7 @@
 """FastAPI application factory. Run with: uvicorn --factory slim_lims.main:create_app"""
 
+from zoneinfo import ZoneInfo
+
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -13,6 +15,7 @@ from slim_lims.auth import LoginRequired, StaffRequired, login_redirect
 from slim_lims.auth import router as auth_router
 from slim_lims.config import Settings, load_settings
 from slim_lims.db import make_engine, make_session_factory
+from slim_lims.labtime import LabClock
 from slim_lims.prep_routes import api_router as prep_api_router
 from slim_lims.prep_routes import router as prep_router
 from slim_lims.reference import ReferenceData
@@ -22,7 +25,7 @@ from slim_lims.results import SpecReader
 from slim_lims.results_routes import api_router as results_api_router
 from slim_lims.results_routes import router as results_router
 from slim_lims.routes import router as pages_router
-from slim_lims.security import BodySizeLimitMiddleware, SecurityHeadersMiddleware
+from slim_lims.security import BodySizeLimitMiddleware, LoginThrottle, SecurityHeadersMiddleware
 from slim_lims.web import STATIC_DIR, render
 
 SESSION_COOKIE = "slim_portal_session"
@@ -61,6 +64,8 @@ def create_app(
     # SLIM spec limits for slim-data: (customer_id, chemical_id, location) -> {element: limit}.
     app.state.specs = specs or SpecReader(slim_engine)
     app.state.report_renderer = report_renderer or engine_renderer  # spec §13, slim-data D-79
+    app.state.login_throttle = LoginThrottle()
+    app.state.lab_clock = LabClock(ZoneInfo(settings.lab_timezone))
 
     # Last added = outermost. Headers wrap everything, including 413s and session errors.
     app.add_middleware(BodySizeLimitMiddleware, max_bytes=settings.max_body_bytes)

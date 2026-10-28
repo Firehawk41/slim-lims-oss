@@ -134,17 +134,33 @@ def login(
     password: Annotated[str, Form()],
     next: Annotated[str, Form()] = "/",
 ):
-    user = db.scalars(select(User).where(User.email == email.strip().lower())).first()
+    account = email.strip().lower()
+    address = request.client.host if request.client else "unknown"
+    throttle = request.app.state.login_throttle
+    if wait := throttle.wait_seconds(account, address):  # the password isn't even checked
+        minutes = -(-wait // 60)
+        refused = render(
+            request,
+            "login.html",
+            {"error": f"Too many failed logins. Try again in {minutes} minute{'s' * (minutes != 1)}.",
+             "next": _safe_next(next), "email": email},
+            status_code=429,
+        )  # fmt: skip
+        refused.headers["Retry-After"] = str(wait)
+        return refused
+    user = db.scalars(select(User).where(User.email == account)).first()
     if user is not None and user.is_persona:
         user = None  # personas are chosen on /demo/personas, never signed in with a password
     ok = verify_password(password, user.password_hash if user else None)
     if not ok or user is None or not user.is_active:
+        throttle.failed(account, address)
         return render(
             request,
             "login.html",
             {"error": "Invalid email or password.", "next": _safe_next(next), "email": email},
             status_code=401,
         )
+    throttle.succeeded(account)
     # New session on login: drops any pre-login state and rotates the CSRF token.
     request.session.clear()
     request.session[SESSION_USER_KEY] = str(user.id)

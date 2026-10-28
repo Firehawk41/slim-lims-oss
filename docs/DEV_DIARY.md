@@ -49,6 +49,8 @@ Tally and themes are updated now and then at the bottom.
 | C→J | Fresh demo: Claude first proposed a reset; after Jamie's "fresh for every user", Claude pushed back on resetting at start (two visitors at once still share) and proposed a **lab per visitor**; Jamie agreed. | Pushback that changed the plan's mechanism, not its goal. |
 | C✓ | D-99: statuses follow facts; cancel asks the modules. | Jamie's rule added: re-check hand-set statuses after each module is wired. |
 | C→J | D-100: managing users is a capability, supervisors by default, grantable per person; nobody acts on a higher role. | Jamie's amendment (the lab customises) shaped it. |
+| C✓ | D-101: login limits, the lab's clock for prep, DOCTYPE refused inside the parser, a report-escaping test. | |
+| F | Claude's review listed the Qtegra DOCTYPE as open; it was already refused (a byte check Claude wrote, which a UTF-16 file could pass). | The review was wrong; the fix still mattered. |
 
 ## Themes so far
 - **Domain facts are Jamie's, and they overrule Claude's defaults:** DF < 1, MDL averaging, standards as

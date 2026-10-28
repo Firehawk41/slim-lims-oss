@@ -163,7 +163,8 @@ slim_lims/
 ├── demo_scenarios.py  # slim-data's demo scenarios on real TRs (PortalDemoHost, seed_scenarios); demo seed only
 ├── demo_prep.py     # slim-prep's demo scenario (seed_prep_scenario): one evaporation batch, end to end; demo seed only
 ├── api.py           # /api/submissions JSON API; maps service errors to 422/403/404/409
-├── security.py      # bcrypt hashing, CSRF (csrf_token / csrf_protect), headers + body-size middleware
+├── security.py      # bcrypt hashing, CSRF (csrf_token / csrf_protect), LoginThrottle, headers + body-size middleware
+├── labtime.py       # LabClock: the lab's now / today (LAB_TIMEZONE) for host code; app.state.lab_clock
 ├── auth.py          # current_user / require_user / require_staff deps; /login, /logout
 ├── board.py         # the lab board (spec §13): TR cards by stage, chips per sample × analysis
 ├── invoices.py      # Invoice: TR + report issues -> invoicing V5's sales order; sent / paid (tr_invoices)
@@ -223,7 +224,7 @@ docs/SLIM_DOMAIN_V2.md
   SLIM analyses with no `analysis_catalog` row are never offered. `GET /api/reference` gives the
   form its choices (customers only for staff).
 - **OSS only:** see the banner at the top. `PORTAL_ALLOWED_DB_HOSTS` is for other *demo* hosts.
-- **Dates:** "today" means the lab's local date (`LAB_TIMEZONE`, default America/Chicago). Expected
+- **Dates:** "today" means the lab's local date (`LAB_TIMEZONE`, default America/Chicago; `labtime.LabClock`, slim-data D-101). Expected
   arrival (optional, customer) can't be in the past; `date_received` (staff) can't be in the future.
 - **Demo data only:** dev, tests and the portfolio use the OSS repos' fictional data
   (`slim-report-engine-oss/demo/demo.py`). `scripts/seed_demo.py` never writes into SLIM tables

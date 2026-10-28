@@ -141,3 +141,35 @@ def test_half_delta_is_noted_beside_the_spec_and_explained():
     assert "Fe: above the customer&#x27;s specification; half delta 0.050" in html
     assert "<dt>Half delta</dt><dd>Half the difference between the two measurements" in html
     assert "<dt>MDL</dt>" in html
+
+
+HOSTILE = '<script>alert("x")</script>'
+
+
+def test_both_renderers_escape_what_people_typed():  # review A7: the CSP is the backstop, not the guard
+    from slim_report_engine.reporting.html_report import render_html
+
+    row = SimpleNamespace(values={1: HOSTILE}, notes={2: HOSTILE}, limits=None, merges=[], style_name="x")
+    sheet = SimpleNamespace(name=HOSTILE, sections=[SimpleNamespace(id=1, rows=[row])])
+    engine_html = render_html([sheet, sheet], title=HOSTILE)
+    line = ReportLineView(
+        sample=SampleRef(tr_number="TR00001", position=1),
+        analyte=AnalyteRef(analysis_id=5, code="Fe"),
+        version=1,
+        text=HOSTILE,
+        reported=None,
+        qualifier=Qualifier.DETECTED,
+        uncertainty=None,
+        recovery=None,
+        mdl=None,
+        half_delta=None,
+        shown_flags=(),
+    )
+    plain_html = plain_renderer(
+        None,
+        SimpleNamespace(tr_number="TR00001"),
+        ReportView(tr_number="TR00001", lines=(line,)),
+        SimpleNamespace(analysis=lambda _id: SimpleNamespace(name=HOSTILE)),
+    )
+    for html in (engine_html, plain_html):
+        assert "<script" not in html and "&lt;script&gt;" in html

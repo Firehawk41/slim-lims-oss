@@ -229,3 +229,21 @@ def test_a_cancelled_requests_batch_isnt_sent(client, prep):  # D-99
     assert refused.status_code == 422 and "TR00001-01, TR00001-02: the request was cancelled" in str(
         refused.json()
     )
+
+
+def test_an_evenings_batch_is_dated_by_the_lab_not_the_server(client, prep):  # review A8
+    from datetime import UTC, datetime
+    from zoneinfo import ZoneInfo
+
+    from slim_lims.labtime import LabClock
+
+    evening = datetime(2026, 10, 29, 4, 30, tzinfo=UTC)  # 23:30 on the 28th in Chicago
+    client.app.state.lab_clock = LabClock(ZoneInfo("America/Chicago"), lambda: evening)
+    assert client.app.state.lab_clock.today() == date(2026, 10, 28)
+    login(client, "staff@lab.example")
+    page = client.get("/prep")
+    assert 'value="2026-10-28"' in page.text  # the standards form's default prep date
+    _standards(client, csrf_from(page.text))
+    client.post("/prep/batches", data=_grid(csrf_from(page.text)))
+    at = client.get("/api/prep/batches/PB-P1").json()["batch"]["prep"]["at"]
+    assert at.startswith("2026-10-28T23:30") and at.endswith("-05:00")

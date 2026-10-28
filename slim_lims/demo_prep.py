@@ -81,7 +81,7 @@ def seed_prep_scenario(
 def _batch(
     tr: str, fifty, initials: str, now: datetime, final: str, cup_2_final: str | None = None
 ) -> PrepBatch:
-    at = datetime.combine(now.date(), time(9, 0), tzinfo=UTC)
+    at = datetime.combine(now.date(), time(9, 0), tzinfo=now.tzinfo)
 
     def cup(number, final_g, kind=CupKind.SAMPLE, spikes=()):
         weighing = Weighing(tare=D("2.0000"), cap=D("0.5000"), gross=D("12.5000"), final=D(final_g))
@@ -107,7 +107,7 @@ def _batch(
 
 def _readings(tr: str, analyst: str, now: datetime) -> bytes:
     """Raw readings, in run order: a check standard, the samples, their spikes, a check standard."""
-    stamp = datetime.combine(now.date(), time(14, 0), tzinfo=UTC).isoformat()
+    stamp = datetime.combine(now.date(), time(14, 0), tzinfo=now.tzinfo).isoformat()
     rows = [("CHECK", "Cu", "CHECK", 1, "10.1", "", "10.0"), ("CHECK", "Fe", "CHECK", 1, "9.9", "", "10.0")]
     for position, (cu, fe) in ((1, ("100.0", "50.0")), (2, ("80.0", "40.0"))):
         s = f"{tr}-{position:02d}"
