@@ -91,7 +91,7 @@ slim_lims/
 ├── reference.py, reference_cache.py, slim_tables.py, catalog.py  # SLIM reference data (read-only) + analysis catalog
 ├── bridge.py        # to_slim_v1: TR -> slim-domain v1 TRSubmission
 ├── results.py, results_routes.py  # slim-data host side; /results, /api/results (staff)
-├── prep.py, prep_routes.py        # slim-prep host side; /prep, /api/prep (staff)
+├── prep.py, prep_routes.py        # slim-prep host side (TrSamples: its TR port); /prep, /api/prep (staff)
 ├── invoices.py, demo_prices.py    # invoicing V5; /invoices
 ├── reports.py       # issued reports: engine_renderer / plain_renderer, report_files
 ├── board.py         # the lab board (spec §13)

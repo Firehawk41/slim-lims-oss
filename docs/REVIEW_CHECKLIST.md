@@ -16,7 +16,7 @@ two or three modules. **Output:** `docs/REVIEW_<date>.md`, findings only, each w
 | 5 | **Whose clock** | Is "today" the lab's (`LabClock`)? Are instants stored as instants and dated in the lab's zone? | `test_prep.py` (evening batch) |
 | 6 | **Untrusted input** | Files (CSV, XML, paste), form fields, JSON bodies: size, encoding, DOCTYPE, formula cells, odd numbers, crafted field names → 422, never 500 or silent loss. | `test_qtegra.py` (DOCTYPE), body cap in `test_app.py` |
 | 7 | **Output escaping** | Is everything typed by people escaped in HTML, CSV and file names? CSP still without `unsafe-inline`? | `test_reports.py` (escaping), CSP in `test_app.py` |
-| 8 | **Module seams** | What does one module trust from another (IDs, codes, versions)? Can either side change it underneath? Does a correction keep what must not change? | (slim-prep B1, B2, B5, B6, B9 open) |
+| 8 | **Module seams** | What does one module trust from another (IDs, codes, versions)? Can either side change it underneath? Does a correction keep what must not change? | (slim-prep B1, B2, B5, B6, B9: fixed 2026-10-28) |
 | 9 | **Sessions and auth** | Login limits, session rotation, CSRF on every state change, open redirects. | `test_auth.py`, CSRF sweep in `test_app.py` |
 | 10 | **Demo isolation** | Can one visitor see or change another's lab? Does anything reach a non-demo database? | `test_labs.py`, `test_oss_guard.py` |
 

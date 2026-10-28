@@ -7,7 +7,8 @@
   {% if version %}<p class="hint">The record keeps version {{ version }} as it was; this becomes the next version, with your reason.
     If it was sent to results, send the correction from the batch page afterwards.</p>{% endif %}
   <p class="hint">One row per cup, in grams. {% if method.tared_vessel %}The vial is tared: Gross is the sample, Final the solution.{% else %}Net = Gross − Tare{% if method.weighs_cap %} − Cap{% endif %}; dilution = (Final − Tare) ÷ Net.{% endif %}
-    Spike level = volume × the standard's concentration ÷ the spike cup's net.</p>
+    Spike level = volume × the standard's concentration ÷ the spike cup's net. A spike cup can take more than one
+    spike line: correct the batch to add another; leave a line blank to drop it.</p>
 
   {% if problems %}
     <div class="form-error" role="alert"><p>Nothing was recorded:</p>
@@ -26,8 +27,18 @@
         <select name="balance">{% for b in rules.balances %}<option value="{{ b }}"{% if values.balance == b %} selected{% endif %}>{{ b }}</option>{% endfor %}</select>
       </label>
       {% if method.pour_out_step %}
-        <label>Poured out by (initials) <input type="text" name="pour_out" maxlength="10" required value="{{ values.pour_out or '' }}"></label>
+        <label>Poured out by
+          <select name="pour_out" required>
+            <option value="">choose</option>
+            {% for u in staff %}<option value="{{ u.id }}"{% if values.pour_out == u.id|string %} selected{% endif %}>{{ u.initials }}</option>{% endfor %}
+            {% if values.pour_out and values.pour_out not in staff_ids %}
+              <option value="{{ values.pour_out }}" selected>{{ values.pour_out }} (as recorded)</option>
+            {% endif %}
+          </select>
+        </label>
+        <label>Poured out at <input type="datetime-local" name="pour_out_at" required value="{{ values.pour_out_at or now }}"></label>
       {% endif %}
+      <label>Prepped at (lab time) <input type="datetime-local" name="prep_at" required value="{{ values.prep_at or now }}"></label>
     </div>
     <table class="table prep-grid">
       <thead><tr>
@@ -48,18 +59,20 @@
               {% if method.weighs_cap %}<td><input type="text" inputmode="decimal" name="{{ k }}_cap" value="{{ values[k ~ '_cap'] or '' }}" aria-label="{{ s }} cup {{ n }} cap"></td>{% endif %}
               <td><input type="text" inputmode="decimal" name="{{ k }}_gross" value="{{ values[k ~ '_gross'] or '' }}" aria-label="{{ s }} cup {{ n }} gross"></td>
               <td><input type="text" inputmode="decimal" name="{{ k }}_final" value="{{ values[k ~ '_final'] or '' }}" aria-label="{{ s }} cup {{ n }} final"></td>
-              {% if n in spike_cups %}
-                <td><select name="{{ k }}_standard" aria-label="{{ s }} cup {{ n }} standard">
-                  {% for st in standards %}{% set ref = st.name ~ '|' ~ st.prepared.isoformat() %}
-                    <option value="{{ ref }}"{% if values[k ~ '_standard'] == ref %} selected{% endif %}>{{ st.name }} ({{ st.prepared }}, expires {{ st.expires }})</option>
-                  {% endfor %}
-                </select></td>
-                <td><input type="text" inputmode="decimal" name="{{ k }}_volume" value="{{ values[k ~ '_volume'] or '' }}" aria-label="{{ s }} cup {{ n }} spike volume"></td>
-                <td><select name="{{ k }}_pipette" aria-label="{{ s }} cup {{ n }} pipette">{% for p in rules.pipettes %}<option value="{{ p }}"{% if values[k ~ '_pipette'] == p %} selected{% endif %}>{{ p }}</option>{% endfor %}</select></td>
+              {% if n in spike_cups %}{% set sk = k ~ '_s0' %}
+                {% include "prep/_spike_line.html" %}
               {% else %}<td></td><td></td><td></td>{% endif %}
               <td><select name="{{ k }}_balance" aria-label="{{ s }} cup {{ n }} balance"><option value="">batch's</option>{% for b in rules.balances %}<option value="{{ b }}"{% if values[k ~ '_balance'] == b %} selected{% endif %}>{{ b }}</option>{% endfor %}</select></td>
               <td><input type="text" name="{{ k }}_note" maxlength="1000" value="{{ values[k ~ '_note'] or '' }}" aria-label="{{ s }} cup {{ n }} note"></td>
             </tr>
+            {% if n in spike_cups %}{% for j in range(1, (lines.get(k, 0) or 0) + 1) %}{% set sk = k ~ '_s' ~ j %}
+              <tr class="spike-line">
+                <td></td><td>{{ n }} spike {{ j + 1 }}</td>
+                {% if not method.tared_vessel %}<td></td>{% endif %}{% if method.weighs_cap %}<td></td>{% endif %}<td></td><td></td>
+                {% include "prep/_spike_line.html" %}
+                <td></td><td></td>
+              </tr>
+            {% endfor %}{% endif %}
           {% endfor %}
         {% endfor %}
       </tbody>

@@ -1,9 +1,9 @@
 """The host side of slim-prep, the prep book (slim-prep P-11…P-21, P6).
 
 slim-prep is a library like slim-data: this app gives it people (`prep_actor_for`), the TR data it
-doesn't own (each sample's chemical, for the run list) and the analysis facts it hands to slim-data
-(analysis ID, the elements it measures, the unit spike amounts are given in). slim-prep flushes; the
-routes commit.
+doesn't own (`TrSamples`: each sample's state, analyses ordered and chemical) and the analysis facts
+it hands to slim-data (analysis ID, the elements it measures, the unit spike amounts are given in).
+slim-prep flushes; the routes commit.
 
 A prep batch reaches slim-data through `send` (P-18, P-20): first send registers it, a later one sends
 the correction; either way slim-data then re-evaluates whatever readings the batch already has.
@@ -23,17 +23,19 @@ from slim_data.rulesets import ruleset_text
 from slim_data.service.workflow import evaluate_batch
 from slim_prep.demo import DEMO_RULES, demo_stock
 from slim_prep.domain.actor import Actor as PrepActor
+from slim_prep.domain.actor import IdentitySource
 from slim_prep.domain.actor import Role as PrepRole
+from slim_prep.domain.ports import SampleInfo, SampleState
 from slim_prep.persistence import books
 from slim_prep.persistence import migrate as prep_migrate
 from slim_prep.persistence._rows import NotFound
 from slim_prep.persistence.rules import PublishedRules, current_rules, publish_rules
 from slim_prep.service.handoff import send_correction, send_to_results, sent_version
 from sqlalchemy import Engine, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from slim_lims.domain import TRStatus
-from slim_lims.models import LAB_ROLE_SUPERVISOR, TRSampleRow, TRSubmissionRow, User
+from slim_lims.models import LAB_ROLE_SUPERVISOR, TRSampleAnalysisRow, TRSampleRow, TRSubmissionRow, User
 from slim_lims.reference import ReferenceData
 from slim_lims.results import SEED_ACTOR, actor_for, reference_lookup
 
@@ -50,12 +52,18 @@ def migrate_slim_prep(engine: Engine) -> None:
 
 def prep_actor_for(user: User) -> PrepActor:
     """A staff user as slim-prep sees them. Until the app has a quality role, a supervisor publishes
-    the prep rules (slim-prep P-17)."""
+    the prep rules (slim-prep P-17). A persona is a claim, not a login (P-27, as slim-data's D-50)."""
     role = PrepRole.SUPERVISOR if user.lab_role == LAB_ROLE_SUPERVISOR else PrepRole.ANALYST
-    return PrepActor(id=str(user.id), display=user.initials or user.email, roles=frozenset({role}))
+    source = IdentitySource.ASSERTED if user.is_persona else IdentitySource.AUTHENTICATED
+    return PrepActor(
+        id=str(user.id), display=user.initials or user.email, roles=frozenset({role}), identity_source=source
+    )
 
 
-SEED_PREP_ACTOR = PrepActor(id=SEED_ACTOR.id, display=SEED_ACTOR.display, roles=frozenset({PrepRole.QUALITY}))
+SEED_PREP_ACTOR = PrepActor(
+    id=SEED_ACTOR.id, display=SEED_ACTOR.display, roles=frozenset({PrepRole.QUALITY}),
+    identity_source=IdentitySource.ASSERTED,
+)  # fmt: skip
 
 
 def rules(session: Session) -> PublishedRules:
@@ -87,28 +95,79 @@ def publish_demo_prep(session: Session, reference: ReferenceData, today: date) -
     return published
 
 
-def chemicals(session: Session, sample_ids) -> dict[str, str]:
-    """Each lab sample ID's chemical, as the TR names it (the run list's matrix, P-21)."""
-    out = {}
-    for sample_id in sample_ids:
-        ref = SampleRef.parse(sample_id)
-        row = session.execute(
-            select(TRSampleRow.chemical_name)
+_STATE = {
+    TRStatus.SUBMITTED: SampleState.NOT_RECEIVED,
+    TRStatus.RECEIVED: SampleState.OPEN,
+    TRStatus.IN_PROGRESS: SampleState.OPEN,
+    TRStatus.PARTIAL_REPORT: SampleState.OPEN,
+    TRStatus.COMPLETE_REPORT: SampleState.OPEN,
+    TRStatus.INVOICED: SampleState.CLOSED,
+    TRStatus.CANCELLED: SampleState.CANCELLED,
+}
+
+
+class TrSamples:
+    """slim-prep's `SampleLookup` over the app's TR tables (P-23; review B1): what each lab sample is,
+    whether it may be prepped, and what was ordered for it. One per request; answers are cached."""
+
+    def __init__(self, session: Session, reference: ReferenceData) -> None:
+        self._session = session
+        self._codes = {a.id: a.code for a in reference.catalog_analyses()}
+        self._ids = {code: id_ for id_, code in self._codes.items()}
+        self._found: dict[str, SampleInfo | None] = {}
+
+    def sample(self, sample_id: str) -> SampleInfo | None:
+        if sample_id not in self._found:
+            try:
+                ref = SampleRef.parse(sample_id)
+            except ValueError:
+                self._found[sample_id] = None
+            else:
+                rows = self._rows(
+                    TRSubmissionRow.tr_number == ref.tr_number, TRSampleRow.position == ref.position
+                )
+                self._found[sample_id] = rows[0] if rows else None
+        return self._found[sample_id]
+
+    def open_samples(self, analysis: str) -> tuple[SampleInfo, ...]:
+        """The received samples that ordered this analysis, oldest request first: the picker's list."""
+        if analysis not in self._ids:
+            return ()
+        open_statuses = [int(s) for s, state in _STATE.items() if state == SampleState.OPEN]
+        ordered = select(TRSampleAnalysisRow.sample_id).where(
+            TRSampleAnalysisRow.analysis_id == self._ids[analysis]
+        )
+        return tuple(self._rows(TRSubmissionRow.status.in_(open_statuses), TRSampleRow.id.in_(ordered)))
+
+    def _rows(self, *where) -> list[SampleInfo]:
+        rows = self._session.scalars(
+            select(TRSampleRow)
             .join(TRSubmissionRow, TRSampleRow.submission_id == TRSubmissionRow.id)
-            .where(TRSubmissionRow.tr_number == ref.tr_number, TRSampleRow.position == ref.position)
-        ).one_or_none()
-        if row is not None:
-            out[sample_id] = row.chemical_name
-    return out
+            .where(*where)
+            .options(selectinload(TRSampleRow.analyses), selectinload(TRSampleRow.submission))
+            .order_by(TRSubmissionRow.tr_number, TRSampleRow.position)
+        ).all()
+        out = []
+        for row in rows:
+            sample_id = f"{row.submission.tr_number}-{row.position:02d}"
+            info = SampleInfo(
+                sample=sample_id,
+                state=_STATE[TRStatus(row.submission.status)],
+                analyses=frozenset(
+                    self._codes[a.analysis_id] for a in row.analyses if a.analysis_id in self._codes
+                ),
+                chemical=row.chemical_name,
+                chemical_id=row.chemical_id,
+            )
+            self._found[sample_id] = info
+            out.append(info)
+        return out
 
 
 def send(session: Session, code: str, user: User, reference: ReferenceData, specs) -> dict:
     """Sends the batch to slim-data (first time) or its correction (after), then re-evaluates the batch
     there if it has readings. Raises slim-prep's PrepRefused / NotFound, or LookupError."""
     batch = books.get_batch(session, code).item
-    cancelled = [s.sample for s in batch.samples if _cancelled(session, s.sample)]
-    if cancelled:  # D-99: a cancelled TR takes no new work
-        raise LookupError(f"{', '.join(cancelled)}: the request was cancelled")
     analysis = next((a for a in reference.catalog_analyses() if a.code == batch.analysis), None)
     if analysis is None or batch.analysis not in PREP_ANALYSES:
         raise LookupError(f"analysis {batch.analysis!r} can't take prep batches here")
@@ -119,7 +178,9 @@ def send(session: Session, code: str, user: User, reference: ReferenceData, spec
         if lookup.analyte_valid(AnalyteRef(analysis_id=analysis.id, code=e.symbol))
     }
     actor = actor_for(user)
-    args = (session, code, actor, analysis.id, analytes, PREP_ANALYSES[batch.analysis])
+    # slim-prep checks every sample against its TR again: a cancelled one takes no new work (D-99, P-23)
+    samples = TrSamples(session, reference)
+    args = (session, code, actor, samples, analysis.id, analytes, PREP_ANALYSES[batch.analysis])
     if sent_version(session, code) is None:
         send_to_results(*args)
         changed = None
@@ -138,12 +199,3 @@ def send(session: Session, code: str, user: User, reference: ReferenceData, spec
         "changed": changed,
         "evaluated": evaluated,
     }
-
-
-def _cancelled(session: Session, sample_id: str) -> bool:
-    status = session.scalar(
-        select(TRSubmissionRow.status).where(
-            TRSubmissionRow.tr_number == SampleRef.parse(sample_id).tr_number
-        )
-    )
-    return status is not None and TRStatus(status) is TRStatus.CANCELLED

@@ -56,6 +56,15 @@ Tally and themes are updated now and then at the bottom.
 | C→C | D-104 TR history: Claude proposed change events, then built whole versions (as the modules keep theirs): no replay code to get wrong. | Logged as a change of Claude's own proposal. |
 | F | Claude's review listed the Qtegra DOCTYPE as open; it was already refused (a byte check Claude wrote, which a UTF-16 file could pass). | The review was wrong; the fix still mattered. |
 
+## 2026-10-28: slim-prep review items B1–B10
+
+| Kind | What | Notes |
+|---|---|---|
+| C✓ | B1–B10 as one design turn: a TR port for slim-prep (P-23), corrections keep code / method / analysis / rules (P-24), entered and bounded prep times (P-25), a code series and safe codes (P-26), who with how the host knows (P-27); slim-data D-105. | Approved as proposed. Jamie asked for the B1 case first. |
+| J | On B1: the weak point is the analyst saying what they prepped with no system eyes on it; an acceptable risk if slim-prep defers to the app. Barcodes would help but still trust the pour. | Claude split it: a wrong *record* (the port refuses it) vs a wrong *bottle* (only the bench's label check; barcodes later, slim-samples). |
+| C✓ | A sample picker instead of typed IDs, from the same port. Jamie: "essential … win-win". | Removes typos instead of refusing them afterwards. |
+| C→C | Building it: an invoiced TR needed its own state (CLOSED), and a self-review caught the API refusing a time without a zone, which it used to read as lab time. | Both fixed before the push. |
+
 ## 2026-10-28: how we work
 
 | Kind | What | Notes |
@@ -77,4 +86,4 @@ Tally and themes are updated now and then at the bottom.
   through), and who must never see what.
 
 ## Tally (2026-10-27/28)
-J 13 · C✓ 3 · C→J 4 · J→C 1 (self-argued) · C→C 1 · F 3
+J 14 · C✓ 5 · C→J 4 · J→C 1 (self-argued) · C→C 2 · F 3

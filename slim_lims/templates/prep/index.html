@@ -15,7 +15,9 @@
   <section class="form-section" aria-labelledby="new-batch-heading">
     <h2 id="new-batch-heading">New prep batch</h2>
     <form method="get" action="{{ url_for('prep_new_batch') }}" class="stack-form">
-      <label>Batch code <input type="text" name="code" maxlength="50" required value="{{ form.code or '' }}"></label>
+      <label>Batch code <input type="text" name="code" maxlength="50" required pattern="[A-Za-z0-9][A-Za-z0-9._\-]*"
+        value="{{ form.code or next_code }}"></label>
+      {% if rules.batch_prefix %}<p class="hint">The lab's codes are {{ rules.batch_prefix }}0001, …; the next free one is filled in.</p>{% endif %}
       <label>Prep method
         <select name="method">
           {% for m in rules.methods %}
@@ -30,10 +32,7 @@
           {% endfor %}
         </select>
       </label>
-      <label>Samples, one lab sample ID per line (e.g. TR00001-01)
-        <textarea name="samples" rows="4" spellcheck="false">{{ form.samples or "" }}</textarea>
-      </label>
-      <div class="choice-row"><button type="submit" class="btn btn--primary">Open the grid</button></div>
+      <div class="choice-row"><button type="submit" class="btn btn--primary">Choose the samples</button></div>
     </form>
   </section>
 
