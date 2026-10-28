@@ -6,7 +6,7 @@
     python -m slim_lims.cli sync-analysis-catalog
     python -m slim_lims.cli sync-personas        # demo sandbox only (DEMO_PERSONAS)
     python -m slim_lims.cli verify               # replay every result + check the audit chain
-    python -m slim_lims.cli empty-public --yes   # demo labs only: public keeps no app tables (D-102)
+    python -m slim_lims.cli empty-public --yes [--if-needed]  # demo labs only: public keeps no app tables
 
 The password comes from the PORTAL_PASSWORD environment variable, or an interactive prompt.
 """
@@ -148,9 +148,10 @@ def _verify() -> int:
     return 0 if report.ok and prep.ok else 1
 
 
-def _empty_public(confirmed: bool) -> int:
+def _empty_public(confirmed: bool, if_needed: bool = False) -> int:
     """Demo labs (D-102): drops and recreates the public schema, so no lab sees an old app table
-    through its search path. Everything in public is lost: the shared lab lives in DATABASE_SCHEMA."""
+    through its search path. Everything in public is lost: the shared lab lives in DATABASE_SCHEMA.
+    `if_needed`: only while public holds app tables (Render runs it on every start; the first wipes)."""
     from sqlalchemy import inspect, text
 
     settings = load_settings()
@@ -159,6 +160,9 @@ def _empty_public(confirmed: bool) -> int:
         print("empty-public is for Postgres demo labs only.", file=sys.stderr)
         return 1
     tables = inspect(engine).get_table_names(schema="public")
+    if if_needed and not set(tables) - {"demo_labs"}:
+        print("public holds no app tables: nothing to empty.")
+        return 0
     if not confirmed:
         print(f"Would drop the public schema and its {len(tables)} tables. Run again with --yes.")
         return 1
@@ -189,6 +193,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("verify", help="Replay every stored result and check the audit chain (slim-data D-76)")
     empty = sub.add_parser("empty-public", help="Demo labs: drop and recreate the public schema (D-102)")
     empty.add_argument("--yes", action="store_true", help="really drop it")
+    empty.add_argument("--if-needed", action="store_true", help="only while public holds app tables")
 
     args = parser.parse_args(argv)
     if args.command == "sync-analysis-catalog":
@@ -198,7 +203,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "sync-personas":
         return _sync_personas()
     if args.command == "empty-public":
-        return _empty_public(args.yes)
+        return _empty_public(args.yes, args.if_needed)
     if args.command == "verify":
         return _verify()
     if args.command == "create-staff":

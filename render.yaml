@@ -20,8 +20,11 @@ services:
       && pip install . "slim-domain @ git+https://github.com/Firehawk41/slim-domain-oss@main" ./vendor/slim-report-engine-oss
     # The seed runs every migration and installs the audit log; re-running it changes nothing
     # (SLIM data, ruleset, personas and scenarios are each skipped once present).
+    # Demo labs (slim-data D-102): public keeps no app tables (emptied once, the first start after the
+    # switch); the shared lab is DATABASE_SCHEMA; each visitor gets a lab of their own.
     startCommand: >-
-      python scripts/seed_demo.py --oss-report-engine vendor/slim-report-engine-oss
+      python -m slim_lims.cli empty-public --yes --if-needed
+      && python scripts/seed_demo.py --oss-report-engine vendor/slim-report-engine-oss
       && uvicorn --factory slim_lims.main:create_app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips='*'
     healthCheckPath: /health
     envVars:
@@ -41,3 +44,9 @@ services:
           property: host
       - key: DEMO_PERSONAS
         value: "true"
+      - key: DEMO_LABS
+        value: "true"
+      - key: DATABASE_SCHEMA
+        value: lab_shared
+      - key: SLIM_REPORT_ENGINE_OSS_DIR
+        value: vendor/slim-report-engine-oss

@@ -197,3 +197,19 @@ def test_a_lab_is_audited_and_public_stays_empty(demo):
     assert inspect(public).get_table_names(schema="public") == ["demo_labs"]
     public.dispose()
     labs.drop(schema)
+
+
+def test_empty_public_only_when_needed(url, monkeypatch, capsys):
+    from slim_lims.cli import main
+
+    monkeypatch.setenv("DATABASE_URL", url)
+    monkeypatch.delenv("DATABASE_SCHEMA", raising=False)
+    engine = make_engine(url, poolclass=NullPool)
+    with engine.begin() as conn:
+        conn.execute(text("CREATE TABLE public.users (id integer)"))
+    assert main(["empty-public", "--if-needed"]) == 1  # not without --yes
+    assert main(["empty-public", "--yes", "--if-needed"]) == 0
+    assert inspect(engine).get_table_names(schema="public") == []
+    assert main(["empty-public", "--yes", "--if-needed"]) == 0
+    assert "nothing to empty" in capsys.readouterr().out
+    engine.dispose()
