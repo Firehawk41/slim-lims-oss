@@ -21,6 +21,7 @@ from slim_lims.domain import (
 )
 from slim_lims.reference import ReferenceData
 from slim_lims.repositories import TRSubmissionRepository
+from slim_lims.results import cancel_blocker
 from slim_lims.schemas import CheckInIn, ChemicalMatchIn, StatusChangeIn, SubmissionIn
 from slim_lims.security import csrf_protect
 from slim_lims.services import Conflict, Forbidden, NotFound, SubmissionRejected, SubmissionService
@@ -38,7 +39,10 @@ def get_service(
     reference: Annotated[ReferenceData, Depends(get_reference)],
 ) -> SubmissionService:
     return SubmissionService(
-        TRSubmissionRepository(db), reference, lab_timezone=request.app.state.settings.lab_timezone
+        TRSubmissionRepository(db),
+        reference,
+        lab_timezone=request.app.state.settings.lab_timezone,
+        cancel_check=lambda tr_number: cancel_blocker(db, tr_number),
     )
 
 

@@ -28,12 +28,12 @@ from zoneinfo import ZoneInfo
 from slim_data.adapters.slim import SlimReferenceLookup, TrSampleInfo
 from slim_data.demo.scenarios import publish_demo_rules as publish_rules
 from slim_data.domain.actor import Actor
-from slim_data.domain.enums import IdentitySource, Role
+from slim_data.domain.enums import IdentitySource, ResultStatus, Role
 from slim_data.domain.results import ReportLine
 from slim_data.domain.values import AnalyteRef, SampleRef
 from slim_data.domain.workflow import WorkflowError
 from slim_data.persistence import migrate
-from slim_data.persistence.results import issues_for_tr
+from slim_data.persistence.results import issues_for_tr, results_for_tr
 from slim_data.persistence.rulesets import ruleset_for
 from slim_data.pipeline.generic_csv import GenericCsv
 from slim_data.pipeline.paste import Paste
@@ -287,6 +287,29 @@ class ResultAction(StrEnum):
     CORRECT = "correct"
 
 
+def cancel_blocker(session: Session, tr_number: str) -> str | None:
+    """Why the results module won't let a TR be cancelled (D-99): a report went out, or a result was
+    released; None otherwise. Readings and drafts don't block: a cancelled TR takes no new readings
+    (`TrSampleTables`) and its results can't be released (`require_open_tr`)."""
+    if issues_for_tr(session, tr_number):
+        return "a report was issued for it"
+    if any(r.status == ResultStatus.RELEASED for r in results_for_tr(session, tr_number)):
+        return "results were released for it"
+    return None
+
+
+class TrCancelled(WorkflowError):
+    """A cancelled TR's results are neither released nor decided on (D-99)."""
+
+
+def require_open_tr(session: Session, sample: SampleRef) -> None:
+    status = session.scalar(
+        select(TRSubmissionRow.status).where(TRSubmissionRow.tr_number == sample.tr_number)
+    )
+    if status is not None and TRStatus(status) is TRStatus.CANCELLED:
+        raise TrCancelled(f"{sample.tr_number} was cancelled")
+
+
 def act_on_result(
     session: Session,
     action: ResultAction,
@@ -297,7 +320,9 @@ def act_on_result(
     note: str = "",
 ):
     """One person's decision on one result, under the published policy. Raises slim-data's
-    WorkflowError (not allowed), NotFound, or a ValidationError (e.g. a missing reason)."""
+    WorkflowError (not allowed, or the TR was cancelled), NotFound, or a ValidationError (e.g. a missing
+    reason)."""
+    require_open_tr(session, sample)
     match action:
         case ResultAction.ACCEPT:
             return wf.accept(session, sample, analyte, actor, reason_category, note)
@@ -404,7 +429,7 @@ def issue_report(
     moved = None
     if submission.status in (TRStatus.IN_PROGRESS, TRStatus.PARTIAL_REPORT):  # forward only
         note = f"report issue {issued.issue_id}" + (" (amended)" if issued.amended else "")
-        service.change_status(tr_number, StatusChangeIn(to_status=target, note=note), user)
+        service.change_status(tr_number, StatusChangeIn(to_status=target, note=note), user, fact=True)
         moved = target
     return {
         "issue_id": issued.issue_id,

@@ -23,7 +23,7 @@ from slim_lims.reference import ReferenceData
 from slim_lims.results import issued_documents
 from slim_lims.schemas import CheckInIn, ChemicalMatchIn, StatusChangeIn
 from slim_lims.security import csrf_protect, hash_password
-from slim_lims.services import Conflict, Forbidden, NotFound, SubmissionRejected
+from slim_lims.services import FACT_STATUSES, Conflict, Forbidden, NotFound, SubmissionRejected
 from slim_lims.web import flash, render
 
 router = APIRouter(dependencies=[Depends(csrf_protect)])
@@ -217,7 +217,10 @@ def request_detail(
         {
             "s": submission,
             "samples": _describe_samples(submission, reference),
-            "next_statuses": allowed_next_statuses(submission.status, actor_type),
+            # Fact statuses come from issuing a report or sending the invoice, never a button (D-99).
+            "next_statuses": [
+                st for st in allowed_next_statuses(submission.status, actor_type) if st not in FACT_STATUSES
+            ],
             "lab_today": service.lab_today(),
             "chemicals": reference.chemical_choices() if user.is_staff else [],
             "TRStatus": TRStatus,

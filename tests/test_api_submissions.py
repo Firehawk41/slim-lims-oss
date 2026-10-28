@@ -199,12 +199,14 @@ def test_status_workflow_over_http(client, staff_user, customer_user):
     assert body["receipt"]["received_by"] == "JM"  # defaults to the staff user's initials
     assert body["effective_service_date"] == "2026-10-12"
 
-    assert client.post("/api/submissions/TR00001/status", json={"to_status": 6}).status_code == 409
-    for status in (3, 4, 4, 5, 6):
-        assert client.post("/api/submissions/TR00001/status", json={"to_status": status}).status_code == 200
+    assert client.post("/api/submissions/TR00001/status", json={"to_status": 3}).status_code == 200
+    # D-99: report and invoice statuses come from issuing the report / sending the invoice, not by hand
+    for status, how in ((4, "issuing a report"), (5, "issuing a report"), (6, "sending its invoice")):
+        refused = client.post("/api/submissions/TR00001/status", json={"to_status": status})
+        assert refused.status_code == 409 and how in refused.json()["detail"]
     final = client.get("/api/submissions/TR00001").json()
-    assert final["status"] == 6
-    assert len(final["status_history"]) == 7
+    assert final["status"] == 3
+    assert len(final["status_history"]) == 3
 
 
 def test_customer_cancels_own_submitted_request(client, staff_user, customer_user):

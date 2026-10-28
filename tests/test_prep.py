@@ -216,3 +216,16 @@ def test_a_batch_is_corrected_on_screen_with_a_reason_then_the_correction_is_sen
 def test_editing_an_unknown_batch_is_404(client, prep):
     login(client, "staff@lab.example")
     assert client.get("/prep/batches/PB-X/edit").status_code == 404
+
+
+def test_a_cancelled_requests_batch_isnt_sent(client, prep):  # D-99
+    login(client, "staff@lab.example")
+    token = csrf_from(client.get("/prep").text)
+    _standards(client, token)
+    client.post("/prep/batches", data=_grid(token))
+    login_api(client, "staff@lab.example")
+    assert client.post("/api/submissions/TR00001/status", json={"to_status": 7}).status_code == 200
+    refused = client.post("/api/prep/batches/PB-P1/send")
+    assert refused.status_code == 422 and "TR00001-01, TR00001-02: the request was cancelled" in str(
+        refused.json()
+    )

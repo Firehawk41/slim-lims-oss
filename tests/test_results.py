@@ -778,3 +778,31 @@ def test_the_api_takes_a_qtegra_export_with_its_options(client, lab):
     ]
     missing = client.post("/api/results/imports?kind=qtegra", files=files)
     assert missing.status_code == 422 and "prep batch" in missing.json()["detail"]
+
+
+# ---------------------------------------------------------------- D-99: a cancel the modules can stand behind
+
+
+def test_a_tr_with_released_results_or_a_report_cant_be_cancelled(app, lab):
+    released(app, 1)
+    with staff_api(app, "RV") as rv:
+        refused = rv.post("/api/submissions/TR00001/status", json={"to_status": TRStatus.CANCELLED})
+        assert refused.status_code == 409 and "results were released for it" in refused.json()["detail"]
+        rv.post("/api/results/reports/TR00001/issue")
+        refused = rv.post("/api/submissions/TR00001/status", json={"to_status": TRStatus.CANCELLED})
+        assert refused.status_code == 409 and "a report was issued for it" in refused.json()["detail"]
+
+
+def test_a_cancelled_tr_takes_no_decisions_or_releases(app, lab):
+    with staff_api(app, "AN") as an, staff_api(app, "RV") as rv:
+        upload(an, csv())
+        rv.post("/api/results/batches/PB-1/review", json={})
+        cancelled = rv.post("/api/submissions/TR00001/status", json={"to_status": TRStatus.CANCELLED})
+        assert cancelled.status_code == 200  # drafts and reviews don't block a cancel
+        release = rv.post("/api/results/samples/TR00001-01/analyses/5/release", json={})
+        assert release.status_code == 409 and "TR00001 was cancelled" in release.json()["detail"]
+        accept = rv.post(
+            "/api/results/samples/TR00001-02/analyses/5/analytes/Fe/accept",
+            json={"reason_category": "MDL taken from the method validation"},
+        )
+        assert accept.status_code == 409 and "cancelled" in accept.json()["detail"]

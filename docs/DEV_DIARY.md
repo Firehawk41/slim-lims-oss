@@ -42,6 +42,13 @@ Tally and themes are updated now and then at the bottom.
 | C→J | Demo reset: Claude proposed a scheduled reset; Jamie: **fresh for every visitor** (an HR reviewer must never see the last visitor's rude words). | Portfolio audience drives the requirement. |
 | J | Manual TR statuses are leftovers from before modules were wired; review after each module is wired. | Process rule from Jamie. |
 
+## 2026-10-28: hardening after the review
+
+| Kind | What | Notes |
+|---|---|---|
+| C→J | Fresh demo: Claude first proposed a reset; after Jamie's "fresh for every user", Claude pushed back on resetting at start (two visitors at once still share) and proposed a **lab per visitor**; Jamie agreed. | Pushback that changed the plan's mechanism, not its goal. |
+| C✓ | D-99: statuses follow facts; cancel asks the modules. | Jamie's rule added: re-check hand-set statuses after each module is wired. |
+
 ## Themes so far
 - **Domain facts are Jamie's, and they overrule Claude's defaults:** DF < 1, MDL averaging, standards as
   recipes, spike placement. Claude's "cautious" engineering defaults were wrong more than once where

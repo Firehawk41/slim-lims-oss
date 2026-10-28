@@ -243,6 +243,10 @@ docs/SLIM_DOMAIN_V2.md
   the app's equivalent of the VBA/manual log-in. "Reject" = cancel with a reason.
 - Statuses: submitted → received → in progress → partial report (repeatable) → complete report
   → invoiced (terminal, staff only); cancelled (customer may cancel only while submitted).
+  Statuses follow the facts (slim-data D-99): partial / complete report only by issuing a report,
+  invoiced only by sending the invoice; a cancel is refused once a report was issued or a result released,
+  and the modules take no new work for a cancelled TR. **Each time a module is wired, re-check which
+  statuses are still set by hand.**
 - Payment: purchase order (PO number, also used for billing codes) or credit card (lab calls;
   no card data stored).
 - Call-in RUSH = outside business hours. Wafer sizes 200 / 300 mm; units atoms/cm² or

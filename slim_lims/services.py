@@ -68,6 +68,16 @@ def _utcnow() -> datetime:
     return datetime.now(UTC)
 
 
+# Statuses that stand for a fact another part of the system makes (D-99): a person never sets them by
+# hand. The action that makes the fact moves the TR (`fact=True`); the LIMS (spec §12) issues reports
+# itself, so its token may set the report statuses.
+FACT_STATUSES = {
+    TRStatus.PARTIAL_REPORT: "issuing a report",
+    TRStatus.COMPLETE_REPORT: "issuing a report",
+    TRStatus.INVOICED: "sending its invoice",
+}
+
+
 class SubmissionService:
     def __init__(
         self,
@@ -75,11 +85,15 @@ class SubmissionService:
         reference: ReferenceData,
         clock: Callable[[], datetime] = _utcnow,
         lab_timezone: str = "America/Chicago",
+        cancel_check: Callable[[str], str | None] | None = None,
     ) -> None:
+        """`cancel_check(tr_number)` says why the modules won't let a TR be cancelled (a report was
+        issued, a result released), or None; the host wires it (D-99)."""
         self.repo = repo
         self.reference = reference
         self.clock = clock
         self.lab_tz = ZoneInfo(lab_timezone)
+        self.cancel_check = cancel_check
 
     def lab_today(self) -> date:
         return self.clock().astimezone(self.lab_tz).date()
@@ -247,10 +261,21 @@ class SubmissionService:
         except StaleSubmission as e:
             raise Conflict(f"{tr_number} was changed by someone else; reload and try again") from e
 
-    def change_status(self, tr_number: str, data: StatusChangeIn, user: User) -> TRSubmission:
+    def change_status(
+        self, tr_number: str, data: StatusChangeIn, user: User, *, fact: bool = False
+    ) -> TRSubmission:
+        """`fact`: the caller is the action that makes the status true (issuing a report, sending the
+        invoice); without it a person may not set a fact status (D-99)."""
         if data.to_status is TRStatus.RECEIVED:
             raise Conflict("requests are received by checking them in (POST .../check-in)")
+        how = FACT_STATUSES.get(data.to_status)
+        if how and not fact and not user.is_service:
+            raise Conflict(f"a request becomes {data.to_status.label.lower()} by {how}, not by hand")
         before = self.get(tr_number, user)
+        if data.to_status is TRStatus.CANCELLED and self.cancel_check is not None:
+            why = self.cancel_check(tr_number)
+            if why:
+                raise Conflict(f"{tr_number} can't be cancelled: {why}")
         received_by = data.received_by
         if data.to_status is TRStatus.RECEIVED and not received_by and user.is_staff:
             received_by = user.initials

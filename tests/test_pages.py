@@ -95,8 +95,10 @@ def test_bad_status_change_is_flashed_not_500(submitted):
         },
     )
     assert response.status_code == 200 and "future" in response.text and "Accept into LIMS" in response.text
-    response = _post_status(submitted, "/requests/TR00001", to_status="6")
+    response = _post_status(submitted, "/requests/TR00001", to_status="3")  # still submitted
     assert "cannot move" in response.text
+    response = _post_status(submitted, "/requests/TR00001", to_status="6")
+    assert "by sending its invoice, not by hand" in response.text  # D-99
 
 
 def test_customer_cancels_from_page(submitted):
