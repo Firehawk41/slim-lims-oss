@@ -17,6 +17,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from slim_lims import capabilities
 from slim_lims.db import get_db
 from slim_lims.models import User
 from slim_lims.personas import persona_choices
@@ -88,6 +89,7 @@ def current_user(request: Request, db: Annotated[Session, Depends(get_db)]) -> U
             request.session.pop(SESSION_USER_KEY, None)
             user = None
     request.state.user = user
+    request.state.capabilities = capabilities.effective(db, user) if user is not None else frozenset()
     return user
 
 

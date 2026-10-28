@@ -27,7 +27,7 @@
               <a href="{{ url_for('prep_home') }}">Prep</a>
               <a href="{{ url_for('results_home') }}">Results</a>
               <a href="{{ url_for('invoices_home') }}">Invoices</a>
-              <a href="{{ url_for('admin_users') }}">Users</a>
+              {% if "manage_users" in current_capabilities %}<a href="{{ url_for('admin_users') }}">Users</a>{% endif %}
             {% else %}
               <a href="{{ url_for('my_requests') }}">My requests</a>
               <a href="{{ url_for('new_request') }}">New request</a>

@@ -5,7 +5,7 @@
 {% block content %}
   <h1>Users</h1>
   <table class="table">
-    <thead><tr><th scope="col">Email</th><th scope="col">Role</th><th scope="col">Customer / initials</th><th scope="col">Lab role</th><th scope="col">Status</th><th scope="col"></th></tr></thead>
+    <thead><tr><th scope="col">Email</th><th scope="col">Role</th><th scope="col">Customer / initials</th><th scope="col">Lab role</th><th scope="col">Also may</th><th scope="col">Status</th><th scope="col"></th></tr></thead>
     <tbody>
       {% for u in users %}
         <tr>
@@ -13,7 +13,7 @@
           <td>{{ u.role }}</td>
           <td>{% if u.is_staff %}{{ u.initials }}{% else %}{{ customers.get(u.customer_id, "Customer #" ~ u.customer_id) }}{% endif %}</td>
           <td>{% if u.is_staff %}
-            {% if current_user.lab_role == 3 and u.id != current_user.id %}
+            {% if u.id != current_user.id and not outranks[u.id] %}
               <form method="post" action="{{ url_for('set_lab_role', user_id=u.id) }}" class="nav-form">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
                 <select name="lab_role" aria-label="Lab role for {{ u.email }}">
@@ -21,10 +21,28 @@
                 </select>
                 <button type="submit" class="btn btn--secondary btn--small">Set</button>
               </form>
-            {% else %}{{ lab_roles.get(u.lab_role, "—") }}{% endif %}
+            {% else %}{{ all_lab_roles.get(u.lab_role, "—") }}{% endif %}
+          {% endif %}</td>
+          <td>{% if u.is_staff and not u.is_persona %}
+            {% for cap, label in capabilities.items() %}
+              {% if cap in role_defaults.get(u.lab_role, ()) %}{{ label.split(":")[0] }} (role)
+              {% elif may_grant[cap] and u.id != current_user.id %}
+                <form method="post" action="{{ url_for('set_capability', user_id=u.id) }}" class="nav-form">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+                  <input type="hidden" name="capability" value="{{ cap }}">
+                  {% if (u.id, cap) in grants %}
+                    <input type="hidden" name="grant" value="0">
+                    <button type="submit" class="btn btn--secondary btn--small" title="{{ label }}">Remove: {{ label.split(":")[0] }}</button>
+                  {% else %}
+                    <input type="hidden" name="grant" value="1">
+                    <button type="submit" class="btn btn--secondary btn--small" title="{{ label }}">Grant: {{ label.split(":")[0] }}</button>
+                  {% endif %}
+                </form>
+              {% elif (u.id, cap) in grants %}{{ label.split(":")[0] }} (granted){% endif %}
+            {% endfor %}
           {% endif %}</td>
           <td>{{ "Active" if u.is_active else "Deactivated" }}</td>
-          <td>{% if u.id != current_user.id %}
+          <td>{% if u.id != current_user.id and not outranks[u.id] %}
             <form method="post" action="{{ url_for('toggle_user_active', user_id=u.id) }}">
               <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
               <button type="submit" class="btn btn--secondary btn--small">{{ "Deactivate" if u.is_active else "Reactivate" }}</button>
@@ -53,7 +71,7 @@
         </select>
       </label>
       <label>Initials (staff; the analyst ID in result files) <input type="text" name="initials" maxlength="10" size="5"></label>
-      <label>Lab role (staff{% if current_user.lab_role != 3 %}; only a supervisor can give a higher role{% endif %})
+      <label>Lab role (staff; up to your own)
         <select name="lab_role">
           {% for id, label in lab_roles.items() %}<option value="{{ id }}">{{ label }}</option>{% endfor %}
         </select>

@@ -70,6 +70,19 @@ class User(Base):
     is_service = False  # see auth.ServiceClient
 
 
+class UserCapability(Base):
+    """A capability granted to one person beyond their lab role's defaults (D-100), e.g. an analyst who
+    is also the lab's LIMS specialist manages users. Who granted it is kept; removing it deletes the row
+    (the audit log records both on Postgres)."""
+
+    __tablename__ = "user_capabilities"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    capability: Mapped[str] = mapped_column(String(50), primary_key=True)
+    granted_by: Mapped[uuid.UUID] = mapped_column(Uuid)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
 # ---------------------------------------------------------------- Testing Requests
 # Spec §7. These tables move to slim-domain later: same names, same columns. Enums are stored
 # as their integer values; customer/chemical/analysis/element IDs are SLIM IDs (no FKs).

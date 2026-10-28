@@ -13,12 +13,12 @@ from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from slim_lims import board, invoices
+from slim_lims import board, capabilities, invoices
 from slim_lims.api import Service, get_reference
 from slim_lims.auth import CurrentUser, RequireStaff, RequireUser
 from slim_lims.db import get_db
 from slim_lims.domain import ActorType, RequestType, TRStatus, TRSubmission, allowed_next_statuses
-from slim_lims.models import LAB_ROLE_ANALYST, LAB_ROLE_SUPERVISOR, LAB_ROLES, ROLE_CUSTOMER, ROLE_STAFF, User
+from slim_lims.models import LAB_ROLE_ANALYST, LAB_ROLES, ROLE_CUSTOMER, ROLE_STAFF, User, UserCapability
 from slim_lims.reference import ReferenceData
 from slim_lims.results import issued_documents
 from slim_lims.schemas import CheckInIn, ChemicalMatchIn, StatusChangeIn
@@ -441,12 +441,46 @@ def refresh_reference(request: Request, user: RequireStaff):
     return _redirect(request, "admin_home")
 
 
+def _user_admin(db: Session, user: User) -> str | None:
+    """Why `user` may not manage users (D-100), or None."""
+    if user.is_persona:
+        return "Demo personas can't manage users."
+    if not capabilities.can(db, user, capabilities.MANAGE_USERS):
+        return "Managing users needs the capability (a supervisor's, or granted by one)."
+    return None
+
+
+def _back_to_users(request: Request, db: Session, user: User) -> RedirectResponse:
+    """The users page for those who may see it; the board (with the flash) for everyone else."""
+    may = capabilities.can(db, user, capabilities.MANAGE_USERS)
+    return _redirect(request, "admin_users" if may else "index")
+
+
 @router.get("/admin/users", name="admin_users")
 def admin_users(request: Request, user: RequireStaff, db: DB, reference: Reference):
+    refused = _user_admin(db, user)
+    if refused:
+        return render(request, "error.html", {"status": 403, "message": refused}, 403)
     users = db.scalars(select(User).order_by(User.role.desc(), User.email)).all()
     customers = {c.id: c.name for c in reference.customer_choices()}
+    grants = {
+        (g.user_id, g.capability) for g in db.scalars(select(UserCapability)).all()
+    }  # one query for the page
     return render(
-        request, "admin/users.html", {"users": users, "customers": customers, "lab_roles": LAB_ROLES}
+        request,
+        "admin/users.html",
+        {
+            "users": users,
+            "customers": customers,
+            # nobody gives a role above their own (D-100)
+            "lab_roles": {k: v for k, v in LAB_ROLES.items() if k <= (user.lab_role or 0)},
+            "all_lab_roles": LAB_ROLES,
+            "capabilities": capabilities.CAPABILITIES,
+            "grants": grants,
+            "role_defaults": capabilities.ROLE_DEFAULTS,
+            "may_grant": {c: capabilities.may_grant(user, c) for c in capabilities.CAPABILITIES},
+            "outranks": {u.id: capabilities.outranks(u, user) for u in users},
+        },
     )
 
 
@@ -465,37 +499,40 @@ def create_user(
 ):
     email = email.strip().lower()
     initials = initials.strip().upper()
-    error = None
     cid = _int_or_none(customer_id)
     role_id = _int_or_none(lab_role) or LAB_ROLE_ANALYST
-    if user.is_persona:
-        error = "Demo personas can't manage users."
-    elif role not in (ROLE_CUSTOMER, ROLE_STAFF):
-        error = "Choose a role."
-    elif "@" not in email:
-        error = "Enter a valid email address."
-    elif len(password) < 12:
-        error = "Passwords must be at least 12 characters."
-    elif role == ROLE_STAFF and not initials:
-        error = "Staff users need initials."
-    elif role == ROLE_STAFF and role_id not in LAB_ROLES:
-        error = "Choose a lab role."
-    elif role == ROLE_STAFF and role_id != LAB_ROLE_ANALYST and user.lab_role != LAB_ROLE_SUPERVISOR:
-        error = "Only a supervisor can give a lab role above analyst."
-    elif role == ROLE_STAFF and db.scalars(select(User).where(User.initials == initials)).first():
-        error = f"Initials {initials} are taken: they identify the analyst in result files."
-    elif role == ROLE_CUSTOMER and (cid is None or reference.customer(cid) is None):
-        error = "Choose the customer (it must already exist in SLIM)."
-    elif db.scalars(select(User).where(User.email == email)).first():
-        error = f"A user with email {email} already exists."
+
+    def problem() -> str | None:
+        if role not in (ROLE_CUSTOMER, ROLE_STAFF):
+            return "Choose a role."
+        if "@" not in email:
+            return "Enter a valid email address."
+        if len(password) < 12:
+            return "Passwords must be at least 12 characters."
+        if role == ROLE_STAFF:
+            if not initials:
+                return "Staff users need initials."
+            if role_id not in LAB_ROLES:
+                return "Choose a lab role."
+            if role_id > (user.lab_role or 0):
+                return "Nobody can give a lab role above their own."
+            if db.scalars(select(User).where(User.initials == initials)).first():
+                return f"Initials {initials} are taken: they identify the analyst in result files."
+        if role == ROLE_CUSTOMER and (cid is None or reference.customer(cid) is None):
+            return "Choose the customer (it must already exist in SLIM)."
+        if db.scalars(select(User).where(User.email == email)).first():
+            return f"A user with email {email} already exists."
+        return None
+
+    error = _user_admin(db, user) or problem()
     if error:
         flash(request, error, "error")
-        return _redirect(request, "admin_users")
+        return _back_to_users(request, db, user)
     try:
         password_hash = hash_password(password)
     except ValueError as e:
         flash(request, str(e), "error")
-        return _redirect(request, "admin_users")
+        return _back_to_users(request, db, user)
     db.add(
         User(
             email=email,
@@ -508,52 +545,92 @@ def create_user(
     )
     db.commit()
     flash(request, f"Created {role} user {email}.")
-    return _redirect(request, "admin_users")
+    return _back_to_users(request, db, user)
+
+
+def _target(db: Session, user_id: str) -> User | None:
+    try:
+        return db.get(User, uuid.UUID(user_id))
+    except ValueError:
+        return None
 
 
 @router.post("/admin/users/{user_id}/active", name="toggle_user_active")
 def toggle_user_active(request: Request, user_id: str, user: RequireStaff, db: DB):
-    try:
-        target = db.get(User, uuid.UUID(user_id))
-    except ValueError:
-        target = None
-    if user.is_persona:
-        flash(request, "Demo personas can't manage users.", "error")
-    elif target is None:
-        flash(request, "User not found.", "error")
-    elif target.id == user.id:
-        flash(request, "You cannot deactivate yourself.", "error")
+    target = _target(db, user_id)
+    error = _user_admin(db, user)
+    if not error and target is None:
+        error = "User not found."
+    elif not error and target.id == user.id:
+        error = "You cannot deactivate yourself."
+    elif not error and capabilities.outranks(target, user):
+        error = "Nobody acts on someone with a higher lab role."
+    if error:
+        flash(request, error, "error")
     else:
         target.is_active = not target.is_active
         db.commit()
         flash(request, f"{target.email} is now {'active' if target.is_active else 'deactivated'}.")
-    return _redirect(request, "admin_users")
+    return _back_to_users(request, db, user)
 
 
 @router.post("/admin/users/{user_id}/lab-role", name="set_lab_role")
 def set_lab_role(
     request: Request, user_id: str, user: RequireStaff, db: DB, lab_role: Annotated[int, Form()]
 ):
-    """Supervisors only: lab roles decide who may review, accept and release results (D-70)."""
-    try:
-        target = db.get(User, uuid.UUID(user_id))
-    except ValueError:
-        target = None
-    if user.is_persona:
-        flash(request, "Demo personas can't change lab roles.", "error")
-    elif user.lab_role != LAB_ROLE_SUPERVISOR:
-        flash(request, "Only a supervisor can change lab roles.", "error")
-    elif target is None or not target.is_staff:
-        flash(request, "Staff user not found.", "error")
-    elif lab_role not in LAB_ROLES:
-        flash(request, "Choose a lab role.", "error")
-    elif target.id == user.id:
-        flash(request, "You cannot change your own lab role.", "error")
+    """Lab roles decide who may review, accept and release results (D-70); managing them is a
+    capability (D-100), and nobody raises anyone above their own role or acts on a higher one."""
+    target = _target(db, user_id)
+    error = _user_admin(db, user)
+    if not error and (target is None or not target.is_staff):
+        error = "Staff user not found."
+    elif not error and lab_role not in LAB_ROLES:
+        error = "Choose a lab role."
+    elif not error and target.id == user.id:
+        error = "You cannot change your own lab role."
+    elif not error and (capabilities.outranks(target, user) or lab_role > (user.lab_role or 0)):
+        error = "Nobody acts on someone with a higher lab role, or gives a role above their own."
+    if error:
+        flash(request, error, "error")
     else:
         target.lab_role = lab_role
         db.commit()
         flash(request, f"{target.email} is now {LAB_ROLES[lab_role].lower()}.")
-    return _redirect(request, "admin_users")
+    return _back_to_users(request, db, user)
+
+
+@router.post("/admin/users/{user_id}/capabilities", name="set_capability")
+def set_capability(
+    request: Request,
+    user_id: str,
+    user: RequireStaff,
+    db: DB,
+    capability: Annotated[str, Form()],
+    grant: Annotated[str, Form()] = "",
+):
+    """Grant or take back a capability (D-100): only someone who holds it by role default may."""
+    target = _target(db, user_id)
+    error = None
+    if capability not in capabilities.CAPABILITIES:
+        error = "No such capability."
+    elif not capabilities.may_grant(user, capability):
+        error = "Only someone who holds it by their lab role can grant it."
+    elif target is None or not target.is_staff or target.is_persona:
+        error = "Staff user not found."
+    elif target.id == user.id:
+        error = "You cannot change your own capabilities."
+    if error:
+        flash(request, error, "error")
+        return _back_to_users(request, db, user)
+    row = db.get(UserCapability, (target.id, capability))
+    if grant == "1" and row is None:
+        db.add(UserCapability(user_id=target.id, capability=capability, granted_by=user.id))
+    elif grant != "1" and row is not None:
+        db.delete(row)
+    db.commit()
+    verb = "may now" if grant == "1" else "may no longer"
+    flash(request, f"{target.email} {verb}: {capabilities.CAPABILITIES[capability].split(':')[0].lower()}.")
+    return _back_to_users(request, db, user)
 
 
 @router.get("/api/me", name="api_me")

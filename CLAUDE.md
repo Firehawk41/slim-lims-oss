@@ -196,7 +196,9 @@ docs/SLIM_DOMAIN_V2.md
   initials (unique). SQLite engines use the explicit-BEGIN recipe so its savepoints work.
 - **Auth:** Starlette signed-cookie sessions (`SameSite=Lax`, `Secure` in production), bcrypt.
   Roles: `customer` (must have `customer_id`, a SLIM customer ID) and `staff` (must have
-  `initials` and a `lab_role`: analyst / reviewer / supervisor). No self-registration; staff create users. Customers must already exist in SLIM.
+  `initials` and a `lab_role`: analyst / reviewer / supervisor). No self-registration; users are created by staff with the *manage users* capability
+  (`capabilities.py`, slim-data D-100: supervisors by default, grantable per person in `user_capabilities`;
+  nobody acts on a higher lab role or gives a role above their own). Customers must already exist in SLIM.
   Demo personas (`is_persona`, only with `DEMO_PERSONAS`) are chosen, not logged in: ASSERTED in slim-data,
   refused by /login, no user or role admin.
 - **Machine access:** slim-lims uses `Authorization: Bearer $LIMS_API_TOKEN` (spec §12). Token
