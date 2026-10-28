@@ -26,6 +26,10 @@ class Settings:
     lims_api_token: str | None = None
     # Public sandbox: offer "Continue as..." demo personas, recorded as ASSERTED (slim-data D-50).
     demo_personas: bool = False
+    # A lab per visitor (slim-data D-102): Postgres only, with demo personas. DATABASE_SCHEMA is the
+    # shared lab (password logins, the CLI); SLIM_REPORT_ENGINE_OSS_DIR has the demo seed's data.
+    demo_labs: bool = False
+    oss_report_engine_dir: str | None = None
 
     @property
     def is_production(self) -> bool:
@@ -64,9 +68,14 @@ def load_settings() -> Settings:
             "LIMS_API_TOKEN must be at least 32 characters (e.g. python -c "
             "'import secrets; print(secrets.token_urlsafe(32))')"
         )
+    database_url = _database_url(os.environ.get("DATABASE_URL", "sqlite:///slim_lims.db"))
+    if schema := os.environ.get("DATABASE_SCHEMA", "").strip():
+        from slim_lims.labs import with_schema
+
+        database_url = with_schema(database_url, schema)
     return Settings(
         env=env,
-        database_url=_database_url(os.environ.get("DATABASE_URL", "sqlite:///slim_lims.db")),
+        database_url=database_url,
         secret_key=secret_key,
         session_cookie_secure=_bool(os.environ.get("SESSION_COOKIE_SECURE"), env == "production"),
         session_max_age_seconds=int(os.environ.get("SESSION_MAX_AGE_SECONDS", 8 * 60 * 60)),
@@ -78,4 +87,6 @@ def load_settings() -> Settings:
         lab_timezone=os.environ.get("LAB_TIMEZONE", "America/Chicago"),
         lims_api_token=lims_api_token,
         demo_personas=_bool(os.environ.get("DEMO_PERSONAS"), False),
+        demo_labs=_bool(os.environ.get("DEMO_LABS"), False),
+        oss_report_engine_dir=os.environ.get("SLIM_REPORT_ENGINE_OSS_DIR") or None,
     )

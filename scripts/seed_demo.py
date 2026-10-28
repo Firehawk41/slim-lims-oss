@@ -19,64 +19,18 @@ What it does, in order:
 Requires slim-domain and slim-report-engine (the OSS packages) to be installed, e.g.
     pip install -e ../slim-domain-oss[postgres] -e ../slim-report-engine-oss
 The target is SLIM_DATABASE_URL, else DATABASE_URL — point it at a demo database only.
+The work is `slim_lims.demo_seed.seed_demo` (also run per visitor lab, slim-data D-102).
 """
 
 import argparse
-import importlib.util
 import os
 import sys
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
-from alembic import command
-from alembic.config import Config
-from sqlalchemy import func, inspect, select, text
 from sqlalchemy.engine import make_url
 
-import slim_lims
-from slim_lims import slim_tables as t
-from slim_lims.audit import install_audit_log
-from slim_lims.catalog import sync_analysis_catalog
 from slim_lims.config import load_settings
-from slim_lims.db import make_engine, make_session_factory
-from slim_lims.demo_prep import seed_prep_scenario
-from slim_lims.demo_scenarios import seed_scenarios
-from slim_lims.invoices import migrate_invoicing
-from slim_lims.labtime import LabClock
-from slim_lims.oss_guard import assert_oss_database
-from slim_lims.personas import sync_personas
-from slim_lims.prep import migrate_slim_prep, publish_demo_prep
-from slim_lims.reference_cache import load_reference
-from slim_lims.results import SpecReader, migrate_slim_data, publish_demo_rules
-
-REPO_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_OSS_DIR = REPO_ROOT.parent / "slim-report-engine-oss"
-
-
-def _load_oss_demo(oss_dir: Path):
-    demo_path = oss_dir / "demo" / "demo.py"
-    if not demo_path.is_file():
-        raise SystemExit(f"OSS demo seed not found at {demo_path}; pass --oss-report-engine")
-    spec = importlib.util.spec_from_file_location("slim_oss_demo", demo_path)
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module  # dataclasses in demo.py look their module up here
-    try:
-        spec.loader.exec_module(module)
-    except ImportError as e:
-        raise SystemExit(
-            f"{e}\nInstall the OSS packages first: pip install -e ../slim-domain-oss[postgres] "
-            "-e ../slim-report-engine-oss"
-        ) from e
-    return module
-
-
-def _slim_tables_have_data(engine) -> bool:
-    existing = set(inspect(engine).get_table_names())
-    with engine.connect() as conn:
-        for table in (t.customers, t.chemicals, t.elements, t.analyses):
-            if table.name in existing and conn.scalar(select(func.count()).select_from(table)):
-                return True
-    return False
+from slim_lims.demo_seed import DEFAULT_OSS_DIR, seed_demo
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -96,72 +50,54 @@ def main(argv: list[str] | None = None) -> int:
     slim_url = settings.slim_database_url or settings.database_url
     print(f"Database: {make_url(settings.database_url).render_as_string(hide_password=True)}")
     print(f"SLIM database:   {make_url(slim_url).render_as_string(hide_password=True)}")
-
-    config = Config(str(Path(slim_lims.__file__).parent / "alembic.ini"))
-    config.attributes["database_url"] = settings.database_url
-    command.upgrade(config, "head")
-
-    portal_engine = make_engine(settings.database_url)
-    slim_engine = make_engine(slim_url) if slim_url != settings.database_url else portal_engine
-
-    if _slim_tables_have_data(slim_engine):
-        print("SLIM reference tables already hold data -- left untouched.")
-    else:
-        assert_oss_database(slim_url)  # demo.seed() opens its own engine, outside make_engine
-        demo = _load_oss_demo(args.oss_report_engine.resolve())
-        if slim_engine.dialect.name == "postgresql":
-            with slim_engine.begin() as conn:  # slim-domain's unique names are CITEXT on Postgres
-                conn.execute(text("CREATE EXTENSION IF NOT EXISTS citext"))
-        demo.seed(slim_url)
-        print(f"Seeded SLIM demo reference data from {args.oss_report_engine}.")
-
-    with make_session_factory(portal_engine)() as session:
-        report = sync_analysis_catalog(slim_engine, session)
-        session.commit()
-    print(f"analysis_catalog: {report.matched} analyses offered or mapped.")
-    if report.not_in_slim:
-        print(
-            f"  {len(report.not_in_slim)} catalog entries not in this SLIM database (skipped): "
-            + ", ".join(report.not_in_slim)
+    try:
+        report = seed_demo(
+            settings.database_url,
+            settings.slim_database_url,
+            args.oss_report_engine,
+            settings.lab_timezone,
+            scenarios=not args.no_scenarios,
         )
-    if report.not_in_catalog:
+    except (FileNotFoundError, ImportError) as e:
+        raise SystemExit(
+            f"{e}\nPass --oss-report-engine, and install the OSS packages: "
+            "pip install -e ../slim-domain-oss[postgres] -e ../slim-report-engine-oss"
+        ) from e
+    print(
+        f"Seeded SLIM demo reference data from {args.oss_report_engine}."
+        if report.slim_seeded
+        else "SLIM reference tables already hold data -- left untouched."
+    )
+    catalog = report.catalog
+    print(f"analysis_catalog: {catalog.matched} analyses offered or mapped.")
+    if catalog.not_in_slim:
         print(
-            f"  {len(report.not_in_catalog)} SLIM analyses with no catalog entry (not offered): "
-            + ", ".join(report.not_in_catalog)
+            f"  {len(catalog.not_in_slim)} catalog entries not in this SLIM database (skipped): "
+            + ", ".join(catalog.not_in_slim)
         )
-
-    migrate_slim_data(portal_engine)
-    migrate_slim_prep(portal_engine)
-    migrate_invoicing(portal_engine)
-    audited = install_audit_log(portal_engine)  # before the scenarios, so their writes are chained (D-77)
-    clock = LabClock(ZoneInfo(settings.lab_timezone))  # the demo's dates are the lab's (review A8)
-    with make_session_factory(portal_engine)() as session:
-        reference = load_reference(slim_engine, portal_engine)
-        analyses = publish_demo_rules(session, reference)
-        publish_demo_prep(session, reference, clock.today())
-        personas = sync_personas(session)
-        session.commit()
-        specs = SpecReader(slim_engine)
-        scenarios = {} if args.no_scenarios else seed_scenarios(session, reference, specs, clock.now())
-        session.commit()
-        prepped = None if args.no_scenarios else seed_prep_scenario(session, reference, specs, clock.now())
-        session.commit()
+    if catalog.not_in_catalog:
+        print(
+            f"  {len(catalog.not_in_catalog)} SLIM analyses with no catalog entry (not offered): "
+            + ", ".join(catalog.not_in_catalog)
+        )
     print(
         "slim-data: demo rulesets published for "
-        + ", ".join(code for code, _ in analyses.values())
+        + ", ".join(code for code, _ in report.analyses.values())
         + "; demo policy."
     )
     print(
-        f"Audit log on {len(audited)} tables."
-        if audited
+        f"Audit log on {len(report.audited)} tables."
+        if report.audited
         else "No audit log (not Postgres, or no SLIM tables)."
     )
     print("slim-prep: demo prep rules, stock and the metals rules under its prep methods.")
-    if prepped:
-        print(f"slim-prep demo: an evaporation batch prepped, run, released and corrected on {prepped}.")
-    print(f"{personas} demo personas (offered when DEMO_PERSONAS is on).")
-    if scenarios:
-        print("Demo scenarios: " + ", ".join(f"{name} {tr}" for name, tr in scenarios.items()))
+    if report.prepped:
+        print(
+            f"slim-prep demo: an evaporation batch prepped, run, released and corrected on {report.prepped}."
+        )
+    print(f"{report.personas} demo personas (offered when DEMO_PERSONAS is on).")
+    if report.scenarios:
+        print("Demo scenarios: " + ", ".join(f"{name} {tr}" for name, tr in report.scenarios.items()))
     elif not args.no_scenarios:
         print("Demo scenarios: results exist already -- left untouched.")
     return 0

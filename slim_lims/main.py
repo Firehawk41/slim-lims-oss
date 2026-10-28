@@ -1,5 +1,6 @@
 """FastAPI application factory. Run with: uvicorn --factory slim_lims.main:create_app"""
 
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI, Request
@@ -15,6 +16,8 @@ from slim_lims.auth import LoginRequired, StaffRequired, login_redirect
 from slim_lims.auth import router as auth_router
 from slim_lims.config import Settings, load_settings
 from slim_lims.db import make_engine, make_session_factory
+from slim_lims.demo_seed import DEFAULT_OSS_DIR, seed_demo
+from slim_lims.labs import Labs
 from slim_lims.labtime import LabClock
 from slim_lims.prep_routes import api_router as prep_api_router
 from slim_lims.prep_routes import router as prep_router
@@ -31,6 +34,19 @@ from slim_lims.web import STATIC_DIR, render
 SESSION_COOKIE = "slim_portal_session"
 
 
+def _labs(settings: Settings) -> Labs:
+    if not (settings.database_url.startswith("postgresql") and settings.demo_personas):
+        raise RuntimeError("DEMO_LABS needs Postgres and DEMO_PERSONAS")
+    oss_dir = Path(settings.oss_report_engine_dir) if settings.oss_report_engine_dir else DEFAULT_OSS_DIR
+    labs = Labs(
+        settings.database_url,
+        seed=lambda url: seed_demo(url, oss_dir=oss_dir, lab_timezone=settings.lab_timezone),
+    )
+    labs.check()
+    labs.start()
+    return labs
+
+
 def _wants_json(request: Request) -> bool:
     return request.url.path.startswith("/api/") or "application/json" in request.headers.get("accept", "")
 
@@ -41,6 +57,7 @@ def create_app(
     reference: ReferenceData | None = None,
     specs=None,
     report_renderer=None,
+    labs=None,
 ) -> FastAPI:
     settings = settings or load_settings()
     engine = engine or make_engine(settings.database_url)
@@ -66,6 +83,9 @@ def create_app(
     app.state.report_renderer = report_renderer or engine_renderer  # spec §13, slim-data D-79
     app.state.login_throttle = LoginThrottle()
     app.state.lab_clock = LabClock(ZoneInfo(settings.lab_timezone))
+    if labs is None and settings.demo_labs:
+        labs = _labs(settings)
+    app.state.labs = labs  # a lab per visitor (slim-data D-102), or None
 
     # Last added = outermost. Headers wrap everything, including 413s and session errors.
     app.add_middleware(BodySizeLimitMiddleware, max_bytes=settings.max_body_bytes)

@@ -164,6 +164,8 @@ slim_lims/
 ├── demo_prep.py     # slim-prep's demo scenario (seed_prep_scenario): one evaporation batch, end to end; demo seed only
 ├── api.py           # /api/submissions JSON API; maps service errors to 422/403/404/409
 ├── security.py      # bcrypt hashing, CSRF (csrf_token / csrf_protect), LoginThrottle, headers + body-size middleware
+├── labs.py          # a lab per visitor (DEMO_LABS, slim-data D-102): Labs (claim, spares, sweep), with_schema
+├── demo_seed.py     # seed_demo(url): the whole demo seed (scripts/seed_demo.py and each lab)
 ├── labtime.py       # LabClock: the lab's now / today (LAB_TIMEZONE) for host code; app.state.lab_clock
 ├── auth.py          # current_user / require_user / require_staff deps; /login, /logout
 ├── board.py         # the lab board (spec §13): TR cards by stage, chips per sample × analysis

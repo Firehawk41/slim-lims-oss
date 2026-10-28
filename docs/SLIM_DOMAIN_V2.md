@@ -474,7 +474,9 @@ The portal is a portfolio demo: modular but narrow. These came up and are delibe
 - **Repeat a previous request**: copy TR00042 into a new form and change only the sample IDs — the
   improvement over Excel for customers who send the same panel regularly.
 - Upload sample IDs from a CSV/XLSX column (beyond pasting).
-- Login rate limiting; SRI hashes / self-hosted CDN assets; file attachments; email notifications.
+- slim-domain's audit log lists `current_schema()`'s tables instead of public's (the host works around it for
+  demo labs, slim-data D-102).
+- SRI hashes / self-hosted CDN assets; file attachments; email notifications.
 - Quality layer: pooled precision per element and matrix (steadier than one sample's ½Δ), control charts
   and trends across batches (slim-data D-81 leaves these out).
 

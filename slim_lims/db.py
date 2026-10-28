@@ -57,9 +57,21 @@ def make_session_factory(engine: Engine) -> sessionmaker[Session]:
     return sessionmaker(bind=engine, expire_on_commit=False)
 
 
+LAB_SESSION_KEY = "lab"  # the visitor's own lab (labs.Labs, slim-data D-102)
+
+
 def get_db(request: Request) -> Iterator[Session]:
-    """FastAPI dependency: one session per request. Callers commit explicitly."""
-    session = request.app.state.session_factory()
+    """FastAPI dependency: one session per request, on the visitor's own lab when they have one (a
+    lab dropped while idle ends their session: they start again). Callers commit explicitly."""
+    factory = request.app.state.session_factory
+    labs = getattr(request.app.state, "labs", None)
+    if labs is not None and (schema := request.session.get(LAB_SESSION_KEY)):
+        lab = labs.enter(schema)
+        if lab is None:
+            request.session.clear()
+        else:
+            factory = lab
+    session = factory()
     try:
         yield session
     finally:
