@@ -226,6 +226,16 @@ class SubmissionService:
             raise NotFound(tr_number)
         return submission
 
+    def history(self, tr_number: str, user: User):
+        """The TR's versions, oldest first (D-104); NotFound as for get."""
+        return self.repo.versions(self.get(tr_number, user).id)
+
+    def version(self, tr_number: str, version: int, user: User) -> TRSubmission:
+        found = self.repo.version(self.get(tr_number, user).id, version)
+        if found is None:
+            raise NotFound(f"{tr_number} version {version}")
+        return found
+
     def list(self, user: User, customer_id: int | None = None, **filters) -> SubmissionPage:
         return self.repo.list(Scope.for_user(user, customer_id), **filters)
 
@@ -310,7 +320,9 @@ class SubmissionService:
             match_chemical(submission, position, data.chemical_id)  # validates the change
         except ValueError as e:
             raise SubmissionRejected([FieldError(("chemical_id",), str(e))]) from e
-        return self.repo.record_chemical_match(submission.id, position, data.chemical_id)
+        return self.repo.record_chemical_match(
+            submission.id, position, data.chemical_id, user.initials or user.email
+        )
 
 
 def _can_see(user: User, submission: TRSubmission) -> bool:

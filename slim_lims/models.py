@@ -5,6 +5,7 @@ from datetime import UTC, date, datetime
 from datetime import time as time_type
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     CheckConstraint,
     Date,
@@ -199,6 +200,22 @@ class TRSubmissionEmailRow(Base):
     email: Mapped[str] = mapped_column(String(254))
 
 
+class TRVersionRow(Base):
+    """Every change to a TR, kept whole (slim-data D-104; review A5): version n is the TR as it stood after
+    its n-th change. Append-only (triggers, migration 0010). The other TR tables are the current state."""
+
+    __tablename__ = "tr_versions"
+    __table_args__ = (UniqueConstraint("submission_id", "version"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    submission_id: Mapped[int] = mapped_column(ForeignKey("tr_submissions.id"), index=True)
+    version: Mapped[int] = mapped_column(Integer)
+    recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    change: Mapped[str] = mapped_column(String(100))
+    actor_display: Mapped[str] = mapped_column(String(254))
+    document: Mapped[dict] = mapped_column(JSON)
+
+
 class TRStatusEventRow(Base):
     __tablename__ = "tr_status_events"
 
@@ -219,6 +236,26 @@ class TRStatusEventRow(Base):
 def _seed_counter(target, connection, **_kw) -> None:
     # Same row the 0002 migration inserts; keeps metadata.create_all (tests, demos) equivalent.
     connection.execute(target.insert().values(id=1, last_value=0))
+
+
+@event.listens_for(TRVersionRow.__table__, "after_create")
+def _versions_append_only(target, connection, **_kw) -> None:
+    # The triggers migration 0010 makes; keeps metadata.create_all (tests, demos) equivalent.
+    if connection.dialect.name == "postgresql":
+        connection.exec_driver_sql(
+            "CREATE OR REPLACE FUNCTION tr_versions_append_only() RETURNS trigger LANGUAGE plpgsql AS $$ "
+            "BEGIN RAISE EXCEPTION 'tr_versions is append-only'; END $$"
+        )
+        connection.exec_driver_sql(
+            "CREATE TRIGGER tr_versions_append_only BEFORE UPDATE OR DELETE ON tr_versions "
+            "FOR EACH ROW EXECUTE FUNCTION tr_versions_append_only()"
+        )
+    else:
+        for operation in ("UPDATE", "DELETE"):
+            connection.exec_driver_sql(
+                f"CREATE TRIGGER tr_versions_no_{operation.lower()} BEFORE {operation} ON tr_versions "
+                "BEGIN SELECT RAISE(ABORT, 'tr_versions is append-only'); END"
+            )
 
 
 # ---------------------------------------------------------------- reference overlays

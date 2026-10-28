@@ -216,6 +216,7 @@ def request_detail(
         "requests/detail.html",
         {
             "s": submission,
+            "versions": service.history(tr_number, user),
             "samples": _describe_samples(submission, reference),
             # Fact statuses come from issuing a report or sending the invoice, never a button (D-99).
             "next_statuses": [
@@ -223,6 +224,33 @@ def request_detail(
             ],
             "lab_today": service.lab_today(),
             "chemicals": reference.chemical_choices() if user.is_staff else [],
+            "TRStatus": TRStatus,
+        },
+    )
+
+
+@router.get("/requests/{tr_number}/versions/{version}", name="request_version")
+def request_version(
+    request: Request, tr_number: str, version: int, user: RequireUser, service: Service, reference: Reference
+):
+    """The TR exactly as it stood after its n-th change (D-104), read-only."""
+    try:
+        then = service.version(tr_number, version, user)
+        versions = service.history(tr_number, user)
+    except NotFound:
+        return render(
+            request, "error.html", {"status": 404, "message": f"{tr_number} has no version {version}."}, 404
+        )
+    return render(
+        request,
+        "requests/detail.html",
+        {
+            "s": then,
+            "versions": versions,
+            "viewing": version,
+            "samples": _describe_samples(then, reference),
+            "next_statuses": [],
+            "chemicals": [],
             "TRStatus": TRStatus,
         },
     )

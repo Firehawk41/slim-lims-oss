@@ -146,7 +146,7 @@ slim_lims/
 ├── oss_guard.py     # OSS-ONLY guard: refuses "precilab" URLs and non-demo hosts (called by make_engine)
 ├── domain/          # Spec §3–4: enums.py, tr.py (TRSubmission, TRSample, ...), workflow.py (transitions)
 ├── models.py        # SQLAlchemy models: User + TR tables (tr_submissions, tr_samples, ...)
-├── repositories.py  # TRSubmissionRepository: domain <-> rows, gapless TR numbers, stale-update check
+├── repositories.py  # TRSubmissionRepository: domain <-> rows, gapless TR numbers, stale-update check, tr_versions (as_of, D-104)
 ├── schemas.py       # Input models (SubmissionIn, SampleIn, StatusChangeIn) — shape/type validation only
 ├── scope.py         # Scope.for_user: whose TRs a listing shows; fails closed (slim-data D-103)
 ├── services.py      # SubmissionService: reference-data rules, access rules, submit/list/get/change_status
