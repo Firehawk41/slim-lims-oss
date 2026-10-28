@@ -99,6 +99,16 @@ never change the private slim-lims from here. Env vars keep their `PORTAL_` name
    (`results.READERS`, `make_reader`, `import_analyses`); the preview lists what was left out on purpose.
    The API takes the same choice (`kind`, `prep_batch`, `analysis`, `prep_method` query parameters).
 
+16. ✅ slim-prep (the prep book, `slim-prep-oss` P6), a required library: `prep.py` (host side: `prep_actor_for`,
+   `publish_demo_prep` = demo prep rules + stock + the metals rules under each prep method, `chemicals` for the
+   run list, `send` = register or send the correction, then re-evaluate) and `prep_routes.py`: /prep (batches,
+   standards book, make a standard), /prep/new-batch (the grid: one row per cup), /prep/batches/{code} (figures,
+   versions, "Send to results", "Correct this batch", run list CSV), /api/prep/*. Nav: Prep. `cli migrate` and the seed run its
+   migrations. Slice 1 ✅; slice 2 ✅ correcting a batch on screen (/prep/batches/{code}/edit: the grid filled
+   from the current version, a reason required, the next version; who prepped it stays). P7 ✅: `demo_prep.py`
+   (the seed's prep scenario: standards → evaporation batch → sent → bracketed run → released → a corrected weighing
+   sent again, the released result left waiting for its correction); `cli verify` also runs slim-prep's verify.
+
 Done: A, B, link-ready (9), the board (13), invoicing (14), instrument data in (15). What comes next follows `docs/ROADMAP.md`;
 C last. The user is token-constrained: small, focused steps,
 short replies.
@@ -144,8 +154,11 @@ slim_lims/
 ├── bridge.py        # to_slim_v1: TR -> slim-domain-oss v1 TRSubmission (location/TR no. in file_name)
 ├── results.py       # slim-data host side: TrSampleTables, SpecReader, StaffDirectory, actor_for, demo rules
 ├── results_routes.py  # /results (upload, batches with every cup, trace, reports) and /api/results — staff only
+├── prep.py          # slim-prep host side: prep_actor_for, publish_demo_prep, chemicals, send (+ re-evaluate)
+├── prep_routes.py   # /prep (batches, standards book, grid, send, run list CSV) and /api/prep — staff only
 ├── personas.py      # demo personas (DEMO_PERSONAS): data/demo_personas.csv -> users.is_persona rows
 ├── demo_scenarios.py  # slim-data's demo scenarios on real TRs (PortalDemoHost, seed_scenarios); demo seed only
+├── demo_prep.py     # slim-prep's demo scenario (seed_prep_scenario): one evaporation batch, end to end; demo seed only
 ├── api.py           # /api/submissions JSON API; maps service errors to 422/403/404/409
 ├── security.py      # bcrypt hashing, CSRF (csrf_token / csrf_protect), headers + body-size middleware
 ├── auth.py          # current_user / require_user / require_staff deps; /login, /logout
@@ -156,7 +169,7 @@ slim_lims/
 ├── routes.py        # Pages: / (board), /requests (customer list), /requests/new|{tr}, status form, /admin, /admin/users
 ├── web.py           # Jinja2 templates, render(), flash()
 ├── audit.py         # slim-domain's audit log: install_audit_log (Postgres), chain_check for verify
-├── cli.py           # migrate (app + slim-data + invoicing + audit log), verify, create-staff, create-customer-user, sync-analysis-catalog, sync-personas
+├── cli.py           # migrate (app + slim-data + slim-prep + invoicing + audit log), verify (results + prep book), create-staff, create-customer-user, sync-analysis-catalog, sync-personas
 ├── alembic.ini, migrations/   # Alembic; only manages tables on db.Base
 ├── templates/       # base, _macros, login, error, requests/{list,new,detail}, admin/{home,users}
 └── static/          # css/style.css, admin.css (.admin-theme), portal.css (components), js/request_form.js

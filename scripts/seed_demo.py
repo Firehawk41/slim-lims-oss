@@ -25,6 +25,7 @@ import argparse
 import importlib.util
 import os
 import sys
+from datetime import date
 from pathlib import Path
 
 from alembic import command
@@ -38,10 +39,12 @@ from slim_lims.audit import install_audit_log
 from slim_lims.catalog import sync_analysis_catalog
 from slim_lims.config import load_settings
 from slim_lims.db import make_engine, make_session_factory
+from slim_lims.demo_prep import seed_prep_scenario
 from slim_lims.demo_scenarios import seed_scenarios
 from slim_lims.invoices import migrate_invoicing
 from slim_lims.oss_guard import assert_oss_database
 from slim_lims.personas import sync_personas
+from slim_lims.prep import migrate_slim_prep, publish_demo_prep
 from slim_lims.reference_cache import load_reference
 from slim_lims.results import SpecReader, migrate_slim_data, publish_demo_rules
 
@@ -127,14 +130,20 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     migrate_slim_data(portal_engine)
+    migrate_slim_prep(portal_engine)
     migrate_invoicing(portal_engine)
     audited = install_audit_log(portal_engine)  # before the scenarios, so their writes are chained (D-77)
     with make_session_factory(portal_engine)() as session:
         reference = load_reference(slim_engine, portal_engine)
         analyses = publish_demo_rules(session, reference)
+        publish_demo_prep(session, reference, date.today())
         personas = sync_personas(session)
         session.commit()
         scenarios = {} if args.no_scenarios else seed_scenarios(session, reference, SpecReader(slim_engine))
+        session.commit()
+        prepped = (
+            None if args.no_scenarios else seed_prep_scenario(session, reference, SpecReader(slim_engine))
+        )
         session.commit()
     print(
         "slim-data: demo rulesets published for "
@@ -146,6 +155,9 @@ def main(argv: list[str] | None = None) -> int:
         if audited
         else "No audit log (not Postgres, or no SLIM tables)."
     )
+    print("slim-prep: demo prep rules, stock and the metals rules under its prep methods.")
+    if prepped:
+        print(f"slim-prep demo: an evaporation batch prepped, run, released and corrected on {prepped}.")
     print(f"{personas} demo personas (offered when DEMO_PERSONAS is on).")
     if scenarios:
         print("Demo scenarios: " + ", ".join(f"{name} {tr}" for name, tr in scenarios.items()))

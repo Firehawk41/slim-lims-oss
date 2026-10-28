@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}Prep — YourLab{% endblock %}
+
+{% block content %}
+  <h1>Prep book</h1>
+  <p class="hint">Under {{ rules.name }}. Weighings go in; net, dilution and spike level are calculated, never typed.</p>
+
+  {% if problems %}
+    <div class="form-error" role="alert">
+      <ul>{% for p in problems %}<li>{{ p }}</li>{% endfor %}</ul>
+    </div>
+  {% endif %}
+
+  <section class="form-section" aria-labelledby="new-batch-heading">
+    <h2 id="new-batch-heading">New prep batch</h2>
+    <form method="get" action="{{ url_for('prep_new_batch') }}" class="stack-form">
+      <label>Batch code <input type="text" name="code" maxlength="50" required value="{{ form.code or '' }}"></label>
+      <label>Prep method
+        <select name="method">
+          {% for m in rules.methods %}
+            <option value="{{ m.name }}"{% if form.method == m.name %} selected{% endif %}>{{ m.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Analysis
+        <select name="analysis">
+          {% for code, name in analyses %}
+            <option value="{{ code }}"{% if form.analysis == code %} selected{% endif %}>{{ name }} ({{ code }})</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Samples, one lab sample ID per line (e.g. TR00001-01)
+        <textarea name="samples" rows="4" spellcheck="false">{{ form.samples or "" }}</textarea>
+      </label>
+      <div class="choice-row"><button type="submit" class="btn btn--primary">Open the grid</button></div>
+    </form>
+  </section>
+
+  <section aria-labelledby="batches-heading">
+    <h2 id="batches-heading">Batches</h2>
+    {% if batches %}
+      <table class="table">
+        <thead><tr><th scope="col">Batch</th><th scope="col">Method</th><th scope="col">Analysis</th>
+          <th scope="col">Version</th><th scope="col">Sent to results</th></tr></thead>
+        <tbody>
+          {% for b in batches %}
+            <tr>
+              <td><a href="{{ url_for('prep_batch', code=b.code) }}">{{ b.code }}</a></td>
+              <td>{{ b.method }}</td><td>{{ b.analysis }}</td><td>{{ b.version }}</td>
+              <td>{% if b.sent %}version {{ b.sent }}{% if b.sent != b.version %} (correction not sent){% endif %}{% else %}—{% endif %}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}<p>No batches yet.</p>{% endif %}
+  </section>
+
+  <section class="form-section" aria-labelledby="standards-heading">
+    <h2 id="standards-heading">Standards book</h2>
+    <p class="hint">Concentration and expiry come from the recipe; an expired source is refused.</p>
+    {% if standards %}
+      <table class="table">
+        <thead><tr><th scope="col">Standard</th><th scope="col">Made</th><th scope="col">Concentration</th>
+          <th scope="col">Expires</th><th scope="col">From</th><th scope="col">By</th></tr></thead>
+        <tbody>
+          {% for s in standards %}
+            <tr{% if s.expires < today %} class="muted"{% endif %}>
+              <td>{{ s.name }}</td><td>{{ s.prepared }}</td><td>{{ s.concentration }}</td>
+              <td>{{ s.expires }}{% if s.expires < today %} (expired){% endif %}</td><td>{{ s.source }}</td><td>{{ s.analyst }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+    <form method="post" action="{{ url_for('prep_make_standard') }}" class="stack-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+      <label>Make
+        <select name="step">
+          {% for r in rules.recipes %}{% for st in r.steps %}
+            <option value="{{ r.name }}|{{ st.name }}"{% if form.step == r.name ~ '|' ~ st.name %} selected{% endif %}>{{ st.name }} ({{ r.name }}: {{ st.volume_ul }} µL to {{ st.final_ml }} mL, keeps {{ st.shelf_life }})</option>
+          {% endfor %}{% endfor %}
+        </select>
+      </label>
+      <label>From
+        <select name="source">
+          {% for s in stocks %}
+            <option value="stock|{{ s.name }}|{{ s.lot }}">{{ s.name }} lot {{ s.lot }} ({{ s.concentration }}, expires {{ s.expires }})</option>
+          {% endfor %}
+          {% for s in standards %}{% if s.expires >= today %}
+            <option value="standard|{{ s.name }}|{{ s.prepared }}">{{ s.name }} made {{ s.prepared }} ({{ s.concentration }})</option>
+          {% endif %}{% endfor %}
+        </select>
+      </label>
+      <label>Prep date <input type="date" name="prepared" required value="{{ form.prepared or today }}"></label>
+      <fieldset><legend>Pipettes used</legend>
+        {% for p in rules.pipettes %}<label class="choice"><input type="checkbox" name="pipettes" value="{{ p }}"> {{ p }}</label>{% endfor %}
+      </fieldset>
+      <div class="choice-row"><button type="submit" class="btn btn--primary">Record the standard</button></div>
+    </form>
+  </section>
+{% endblock %}

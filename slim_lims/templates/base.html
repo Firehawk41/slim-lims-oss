@@ -24,6 +24,7 @@
             {% if current_user.is_staff %}
               <a href="{{ url_for('admin_home') }}">Requests</a>
               <a href="{{ url_for('new_request') }}">New request</a>
+              <a href="{{ url_for('prep_home') }}">Prep</a>
               <a href="{{ url_for('results_home') }}">Results</a>
               <a href="{{ url_for('invoices_home') }}">Invoices</a>
               <a href="{{ url_for('admin_users') }}">Users</a>

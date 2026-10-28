@@ -24,6 +24,7 @@ from slim_lims.db import make_engine, make_session_factory
 from slim_lims.invoices import migrate_invoicing
 from slim_lims.models import LAB_ROLES, ROLE_CUSTOMER, ROLE_STAFF, User
 from slim_lims.personas import sync_personas
+from slim_lims.prep import migrate_slim_prep
 from slim_lims.results import migrate_slim_data
 from slim_lims.security import hash_password
 
@@ -99,10 +100,11 @@ def _migrate() -> int:
     command.upgrade(config, "head")
     engine = make_engine(settings.database_url)
     migrate_slim_data(engine)
+    migrate_slim_prep(engine)
     migrate_invoicing(engine)
     audited = install_audit_log(engine)
     print(
-        "slim-lims, slim-data and invoicing migrations applied."
+        "slim-lims, slim-data, slim-prep and invoicing migrations applied."
         + (
             f" Audit log on {len(audited)} tables."
             if audited
@@ -113,12 +115,15 @@ def _migrate() -> int:
 
 
 def _verify() -> int:
-    """slim-data's verify (D-76): exit 1 if a result doesn't replay or the audit chain is broken."""
+    """slim-data's verify (D-76) and slim-prep's (P-22): exit 1 if a result doesn't replay, the audit
+    chain is broken or the prep book doesn't hold."""
     from slim_data.service.verify import verify
+    from slim_prep.service.verify import verify as verify_prep
 
     engine = make_engine(load_settings().database_url)
     with make_session_factory(engine)() as session:
         report = verify(session, chain_check(engine))
+        prep = verify_prep(session)
     print(
         f"Replayed {report.versions} result versions: "
         + ("all match." if not report.mismatches else f"{len(report.mismatches)} don't match:")
@@ -131,7 +136,13 @@ def _verify() -> int:
         print(f"Audit chain: BROKEN, entries {', '.join(map(str, report.broken_entries))}.")
     else:
         print("Audit chain: intact.")
-    return 0 if report.ok else 1
+    print(
+        f"Prep book: {prep.standards} standard and {prep.batches} batch versions, {prep.sent} sent: "
+        + ("all hold." if prep.ok else f"{len(prep.problems)} problems:")
+    )
+    for problem in prep.problems:
+        print(f"  {problem}")
+    return 0 if report.ok and prep.ok else 1
 
 
 def main(argv: list[str] | None = None) -> int:

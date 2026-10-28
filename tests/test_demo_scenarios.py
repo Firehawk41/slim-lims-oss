@@ -11,6 +11,7 @@ from slim_data.persistence.results import issues_for_tr
 from slim_data.service.verify import verify
 from slim_data.service.views import batch_view, report_view
 from slim_domain.domain.report_log.report_log_repository import _ReportGenerationLogRow
+from slim_prep.persistence import migrate as prep_migrate
 from sqlalchemy import text
 
 from slim_lims import cli, reports
@@ -54,8 +55,10 @@ def specs(customer, chemical, location):
 @pytest.fixture
 def seeded(engine, db, reference):
     with engine.begin() as connection:
+        prep_migrate.downgrade(connection)
         migrate.downgrade(connection)
         migrate.upgrade(connection)
+        prep_migrate.upgrade(connection)  # cli verify checks the prep book too
     publish_demo_rules(db, reference)
     sync_personas(db)
     trs = seed_scenarios(db, reference, specs, renderer=plain_renderer)
