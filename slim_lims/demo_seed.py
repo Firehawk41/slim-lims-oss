@@ -40,6 +40,7 @@ from slim_lims.oss_guard import assert_oss_database
 from slim_lims.personas import sync_personas
 from slim_lims.prep import migrate_slim_prep, publish_demo_prep
 from slim_lims.reference_cache import load_reference
+from slim_lims.repositories import TRSubmissionRepository
 from slim_lims.results import SpecReader, migrate_slim_data, publish_demo_rules
 
 DEFAULT_OSS_DIR = Path(slim_lims.__file__).resolve().parents[2] / "slim-report-engine-oss"
@@ -111,6 +112,7 @@ def seed_demo(
 
         with make_session_factory(portal_engine)() as session:
             report.catalog = sync_analysis_catalog(slim_engine, session)
+            TRSubmissionRepository(session).backfill_versions()  # TRs from before their history (D-104)
             session.commit()
 
         migrate_slim_data(portal_engine)

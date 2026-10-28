@@ -27,6 +27,7 @@ from slim_lims.labs import ensure_schema, without_schema
 from slim_lims.models import LAB_ROLES, ROLE_CUSTOMER, ROLE_STAFF, User
 from slim_lims.personas import sync_personas
 from slim_lims.prep import migrate_slim_prep
+from slim_lims.repositories import TRSubmissionRepository
 from slim_lims.results import migrate_slim_data
 from slim_lims.security import hash_password
 
@@ -102,6 +103,11 @@ def _migrate() -> int:
     config.attributes["database_url"] = settings.database_url
     command.upgrade(config, "head")
     engine = make_engine(settings.database_url)
+    with make_session_factory(engine)() as session:  # TRs from before their history (D-104)
+        backfilled = TRSubmissionRepository(session).backfill_versions()
+        session.commit()
+    if backfilled:
+        print(f"{backfilled} requests given their current state as version 1.")
     migrate_slim_data(engine)
     migrate_slim_prep(engine)
     migrate_invoicing(engine)

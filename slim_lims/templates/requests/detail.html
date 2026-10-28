@@ -7,6 +7,9 @@
   <div class="page-head">
     <h1>{{ s.tr_number }} {{ badge(s.status) }} {% if s.is_rush %}<span class="badge badge--rush">RUSH</span>{% endif %}</h1>
     <span>
+      {% if viewing %}
+        <a href="{{ url_for('request_detail', tr_number=s.tr_number) }}">Back to the request as it is now</a>
+      {% else %}
       {% if current_user.is_staff and s.status not in (TRStatus.SUBMITTED, TRStatus.CANCELLED) %}
         <a href="{{ url_for('results_report', tr_number=s.tr_number) }}">Results report</a> ·
       {% endif %}
@@ -17,8 +20,12 @@
         <a href="{{ url_for('invoice_page', tr_number=s.tr_number) }}">Invoice</a> ·
       {% endif %}
       <a class="muted" href="{{ url_for('get_submission', tr_number=s.tr_number) }}">View as JSON</a>
+      {% endif %}
     </span>
   </div>
+  {% if viewing %}
+    <div class="flash flash--info" role="status">As it stood at version {{ viewing }} of {{ versions|length }}: read-only.</div>
+  {% endif %}
 
   <section class="form-section">
     <dl class="kv">
@@ -53,7 +60,7 @@
               {% if d.slim_chemical %}<span class="muted">→ SLIM: {{ d.slim_chemical }}</span>
               {% else %}<span class="badge badge--rush">Not matched to SLIM</span>{% endif %}
             {% endif %}</dd>
-          {% if current_user.is_staff and s.request_type.value == 1 and s.status != TRStatus.SUBMITTED %}
+          {% if current_user.is_staff and s.request_type.value == 1 and s.status != TRStatus.SUBMITTED and not viewing %}
             <dt>Match to SLIM</dt><dd>
               <form method="post" action="{{ url_for('match_chemical_form', tr_number=s.tr_number, position=smp.position) }}" class="inline-form">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
@@ -74,7 +81,7 @@
     </section>
   {% endfor %}
 
-  {% if current_user.is_staff and s.status == TRStatus.SUBMITTED %}
+  {% if current_user.is_staff and s.status == TRStatus.SUBMITTED and not viewing %}
     <section class="form-section">
       <h2>Next step</h2>
       <p>When the samples arrive, check them in: confirm the receipt and match the chemicals to SLIM.</p>
@@ -104,4 +111,20 @@
       <li><strong>{{ e.to_status.label }}</strong> — {{ e.at.strftime("%Y-%m-%d %H:%M UTC") }} by {{ e.actor.display }}{% if e.note %}: <em>{{ e.note }}</em>{% endif %}</li>
     {% endfor %}
   </ol>
+
+  {% if versions %}
+    <h2>Versions</h2>
+    <p class="hint">Every change to this request, kept whole: open any version to see the request as it stood then.</p>
+    <table class="table">
+      <thead><tr><th>Version</th><th>When (UTC)</th><th>Change</th><th>By</th></tr></thead>
+      <tbody>
+        {% for v in versions|reverse %}
+          <tr{% if v.version == viewing %} class="current"{% endif %}>
+            <td><a href="{{ url_for('request_version', tr_number=s.tr_number, version=v.version) }}">{{ v.version }}</a></td>
+            <td>{{ v.recorded_at.strftime("%Y-%m-%d %H:%M") }}</td><td>{{ v.change }}</td><td>{{ v.actor_display }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
 {% endblock %}

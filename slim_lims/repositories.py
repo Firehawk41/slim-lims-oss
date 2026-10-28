@@ -32,6 +32,7 @@ from slim_lims.models import (
     TRStatusEventRow,
     TRSubmissionEmailRow,
     TRSubmissionRow,
+    TRVersionRow,
 )
 from slim_lims.scope import Scope
 
@@ -68,7 +69,10 @@ class TRSubmissionRepository:
         row = _to_row(submission, tr_number)
         self.session.add(row)
         self.session.flush()
-        return self._load_row(row.id)
+        stored = self._load_row(row.id)
+        event = stored.status_history[-1]
+        self._record_version(stored, "submitted", event.at, event.actor.display)
+        return stored
 
     def record_transition(self, before: TRSubmission, after: TRSubmission) -> TRSubmission:
         """Persists a workflow.transition() / check_in() result (status, receipt, chemical matches,
@@ -99,10 +103,19 @@ class TRSubmissionRepository:
             self.session.add(_event_row(before.id, event))
         self.session.flush()
         self.session.expire_all()
-        return self._load_row(before.id)
+        stored = self._load_row(before.id)
+        last = new_events[-1]
+        change = (
+            "checked in" if after.receipt is not None and before.receipt is None else last.to_status.label
+        )
+        self._record_version(stored, change.lower(), last.at, last.actor.display, before)
+        return stored
 
-    def record_chemical_match(self, submission_id: int, position: int, chemical_id: int) -> TRSubmission:
+    def record_chemical_match(
+        self, submission_id: int, position: int, chemical_id: int, actor_display: str = ""
+    ) -> TRSubmission:
         """Persists a workflow.match_chemical() result for one sample. The caller commits."""
+        before = self._load_row(submission_id)
         result = self.session.execute(
             update(TRSampleRow)
             .where(TRSampleRow.submission_id == submission_id, TRSampleRow.position == position)
@@ -112,7 +125,46 @@ class TRSubmissionRepository:
             raise ValueError(f"sample {position} not found")
         self.session.flush()
         self.session.expire_all()
-        return self._load_row(submission_id)
+        stored = self._load_row(submission_id)
+        change = f"sample {position} matched to SLIM chemical {chemical_id}"
+        self._record_version(stored, change, datetime.now(UTC), actor_display, before)
+        return stored
+
+    def _record_version(
+        self, after: TRSubmission, change: str, at: datetime, by: str, before: TRSubmission | None = None
+    ) -> None:
+        """Appends the TR as it now stands (D-104). A TR from before the history began gets its
+        earlier state first, as version 1."""
+        latest = self.session.scalar(
+            select(func.max(TRVersionRow.version)).where(TRVersionRow.submission_id == after.id)
+        )
+        if latest is None and before is not None:
+            self._add_version(before, 1, before.status_history[-1].at, "before the history began", "")
+            latest = 1
+        self._add_version(after, (latest or 0) + 1, at, change, by)
+        self.session.flush()
+
+    def _add_version(self, s: TRSubmission, version: int, at: datetime, change: str, by: str) -> None:
+        self.session.add(
+            TRVersionRow(
+                submission_id=s.id,
+                version=version,
+                recorded_at=_utc(at),
+                change=change[:100],
+                actor_display=by[:254],
+                document=s.model_dump(mode="json", exclude_computed_fields=True),
+            )
+        )
+
+    def backfill_versions(self) -> int:
+        """Gives every TR without a history its current state as version 1. Returns how many."""
+        have = select(TRVersionRow.submission_id)
+        ids = self.session.scalars(select(TRSubmissionRow.id).where(TRSubmissionRow.id.not_in(have))).all()
+        for submission_id in ids:
+            s = self._load_row(submission_id)
+            self._add_version(s, 1, s.status_history[-1].at, "before the history began", "")
+        self.session.flush()
+        return len(ids)
 
     def _next_tr_number(self) -> str:
         value = self.session.execute(
@@ -128,6 +180,34 @@ class TRSubmissionRepository:
     def get(self, submission_id: int) -> TRSubmission | None:
         row = self.session.scalars(_select_full().where(TRSubmissionRow.id == submission_id)).first()
         return _from_row(row) if row else None
+
+    def versions(self, submission_id: int) -> list[TRVersionRow]:
+        """The TR's history, oldest first (D-104)."""
+        return list(
+            self.session.scalars(
+                select(TRVersionRow)
+                .where(TRVersionRow.submission_id == submission_id)
+                .order_by(TRVersionRow.version)
+            )
+        )
+
+    def version(self, submission_id: int, version: int) -> TRSubmission | None:
+        row = self.session.scalar(
+            select(TRVersionRow).where(
+                TRVersionRow.submission_id == submission_id, TRVersionRow.version == version
+            )
+        )
+        return TRSubmission.model_validate(row.document) if row else None
+
+    def as_of(self, submission_id: int, at: datetime) -> TRSubmission | None:
+        """The TR as it stood at `at`: its latest version recorded by then; None before it existed."""
+        row = self.session.scalar(
+            select(TRVersionRow)
+            .where(TRVersionRow.submission_id == submission_id, TRVersionRow.recorded_at <= _utc(at))
+            .order_by(TRVersionRow.version.desc())
+            .limit(1)
+        )
+        return TRSubmission.model_validate(row.document) if row else None
 
     def get_by_tr_number(self, tr_number: str) -> TRSubmission | None:
         row = self.session.scalars(

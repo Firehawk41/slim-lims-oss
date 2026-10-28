@@ -53,6 +53,7 @@ Tally and themes are updated now and then at the bottom.
 | C→C | D-102 lab per visitor: Claude measured the seed (~3 s CPU, ~30 s on Render's free CPU) and added spare labs kept ready, and found public must hold no app tables. | Measuring changed the mechanism, not the plan. |
 | J | Switch Render to labs and wipe the old demo database once (`empty-public --if-needed` on start). | |
 | C✓ | D-103: listings take a Scope; a customer always gets their own, "everyone" is staff's, a lost customer ID refuses. | |
+| C→C | D-104 TR history: Claude proposed change events, then built whole versions (as the modules keep theirs): no replay code to get wrong. | Logged as a change of Claude's own proposal. |
 | F | Claude's review listed the Qtegra DOCTYPE as open; it was already refused (a byte check Claude wrote, which a UTF-16 file could pass). | The review was wrong; the fix still mattered. |
 
 ## Themes so far
