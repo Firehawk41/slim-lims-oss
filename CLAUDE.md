@@ -105,7 +105,9 @@ never change the private slim-lims from here. Env vars keep their `PORTAL_` name
    standards book, make a standard), /prep/new-batch (the grid: one row per cup), /prep/batches/{code} (figures,
    versions, "Send to results", "Correct this batch", run list CSV), /api/prep/*. Nav: Prep. `cli migrate` and the seed run its
    migrations. Slice 1 ✅; slice 2 ✅ correcting a batch on screen (/prep/batches/{code}/edit: the grid filled
-   from the current version, a reason required, the next version; who prepped it stays); next: demo scenarios.
+   from the current version, a reason required, the next version; who prepped it stays). P7 ✅: `demo_prep.py`
+   (the seed's prep scenario: standards → evaporation batch → sent → bracketed run → released → a corrected weighing
+   sent again, the released result left waiting for its correction); `cli verify` also runs slim-prep's verify.
    slim-data and slim-prep are pinned to `claude/intelligent-planck-fhq1bc` until merged, then `@main`.
 
 Done: A, B, link-ready (9), the board (13), invoicing (14), instrument data in (15). What comes next follows `docs/ROADMAP.md`;
@@ -157,6 +159,7 @@ slim_lims/
 ├── prep_routes.py   # /prep (batches, standards book, grid, send, run list CSV) and /api/prep — staff only
 ├── personas.py      # demo personas (DEMO_PERSONAS): data/demo_personas.csv -> users.is_persona rows
 ├── demo_scenarios.py  # slim-data's demo scenarios on real TRs (PortalDemoHost, seed_scenarios); demo seed only
+├── demo_prep.py     # slim-prep's demo scenario (seed_prep_scenario): one evaporation batch, end to end; demo seed only
 ├── api.py           # /api/submissions JSON API; maps service errors to 422/403/404/409
 ├── security.py      # bcrypt hashing, CSRF (csrf_token / csrf_protect), headers + body-size middleware
 ├── auth.py          # current_user / require_user / require_staff deps; /login, /logout
@@ -167,7 +170,7 @@ slim_lims/
 ├── routes.py        # Pages: / (board), /requests (customer list), /requests/new|{tr}, status form, /admin, /admin/users
 ├── web.py           # Jinja2 templates, render(), flash()
 ├── audit.py         # slim-domain's audit log: install_audit_log (Postgres), chain_check for verify
-├── cli.py           # migrate (app + slim-data + invoicing + audit log), verify, create-staff, create-customer-user, sync-analysis-catalog, sync-personas
+├── cli.py           # migrate (app + slim-data + slim-prep + invoicing + audit log), verify (results + prep book), create-staff, create-customer-user, sync-analysis-catalog, sync-personas
 ├── alembic.ini, migrations/   # Alembic; only manages tables on db.Base
 ├── templates/       # base, _macros, login, error, requests/{list,new,detail}, admin/{home,users}
 └── static/          # css/style.css, admin.css (.admin-theme), portal.css (components), js/request_form.js

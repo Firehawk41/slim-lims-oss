@@ -39,6 +39,7 @@ from slim_lims.audit import install_audit_log
 from slim_lims.catalog import sync_analysis_catalog
 from slim_lims.config import load_settings
 from slim_lims.db import make_engine, make_session_factory
+from slim_lims.demo_prep import seed_prep_scenario
 from slim_lims.demo_scenarios import seed_scenarios
 from slim_lims.invoices import migrate_invoicing
 from slim_lims.oss_guard import assert_oss_database
@@ -140,6 +141,10 @@ def main(argv: list[str] | None = None) -> int:
         session.commit()
         scenarios = {} if args.no_scenarios else seed_scenarios(session, reference, SpecReader(slim_engine))
         session.commit()
+        prepped = (
+            None if args.no_scenarios else seed_prep_scenario(session, reference, SpecReader(slim_engine))
+        )
+        session.commit()
     print(
         "slim-data: demo rulesets published for "
         + ", ".join(code for code, _ in analyses.values())
@@ -151,6 +156,8 @@ def main(argv: list[str] | None = None) -> int:
         else "No audit log (not Postgres, or no SLIM tables)."
     )
     print("slim-prep: demo prep rules, stock and the metals rules under its prep methods.")
+    if prepped:
+        print(f"slim-prep demo: an evaporation batch prepped, run, released and corrected on {prepped}.")
     print(f"{personas} demo personas (offered when DEMO_PERSONAS is on).")
     if scenarios:
         print("Demo scenarios: " + ", ".join(f"{name} {tr}" for name, tr in scenarios.items()))
