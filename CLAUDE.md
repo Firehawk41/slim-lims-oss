@@ -148,6 +148,7 @@ slim_lims/
 ├── models.py        # SQLAlchemy models: User + TR tables (tr_submissions, tr_samples, ...)
 ├── repositories.py  # TRSubmissionRepository: domain <-> rows, gapless TR numbers, stale-update check
 ├── schemas.py       # Input models (SubmissionIn, SampleIn, StatusChangeIn) — shape/type validation only
+├── scope.py         # Scope.for_user: whose TRs a listing shows; fails closed (slim-data D-103)
 ├── services.py      # SubmissionService: reference-data rules, access rules, submit/list/get/change_status
 ├── reference.py     # ReferenceData protocol, StaticReferenceData (snapshot + form choices)
 ├── reference_cache.py  # ReferenceCache: loads SLIM tables + analysis_catalog, TTL refresh, keeps last good copy

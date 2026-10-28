@@ -28,6 +28,7 @@ from slim_lims.models import User
 from slim_lims.reference import WATER_CHEMICAL_NAME, ReferenceData
 from slim_lims.repositories import StaleSubmission, SubmissionPage, TRSubmissionRepository
 from slim_lims.schemas import CheckInIn, ChemicalMatchIn, SampleIn, StatusChangeIn, SubmissionIn
+from slim_lims.scope import Scope
 
 
 @dataclass(frozen=True)
@@ -225,10 +226,8 @@ class SubmissionService:
             raise NotFound(tr_number)
         return submission
 
-    def list(self, user: User, **filters) -> SubmissionPage:
-        if not user.is_staff:
-            filters["customer_id"] = user.customer_id
-        return self.repo.list(**filters)
+    def list(self, user: User, customer_id: int | None = None, **filters) -> SubmissionPage:
+        return self.repo.list(Scope.for_user(user, customer_id), **filters)
 
     # ------------------------------------------------------------ status
 
@@ -315,7 +314,7 @@ class SubmissionService:
 
 
 def _can_see(user: User, submission: TRSubmission) -> bool:
-    return user.is_staff or submission.customer_id == user.customer_id
+    return Scope.for_user(user).allows(submission.customer_id)
 
 
 def _to_sample(position: int, s: SampleIn, chemical_id: int | None, chemical_name: str) -> TRSample:

@@ -33,6 +33,7 @@ from slim_lims.models import (
     TRSubmissionEmailRow,
     TRSubmissionRow,
 )
+from slim_lims.scope import Scope
 
 EMAIL_KINDS = ("results_to", "results_cc", "invoice_to", "invoice_cc")
 
@@ -136,16 +137,16 @@ class TRSubmissionRepository:
 
     def list(
         self,
+        scope: Scope,
         *,
-        customer_id: int | None = None,
         status: TRStatus | None = None,
         request_type: RequestType | None = None,
         page: int = 1,
         per_page: int = 25,
     ) -> SubmissionPage:
         filters = []
-        if customer_id is not None:
-            filters.append(TRSubmissionRow.customer_id == customer_id)
+        if scope.customer_id is not None:
+            filters.append(TRSubmissionRow.customer_id == scope.customer_id)
         if status is not None:
             filters.append(TRSubmissionRow.status == int(status))
         if request_type is not None:

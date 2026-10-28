@@ -23,6 +23,7 @@ from slim_lims.reference import ReferenceData
 from slim_lims.repositories import TRSubmissionRepository
 from slim_lims.results import cancel_blocker
 from slim_lims.schemas import CheckInIn, ChemicalMatchIn, StatusChangeIn, SubmissionIn
+from slim_lims.scope import ScopeError
 from slim_lims.security import csrf_protect
 from slim_lims.services import Conflict, Forbidden, NotFound, SubmissionRejected, SubmissionService
 
@@ -120,6 +121,10 @@ def register_error_handlers(app) -> None:
     @app.exception_handler(Forbidden)
     async def _forbidden(_request: Request, exc: Forbidden):
         return JSONResponse({"detail": str(exc)}, status_code=403)
+
+    @app.exception_handler(ScopeError)
+    async def _no_scope(_request: Request, exc: ScopeError):  # fail closed (review A6)
+        return JSONResponse({"detail": "This account can't see any requests."}, status_code=403)
 
     @app.exception_handler(Conflict)
     async def _conflict(_request: Request, exc: Conflict):

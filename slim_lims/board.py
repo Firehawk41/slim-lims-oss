@@ -32,6 +32,7 @@ from slim_lims.invoices import latest_invoices
 from slim_lims.models import LAB_ROLE_ANALYST, LAB_ROLE_REVIEWER, LAB_ROLE_SUPERVISOR, TRInvoiceRow, User
 from slim_lims.reference import ReferenceData
 from slim_lims.repositories import TRSubmissionRepository
+from slim_lims.scope import Scope
 
 COLUMNS = (
     ("expected", "Expected"),
@@ -205,14 +206,14 @@ def board(
 ) -> list[tuple[str, str, list[Card]]]:
     """(column key, title, cards oldest first), in board order. Customers only ever see their own TRs,
     in CUSTOMER_COLUMNS."""
-    if not user.is_staff:
-        customer_id, mine = user.customer_id, False
+    scope = Scope.for_user(user, customer_id)  # a customer's own, whatever was asked (review A6)
+    mine = mine and user.is_staff
     repo, batch_of = TRSubmissionRepository(session), _batch_index(session)
     columns: dict[str, list[Card]] = {key: [] for key, _ in COLUMNS}
     for status in TRStatus:
         if status == TRStatus.CANCELLED:
             continue
-        trs = repo.list(customer_id=customer_id, status=status, per_page=500).items  # newest first
+        trs = repo.list(scope, status=status, per_page=500).items  # newest first
         invoices = latest_invoices(session, [t.id for t in trs]) if status == TRStatus.INVOICED else {}
         for tr in reversed(trs):
             if analysis_id is not None and not any(analysis_id in s.analysis_ids for s in tr.samples):
