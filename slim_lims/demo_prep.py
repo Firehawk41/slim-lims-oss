@@ -12,7 +12,7 @@ One evaporation batch, end to end, so a first visitor sees the prep book at work
 Invented numbers (slim-data D-05). Runs once: skipped when the prep book has a batch.
 """
 
-from datetime import UTC, datetime, time
+from datetime import UTC, datetime, time, timedelta
 from decimal import Decimal
 
 from slim_data.demo.scenarios import HEADER
@@ -24,13 +24,13 @@ from slim_prep.service.books import record_batch, record_standard
 from sqlalchemy.orm import Session
 
 from slim_lims.demo_scenarios import PortalDemoHost
-from slim_lims.prep import prep_actor_for, rules, send
+from slim_lims.prep import TrSamples, prep_actor_for, rules, send
 from slim_lims.reference import ReferenceData
 from slim_lims.repositories import TRSubmissionRepository
 from slim_lims.results import import_and_evaluate, start_work
 from slim_lims.services import SubmissionService
 
-CODE = "PB-PREP-1"
+CODE = "PREP-0001"  # the demo rules' series (slim-prep P-26)
 RECIPE = "multi-element spike"
 D = Decimal
 
@@ -58,7 +58,8 @@ def seed_prep_scenario(
     ).item
 
     # 2. the prep batch, sent to results
-    record_batch(session, _batch(tr, fifty, analyst.initials, now, final="2.6000"), rules_id, who)
+    samples = TrSamples(session, reference)
+    record_batch(session, _batch(tr, fifty, analyst, now, final="2.6000"), rules_id, who, samples, now)
     send(session, CODE, analyst, reference, specs)
 
     # 3. the run's readings (before dilution: the file leaves the factor at 1; the prep book gives it)
@@ -72,16 +73,16 @@ def seed_prep_scenario(
     wf.release(session, SampleRef.parse(f"{tr}-01"), host.analyses["10_elements"][1], host.reviewer)
 
     # 5. a misread final weight, corrected with a reason, sent to results again
-    corrected = _batch(tr, fifty, analyst.initials, now, final="2.6000", cup_2_final="2.6600")
-    record_batch(session, corrected, rules_id, who, 1, "Sample 1 cup 2: final weight misread (2.6600 g)")
+    corrected = _batch(tr, fifty, analyst, now, final="2.6000", cup_2_final="2.6600")
+    reason = "Sample 1 cup 2: final weight misread (2.6600 g)"
+    record_batch(session, corrected, None, who, samples, now, 1, reason)
     send(session, CODE, analyst, reference, specs)
     return tr
 
 
-def _batch(
-    tr: str, fifty, initials: str, now: datetime, final: str, cup_2_final: str | None = None
-) -> PrepBatch:
-    at = datetime.combine(now.date(), time(9, 0), tzinfo=now.tzinfo)
+def _batch(tr: str, fifty, analyst, now: datetime, final: str, cup_2_final: str | None = None) -> PrepBatch:
+    at = now - timedelta(hours=3)  # entered, never in the future (slim-prep P-25)
+    step = StepRecord(analyst=analyst.initials, analyst_id=str(analyst.id), at=at)
 
     def cup(number, final_g, kind=CupKind.SAMPLE, spikes=()):
         weighing = Weighing(tare=D("2.0000"), cap=D("0.5000"), gross=D("12.5000"), final=D(final_g))
@@ -98,8 +99,8 @@ def _batch(
         method="evaporation",
         analysis="10_elements_icpms",
         balance="BAL-1",
-        pour_out=StepRecord(analyst=initials, at=at),
-        prep=StepRecord(analyst=initials, at=at),
+        pour_out=step,
+        prep=step,
         samples=tuple(samples),
         note="demo: evaporated 10 g to about 0.6 g",
     )

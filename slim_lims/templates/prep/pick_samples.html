@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Samples for prep batch {{ form.code }} — YourLab{% endblock %}
+
+{% block content %}
+  <h1>Prep batch {{ form.code }}: choose the samples</h1>
+  <p class="hint">Samples checked in that ordered {{ form.analysis }}, oldest request first. Tick them in the order they
+    will run; slim-prep checks each against its request again when the batch is recorded and sent.</p>
+
+  {% if samples %}
+    <form method="get" action="{{ url_for('prep_new_batch') }}">
+      <input type="hidden" name="code" value="{{ form.code }}">
+      <input type="hidden" name="method" value="{{ form.method }}">
+      <input type="hidden" name="analysis" value="{{ form.analysis }}">
+      <table class="table">
+        <thead><tr><th scope="col"><span class="visually-hidden">Choose</span></th><th scope="col">Sample</th>
+          <th scope="col">Chemical</th><th scope="col">Already prepped in</th></tr></thead>
+        <tbody>
+          {% for s in samples %}
+            <tr{% if prepped.get(s.sample) %} class="muted"{% endif %}>
+              <td><input type="checkbox" name="sample" value="{{ s.sample }}" id="pick-{{ loop.index }}"
+                  {% if not prepped.get(s.sample) %}checked{% endif %}></td>
+              <td><label for="pick-{{ loop.index }}">{{ s.sample }}</label></td>
+              <td>{{ s.chemical }}{% if s.chemical_id is none %} (not matched){% endif %}</td>
+              <td>{{ (prepped.get(s.sample) or ['—'])|join(', ') }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <div class="choice-row">
+        <button type="submit" class="btn btn--primary">Open the grid</button>
+        <a class="btn btn--secondary" href="{{ url_for('prep_home') }}">Back</a>
+      </div>
+    </form>
+  {% else %}
+    <p>No sample checked in has ordered {{ form.analysis }}.</p>
+    <p><a class="btn btn--secondary" href="{{ url_for('prep_home') }}">Back</a></p>
+  {% endif %}
+{% endblock %}

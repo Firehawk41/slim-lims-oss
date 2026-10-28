@@ -11,6 +11,7 @@
     {% if b.batch.pour_out %}<dt>Poured out</dt><dd>{{ b.batch.pour_out.analyst }}, {{ b.batch.pour_out.at }}</dd>{% endif %}
     <dt>Prepped</dt><dd>{{ b.batch.prep.analyst }}, {{ b.batch.prep.at }}</dd>
     <dt>Version</dt><dd>{{ b.version }} by {{ b.by }}{% if b.reason %}: {{ b.reason }}{% endif %}</dd>
+    <dt>Prep rules</dt><dd>version {{ b.rules_id }}{% if b.rules_id != b.current_rules_id %} (the lab's current rules are {{ b.current_rules_id }}; a correction stays under the batch's own){% endif %}</dd>
     <dt>Sent to results</dt><dd>{% if b.sent_version %}version {{ b.sent_version }}{% else %}not yet{% endif %}</dd>
     {% if b.batch.note %}<dt>Note</dt><dd>{{ b.batch.note }}</dd>{% endif %}
   </dl>
@@ -38,6 +39,14 @@
       </form>
     {% endif %}
     <a class="btn btn--secondary" href="{{ url_for('prep_edit_batch', code=b.code) }}">Correct this batch</a>
+    {% if b.rules_id != b.current_rules_id %}
+      <form method="post" action="{{ url_for('prep_move_rules', code=b.code) }}" class="inline-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+        <input type="hidden" name="expected_version" value="{{ b.version }}">
+        <label>Why <input type="text" name="reason" maxlength="1000" required></label>
+        <button type="submit" class="btn btn--secondary">Move to the current prep rules</button>
+      </form>
+    {% endif %}
     <a class="btn btn--secondary" href="{{ url_for('prep_run_list') }}?code={{ b.code|urlencode }}">Run list (CSV)</a>
   </div>
 

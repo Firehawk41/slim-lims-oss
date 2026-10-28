@@ -1,0 +1,9 @@
+{# One spike line of a spike cup: `sk` is its field prefix (c_<sample>_<cup>_s<j>), review B3. #}
+<td><select name="{{ sk }}_standard" aria-label="{{ s }} cup {{ n }} standard">
+  <option value="">none</option>
+  {% for st in standards %}{% set ref = st.name ~ '|' ~ st.prepared.isoformat() %}
+    <option value="{{ ref }}"{% if values[sk ~ '_standard'] == ref %} selected{% endif %}>{{ st.name }} ({{ st.prepared }}, expires {{ st.expires }})</option>
+  {% endfor %}
+</select></td>
+<td><input type="text" inputmode="decimal" name="{{ sk }}_volume" value="{{ values[sk ~ '_volume'] or '' }}" aria-label="{{ s }} cup {{ n }} spike volume"></td>
+<td><select name="{{ sk }}_pipette" aria-label="{{ s }} cup {{ n }} pipette">{% for p in rules.pipettes %}<option value="{{ p }}"{% if values[sk ~ '_pipette'] == p %} selected{% endif %}>{{ p }}</option>{% endfor %}</select></td>
