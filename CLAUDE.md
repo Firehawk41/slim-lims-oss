@@ -16,6 +16,9 @@
 
 **Roadmap:** `docs/ROADMAP.md` (departments Admin · Lab · Quality · IT, phases, portfolio). Read it first.
 
+**Dev diary:** `docs/DEV_DIARY.md` records who decided what (Jamie / Claude / found), across every SLIM repo.
+Add a line whenever a decision is made, amended, overruled or argued; keep it short; update the tally now and then.
+
 ## What This Is
 
 SLIM's host app (OSS demo) for an ISO 17025 accredited analytical chemistry lab: the composition
