@@ -139,3 +139,36 @@ def test_admin_shows_reference_status_and_refreshes(engine, db, staff_user):
         token = csrf_from(page)
         response = client.post("/admin/reference/refresh", data={"csrf_token": token})
         assert "Reference data reloaded from SLIM." in response.text
+
+
+def test_failed_logins_lock_the_account_for_a_while(client, staff_user):  # review A4
+    for _ in range(5):
+        assert login(client, "staff@lab.example", "wrong password").status_code == 401
+    locked = login(client, "staff@lab.example")  # even the right password waits
+    assert locked.status_code == 429 and "Too many failed logins. Try again in 15 minutes." in locked.text
+    assert int(locked.headers["Retry-After"]) > 0
+
+
+def test_the_throttle_counts_per_account_and_per_address_and_forgets_with_time():
+    from slim_lims.security import LoginThrottle
+
+    now = [0.0]
+    throttle = LoginThrottle(per_account=2, per_address=3, window_seconds=60, clock=lambda: now[0])
+    throttle.failed("a", "1.2.3.4")
+    assert throttle.wait_seconds("a", "1.2.3.4") == 0
+    throttle.failed("a", "1.2.3.4")
+    assert throttle.wait_seconds("a", "5.6.7.8") == 60  # the account, from anywhere
+    throttle.failed("b", "1.2.3.4")
+    assert throttle.wait_seconds("c", "1.2.3.4") == 60  # the address, for any account
+    now[0] = 30.5
+    assert throttle.wait_seconds("a", "5.6.7.8") == 30  # rounded up
+    now[0] = 60.0
+    assert throttle.wait_seconds("a", "5.6.7.8") == 0 and throttle.wait_seconds("c", "1.2.3.4") == 0
+
+
+def test_a_successful_login_clears_the_accounts_failures(client, staff_user):
+    for _ in range(4):
+        login(client, "staff@lab.example", "wrong password")
+    assert login(client, "staff@lab.example").status_code == 303
+    client.post("/logout", data={"csrf_token": csrf_from(client.get("/").text)})
+    assert login(client, "staff@lab.example", "wrong password").status_code == 401  # counting afresh

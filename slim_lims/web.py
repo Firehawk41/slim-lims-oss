@@ -28,6 +28,7 @@ def _pop_flashes(request: Request) -> list[list[str]]:
 def render(request: Request, name: str, context: dict[str, Any] | None = None, status_code: int = 200):
     ctx = {
         "current_user": getattr(request.state, "user", None),
+        "current_capabilities": getattr(request.state, "capabilities", frozenset()),
         "flashes": _pop_flashes(request),
         **(context or {}),
     }

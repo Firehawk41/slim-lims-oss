@@ -16,6 +16,9 @@
 
 **Roadmap:** `docs/ROADMAP.md` (departments Admin · Lab · Quality · IT, phases, portfolio). Read it first.
 
+**Dev diary:** `docs/DEV_DIARY.md` records who decided what (Jamie / Claude / found), across every SLIM repo.
+Add a line whenever a decision is made, amended, overruled or argued; keep it short; update the tally now and then.
+
 ## What This Is
 
 SLIM's host app (OSS demo) for an ISO 17025 accredited analytical chemistry lab: the composition
@@ -145,6 +148,7 @@ slim_lims/
 ├── models.py        # SQLAlchemy models: User + TR tables (tr_submissions, tr_samples, ...)
 ├── repositories.py  # TRSubmissionRepository: domain <-> rows, gapless TR numbers, stale-update check
 ├── schemas.py       # Input models (SubmissionIn, SampleIn, StatusChangeIn) — shape/type validation only
+├── scope.py         # Scope.for_user: whose TRs a listing shows; fails closed (slim-data D-103)
 ├── services.py      # SubmissionService: reference-data rules, access rules, submit/list/get/change_status
 ├── reference.py     # ReferenceData protocol, StaticReferenceData (snapshot + form choices)
 ├── reference_cache.py  # ReferenceCache: loads SLIM tables + analysis_catalog, TTL refresh, keeps last good copy
@@ -160,7 +164,10 @@ slim_lims/
 ├── demo_scenarios.py  # slim-data's demo scenarios on real TRs (PortalDemoHost, seed_scenarios); demo seed only
 ├── demo_prep.py     # slim-prep's demo scenario (seed_prep_scenario): one evaporation batch, end to end; demo seed only
 ├── api.py           # /api/submissions JSON API; maps service errors to 422/403/404/409
-├── security.py      # bcrypt hashing, CSRF (csrf_token / csrf_protect), headers + body-size middleware
+├── security.py      # bcrypt hashing, CSRF (csrf_token / csrf_protect), LoginThrottle, headers + body-size middleware
+├── labs.py          # a lab per visitor (DEMO_LABS, slim-data D-102): Labs (claim, spares, sweep), with_schema
+├── demo_seed.py     # seed_demo(url): the whole demo seed (scripts/seed_demo.py and each lab)
+├── labtime.py       # LabClock: the lab's now / today (LAB_TIMEZONE) for host code; app.state.lab_clock
 ├── auth.py          # current_user / require_user / require_staff deps; /login, /logout
 ├── board.py         # the lab board (spec §13): TR cards by stage, chips per sample × analysis
 ├── invoices.py      # Invoice: TR + report issues -> invoicing V5's sales order; sent / paid (tr_invoices)
@@ -193,7 +200,9 @@ docs/SLIM_DOMAIN_V2.md
   initials (unique). SQLite engines use the explicit-BEGIN recipe so its savepoints work.
 - **Auth:** Starlette signed-cookie sessions (`SameSite=Lax`, `Secure` in production), bcrypt.
   Roles: `customer` (must have `customer_id`, a SLIM customer ID) and `staff` (must have
-  `initials` and a `lab_role`: analyst / reviewer / supervisor). No self-registration; staff create users. Customers must already exist in SLIM.
+  `initials` and a `lab_role`: analyst / reviewer / supervisor). No self-registration; users are created by staff with the *manage users* capability
+  (`capabilities.py`, slim-data D-100: supervisors by default, grantable per person in `user_capabilities`;
+  nobody acts on a higher lab role or gives a role above their own). Customers must already exist in SLIM.
   Demo personas (`is_persona`, only with `DEMO_PERSONAS`) are chosen, not logged in: ASSERTED in slim-data,
   refused by /login, no user or role admin.
 - **Machine access:** slim-lims uses `Authorization: Bearer $LIMS_API_TOKEN` (spec §12). Token
@@ -218,7 +227,7 @@ docs/SLIM_DOMAIN_V2.md
   SLIM analyses with no `analysis_catalog` row are never offered. `GET /api/reference` gives the
   form its choices (customers only for staff).
 - **OSS only:** see the banner at the top. `PORTAL_ALLOWED_DB_HOSTS` is for other *demo* hosts.
-- **Dates:** "today" means the lab's local date (`LAB_TIMEZONE`, default America/Chicago). Expected
+- **Dates:** "today" means the lab's local date (`LAB_TIMEZONE`, default America/Chicago; `labtime.LabClock`, slim-data D-101). Expected
   arrival (optional, customer) can't be in the past; `date_received` (staff) can't be in the future.
 - **Demo data only:** dev, tests and the portfolio use the OSS repos' fictional data
   (`slim-report-engine-oss/demo/demo.py`). `scripts/seed_demo.py` never writes into SLIM tables
@@ -240,6 +249,10 @@ docs/SLIM_DOMAIN_V2.md
   the app's equivalent of the VBA/manual log-in. "Reject" = cancel with a reason.
 - Statuses: submitted → received → in progress → partial report (repeatable) → complete report
   → invoiced (terminal, staff only); cancelled (customer may cancel only while submitted).
+  Statuses follow the facts (slim-data D-99): partial / complete report only by issuing a report,
+  invoiced only by sending the invoice; a cancel is refused once a report was issued or a result released,
+  and the modules take no new work for a cancelled TR. **Each time a module is wired, re-check which
+  statuses are still set by hand.**
 - Payment: purchase order (PO number, also used for billing codes) or credit card (lab calls;
   no card data stored).
 - Call-in RUSH = outside business hours. Wafer sizes 200 / 300 mm; units atoms/cm² or

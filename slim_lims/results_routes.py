@@ -57,6 +57,7 @@ from slim_lims.results import (
     reference_lookup,
     report_complete,
     report_document,
+    require_open_tr,
     start_work,
 )
 from slim_lims.schemas import ReEvaluateIn, ResultActionIn, SignOffIn
@@ -246,6 +247,7 @@ def _act(db, user, sample: SampleRef, analyte: AnalyteRef, action: ResultAction,
 
 def _release(db, user, sample: SampleRef, analysis_id: int, data: SignOffIn):
     def run():
+        require_open_tr(db, sample)
         released = wf.release(db, sample, analysis_id, actor_for(user), data.note, data.solo)
         return {
             "sample": str(sample),

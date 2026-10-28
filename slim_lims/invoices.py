@@ -90,7 +90,9 @@ def mark_sent(
         )
     except slim_invoicing.InvoiceRefused as e:
         raise Conflict(str(e)) from e
-    service.change_status(tr_number, StatusChangeIn(to_status=TRStatus.INVOICED, note="invoice sent"), user)
+    service.change_status(
+        tr_number, StatusChangeIn(to_status=TRStatus.INVOICED, note="invoice sent"), user, fact=True
+    )
     row = TRInvoiceRow(
         submission_id=submission.id, sent_on=service.lab_today(), sent_by=user.initials or user.email
     )

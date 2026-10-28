@@ -17,7 +17,8 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from slim_lims.db import get_db
+from slim_lims import capabilities
+from slim_lims.db import LAB_SESSION_KEY, get_db
 from slim_lims.models import User
 from slim_lims.personas import persona_choices
 from slim_lims.security import csrf_protect, verify_password
@@ -88,6 +89,7 @@ def current_user(request: Request, db: Annotated[Session, Depends(get_db)]) -> U
             request.session.pop(SESSION_USER_KEY, None)
             user = None
     request.state.user = user
+    request.state.capabilities = capabilities.effective(db, user) if user is not None else frozenset()
     return user
 
 
@@ -132,17 +134,33 @@ def login(
     password: Annotated[str, Form()],
     next: Annotated[str, Form()] = "/",
 ):
-    user = db.scalars(select(User).where(User.email == email.strip().lower())).first()
+    account = email.strip().lower()
+    address = request.client.host if request.client else "unknown"
+    throttle = request.app.state.login_throttle
+    if wait := throttle.wait_seconds(account, address):  # the password isn't even checked
+        minutes = -(-wait // 60)
+        refused = render(
+            request,
+            "login.html",
+            {"error": f"Too many failed logins. Try again in {minutes} minute{'s' * (minutes != 1)}.",
+             "next": _safe_next(next), "email": email},
+            status_code=429,
+        )  # fmt: skip
+        refused.headers["Retry-After"] = str(wait)
+        return refused
+    user = db.scalars(select(User).where(User.email == account)).first()
     if user is not None and user.is_persona:
         user = None  # personas are chosen on /demo/personas, never signed in with a password
     ok = verify_password(password, user.password_hash if user else None)
     if not ok or user is None or not user.is_active:
+        throttle.failed(account, address)
         return render(
             request,
             "login.html",
             {"error": "Invalid email or password.", "next": _safe_next(next), "email": email},
             status_code=401,
         )
+    throttle.succeeded(account)
     # New session on login: drops any pre-login state and rotates the CSRF token.
     request.session.clear()
     request.session[SESSION_USER_KEY] = str(user.id)
@@ -167,14 +185,37 @@ def continue_as(request: Request, db: Annotated[Session, Depends(get_db)], user_
         persona = None
     if persona is None or not persona.is_persona or not persona.is_active:
         raise HTTPException(status_code=404, detail="No such persona.")
+    labs = request.app.state.labs
+    lab = request.session.get(LAB_SESSION_KEY)
+    if labs is not None and lab is None:  # their first persona: a lab of their own (D-102)
+        lab = labs.claim()
+        with labs.enter(lab)() as lab_db:
+            persona = lab_db.scalars(select(User).where(User.email == persona.email)).one()
     request.session.clear()  # like a login: new session, new CSRF token
+    if lab is not None:
+        request.session[LAB_SESSION_KEY] = lab
     request.session[SESSION_USER_KEY] = str(persona.id)
     return RedirectResponse("/", status_code=303)
 
 
+@router.post("/demo/fresh-lab", name="fresh_lab")
+def fresh_lab(request: Request):
+    """Leaves this lab (it is dropped) for a fresh one at the next persona (D-102)."""
+    labs = request.app.state.labs
+    if labs is None:
+        raise HTTPException(status_code=404, detail="Not Found")
+    if lab := request.session.get(LAB_SESSION_KEY):
+        labs.drop(lab)
+    request.session.clear()
+    return RedirectResponse(request.url_for("demo_personas").path, status_code=303)
+
+
 @router.post("/logout", name="logout")
 def logout(request: Request):
+    lab = request.session.get(LAB_SESSION_KEY)
     request.session.clear()
+    if lab is not None:  # a visitor's lab stays theirs until it idles out (D-102)
+        request.session[LAB_SESSION_KEY] = lab
     return RedirectResponse(request.url_for("login").path, status_code=303)
 
 

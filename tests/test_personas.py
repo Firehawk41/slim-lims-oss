@@ -87,7 +87,8 @@ def test_only_personas_can_be_continued_as(demo_client, personas, staff_user):
 
 def test_personas_cannot_manage_users_or_roles(demo_client, personas, staff_user):
     continue_as(demo_client, personas["sue"])  # a supervisor persona
-    token = csrf_from(demo_client.get("/admin/users").text)
+    token = csrf_from(demo_client.get("/").text)
+    assert demo_client.get("/admin/users").status_code == 403
     created = demo_client.post(
         "/admin/users",
         data={
@@ -100,7 +101,7 @@ def test_personas_cannot_manage_users_or_roles(demo_client, personas, staff_user
     )
     assert "Demo personas can&#39;t manage users" in created.text
     assert (
-        "can&#39;t change lab roles"
+        "can&#39;t manage users"
         in demo_client.post(
             f"/admin/users/{personas['ana'].id}/lab-role", data={"csrf_token": token, "lab_role": 3}
         ).text

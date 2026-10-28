@@ -15,7 +15,7 @@ Errors: the rules or the book refuse -> 422 with every problem; someone else sav
 unknown batch or standard -> 404.
 """
 
-from datetime import UTC, date, datetime
+from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Annotated, Any
 
@@ -46,6 +46,7 @@ from sqlalchemy.orm import Session
 from slim_lims.api import get_reference
 from slim_lims.auth import RequireStaff
 from slim_lims.db import get_db
+from slim_lims.labtime import LabClock, lab_clock
 from slim_lims.prep import PREP_ANALYSES, chemicals, prep_actor_for, rules, send
 from slim_lims.reference import ReferenceData
 from slim_lims.security import csrf_protect
@@ -55,6 +56,7 @@ router = APIRouter(dependencies=[Depends(csrf_protect)])
 api_router = APIRouter(prefix="/api/prep", tags=["prep"], dependencies=[Depends(csrf_protect)])
 DB = Annotated[Session, Depends(get_db)]
 Reference = Annotated[ReferenceData, Depends(get_reference)]
+Clock = Annotated[LabClock, Depends(lab_clock)]
 
 
 async def _form(request: Request) -> dict[str, str]:
@@ -140,7 +142,7 @@ def _standard_json(r) -> dict[str, Any]:
     }
 
 
-def _home(db: Session, reference: ReferenceData, form=None, problems=None) -> dict[str, Any]:
+def _home(db: Session, reference: ReferenceData, today: date, form=None, problems=None) -> dict[str, Any]:
     current = rules(db)
     return {
         "rules": current.rules,
@@ -158,15 +160,15 @@ def _home(db: Session, reference: ReferenceData, form=None, problems=None) -> di
         "standards": [_standard_json(r) for r in books.list_standards(db)],
         "stocks": [r.item for r in books.list_stocks(db)],
         "analyses": [(a.code, a.name) for a in reference.catalog_analyses() if a.code in PREP_ANALYSES],
-        "today": date.today().isoformat(),
+        "today": today.isoformat(),
         "form": form or {},
         "problems": problems or [],
     }
 
 
 @router.get("/prep", name="prep_home")
-def prep_home(request: Request, user: RequireStaff, db: DB, reference: Reference):
-    return render(request, "prep/index.html", _home(db, reference))
+def prep_home(request: Request, user: RequireStaff, db: DB, reference: Reference, clock: Clock):
+    return render(request, "prep/index.html", _home(db, reference, clock.today()))
 
 
 @router.get("/prep/batches/{code}", name="prep_batch")
@@ -198,7 +200,13 @@ def _run_list(db: Session, codes: list[str]):
 
 
 def _grid(
-    db: Session, method: str, analysis: str, code: str, samples: list[str], used: frozenset = frozenset()
+    db: Session,
+    today: date,
+    method: str,
+    analysis: str,
+    code: str,
+    samples: list[str],
+    used: frozenset = frozenset(),
 ) -> dict[str, Any]:
     """The grid's context. Standards still in date are offered, and those the batch already used (a
     correction keeps them, whether or not they have expired since)."""
@@ -206,9 +214,7 @@ def _grid(
     found = current.method(method)
     if found is None:
         raise LookupError(f"no prep method {method!r}")
-    standards = [
-        r.item for r in books.list_standards(db) if r.item.expires >= date.today() or r.item.ref in used
-    ]
+    standards = [r.item for r in books.list_standards(db) if r.item.expires >= today or r.item.ref in used]
     return {
         "method": found,
         "analysis": analysis,
@@ -227,6 +233,7 @@ def prep_new_batch(
     user: RequireStaff,
     db: DB,
     reference: Reference,
+    clock: Clock,
     method: str = "",
     analysis: str = "",
     code: str = "",
@@ -236,10 +243,12 @@ def prep_new_batch(
     try:
         if not (code.strip() and ids):
             raise LookupError("give the batch a code and at least one sample")
-        grid = _grid(db, method, analysis, code.strip(), ids)
+        grid = _grid(db, clock.today(), method, analysis, code.strip(), ids)
     except LookupError as error:
         form = {"method": method, "analysis": analysis, "code": code, "samples": samples}
-        return render(request, "prep/index.html", _home(db, reference, form, [str(error)]), 422)
+        return render(
+            request, "prep/index.html", _home(db, reference, clock.today(), form, [str(error)]), 422
+        )
     return render(request, "prep/new_batch.html", {**grid, "values": {}, "problems": []})
 
 
@@ -283,18 +292,18 @@ def _used(batch: PrepBatch) -> frozenset:
 
 
 @router.get("/prep/batches/{code}/edit", name="prep_edit_batch")
-def prep_edit_batch(request: Request, code: str, user: RequireStaff, db: DB):
+def prep_edit_batch(request: Request, code: str, user: RequireStaff, db: DB, clock: Clock):
     try:
         recorded = books.get_batch(db, code)
     except NotFound:
         return render(request, "error.html", {"message": f"No prep batch {code}."}, 404)
     b = recorded.item
-    grid = _grid(db, b.method, b.analysis, code, [s.sample for s in b.samples], _used(b))
+    grid = _grid(db, clock.today(), b.method, b.analysis, code, [s.sample for s in b.samples], _used(b))
     context = {**grid, "values": _values(b), "problems": [], "version": recorded.version}
     return render(request, "prep/new_batch.html", context)
 
 
-def _batch_from_grid(values: dict[str, str], db: Session, user) -> PrepBatch:
+def _batch_from_grid(values: dict[str, str], db: Session, user, now: datetime) -> PrepBatch:
     """The grid's fields -> a PrepBatch, or PrepRefused with every problem. A correction keeps who
     prepped it and when (and who poured out, unless the initials changed): its own author and reason
     go on the version."""
@@ -304,7 +313,6 @@ def _batch_from_grid(values: dict[str, str], db: Session, user) -> PrepBatch:
         raise LookupError(f"no prep method {values.get('method')!r}")
     by_ref = {f"{s.name}|{s.prepared.isoformat()}": s for s in (r.item for r in books.list_standards(db))}
     problems: list[str] = []
-    now = datetime.now(UTC)
     samples = []
     i = 0
     while f"sample_{i}" in values:
@@ -365,11 +373,11 @@ def _batch_from_grid(values: dict[str, str], db: Session, user) -> PrepBatch:
 
 
 @router.post("/prep/batches", name="prep_save_batch")
-def prep_save_batch(request: Request, user: RequireStaff, db: DB, values: Form_):
+def prep_save_batch(request: Request, user: RequireStaff, db: DB, values: Form_, clock: Clock):
     expected = _expected(values)
 
     def save():
-        batch = _batch_from_grid(values, db, user)
+        batch = _batch_from_grid(values, db, user, clock.now())
         reason = values.get("reason") or None
         return record_batch(db, batch, rules(db).id, prep_actor_for(user), expected, reason)
 
@@ -385,7 +393,13 @@ def prep_save_batch(request: Request, user: RequireStaff, db: DB, values: Form_)
         except NotFound:
             used = frozenset()
         grid = _grid(
-            db, values.get("method", ""), values.get("analysis", ""), values.get("code", ""), ids, used
+            db,
+            clock.today(),
+            values.get("method", ""),
+            values.get("analysis", ""),
+            values.get("code", ""),
+            ids,
+            used,
         )
         context = {**grid, "values": values, "problems": refused.problems}
         if expected:
@@ -422,6 +436,7 @@ def prep_make_standard(
     user: RequireStaff,
     db: DB,
     reference: Reference,
+    clock: Clock,
     step: Annotated[str, Form(max_length=210)] = "",
     source: Annotated[str, Form(max_length=200)] = "",
     prepared: Annotated[str, Form(max_length=10)] = "",
@@ -432,7 +447,10 @@ def prep_make_standard(
         _guard(db, lambda: _make_standard(db, user, step, source, prepared, tuple(pipettes or ())))
     except Refused as refused:
         return render(
-            request, "prep/index.html", _home(db, reference, form, refused.problems), refused.status
+            request,
+            "prep/index.html",
+            _home(db, reference, clock.today(), form, refused.problems),
+            refused.status,
         )
     flash(request, "Standard recorded.", "success")
     return RedirectResponse(request.url_for("prep_home"), status_code=303)
@@ -451,6 +469,15 @@ def _make_standard(db: Session, user, step: str, source: str, prepared: str, pip
 
 
 # ---------------------------------------------------------------- JSON API
+
+
+def _in_lab_time(batch: PrepBatch, clock: LabClock) -> PrepBatch:
+    """The batch's times in the lab's zone: slim-prep dates the prep (a standard's expiry) by them."""
+
+    def local(step: StepRecord | None) -> StepRecord | None:
+        return step if step is None else step.model_copy(update={"at": clock.local(step.at)})
+
+    return batch.model_copy(update={"prep": local(batch.prep), "pour_out": local(batch.pour_out)})
 
 
 class BatchIn(BaseModel):
@@ -484,9 +511,9 @@ def api_batch(code: str, user: RequireStaff, db: DB):
 
 
 @api_router.post("/batches", status_code=201)
-def api_save_batch(data: BatchIn, user: RequireStaff, db: DB):
+def api_save_batch(data: BatchIn, user: RequireStaff, db: DB, clock: Clock):
     def save():
-        batch = PrepBatch.model_validate(data.batch)
+        batch = _in_lab_time(PrepBatch.model_validate(data.batch), clock)
         record_batch(db, batch, rules(db).id, prep_actor_for(user), data.expected_version, data.reason)
         return batch.code
 

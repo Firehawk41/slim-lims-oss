@@ -28,6 +28,7 @@ from slim_lims.models import User
 from slim_lims.reference import WATER_CHEMICAL_NAME, ReferenceData
 from slim_lims.repositories import StaleSubmission, SubmissionPage, TRSubmissionRepository
 from slim_lims.schemas import CheckInIn, ChemicalMatchIn, SampleIn, StatusChangeIn, SubmissionIn
+from slim_lims.scope import Scope
 
 
 @dataclass(frozen=True)
@@ -68,6 +69,16 @@ def _utcnow() -> datetime:
     return datetime.now(UTC)
 
 
+# Statuses that stand for a fact another part of the system makes (D-99): a person never sets them by
+# hand. The action that makes the fact moves the TR (`fact=True`); the LIMS (spec §12) issues reports
+# itself, so its token may set the report statuses.
+FACT_STATUSES = {
+    TRStatus.PARTIAL_REPORT: "issuing a report",
+    TRStatus.COMPLETE_REPORT: "issuing a report",
+    TRStatus.INVOICED: "sending its invoice",
+}
+
+
 class SubmissionService:
     def __init__(
         self,
@@ -75,11 +86,15 @@ class SubmissionService:
         reference: ReferenceData,
         clock: Callable[[], datetime] = _utcnow,
         lab_timezone: str = "America/Chicago",
+        cancel_check: Callable[[str], str | None] | None = None,
     ) -> None:
+        """`cancel_check(tr_number)` says why the modules won't let a TR be cancelled (a report was
+        issued, a result released), or None; the host wires it (D-99)."""
         self.repo = repo
         self.reference = reference
         self.clock = clock
         self.lab_tz = ZoneInfo(lab_timezone)
+        self.cancel_check = cancel_check
 
     def lab_today(self) -> date:
         return self.clock().astimezone(self.lab_tz).date()
@@ -211,10 +226,8 @@ class SubmissionService:
             raise NotFound(tr_number)
         return submission
 
-    def list(self, user: User, **filters) -> SubmissionPage:
-        if not user.is_staff:
-            filters["customer_id"] = user.customer_id
-        return self.repo.list(**filters)
+    def list(self, user: User, customer_id: int | None = None, **filters) -> SubmissionPage:
+        return self.repo.list(Scope.for_user(user, customer_id), **filters)
 
     # ------------------------------------------------------------ status
 
@@ -247,10 +260,21 @@ class SubmissionService:
         except StaleSubmission as e:
             raise Conflict(f"{tr_number} was changed by someone else; reload and try again") from e
 
-    def change_status(self, tr_number: str, data: StatusChangeIn, user: User) -> TRSubmission:
+    def change_status(
+        self, tr_number: str, data: StatusChangeIn, user: User, *, fact: bool = False
+    ) -> TRSubmission:
+        """`fact`: the caller is the action that makes the status true (issuing a report, sending the
+        invoice); without it a person may not set a fact status (D-99)."""
         if data.to_status is TRStatus.RECEIVED:
             raise Conflict("requests are received by checking them in (POST .../check-in)")
+        how = FACT_STATUSES.get(data.to_status)
+        if how and not fact and not user.is_service:
+            raise Conflict(f"a request becomes {data.to_status.label.lower()} by {how}, not by hand")
         before = self.get(tr_number, user)
+        if data.to_status is TRStatus.CANCELLED and self.cancel_check is not None:
+            why = self.cancel_check(tr_number)
+            if why:
+                raise Conflict(f"{tr_number} can't be cancelled: {why}")
         received_by = data.received_by
         if data.to_status is TRStatus.RECEIVED and not received_by and user.is_staff:
             received_by = user.initials
@@ -290,7 +314,7 @@ class SubmissionService:
 
 
 def _can_see(user: User, submission: TRSubmission) -> bool:
-    return user.is_staff or submission.customer_id == user.customer_id
+    return Scope.for_user(user).allows(submission.customer_id)
 
 
 def _to_sample(position: int, s: SampleIn, chemical_id: int | None, chemical_name: str) -> TRSample:

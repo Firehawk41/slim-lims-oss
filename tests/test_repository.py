@@ -8,6 +8,7 @@ from slim_lims.db import make_session_factory
 from slim_lims.domain import RequestType, TRStatus, transition
 from slim_lims.models import TRSubmissionRow
 from slim_lims.repositories import StaleSubmission, TRSubmissionRepository
+from slim_lims.scope import Scope
 from tests.conftest import postgres_only
 from tests.factories import NOW, STAFF_ACTOR, TIME_LIMITED, sample, submission, wafer_sample
 
@@ -128,10 +129,10 @@ def test_list_filters_and_paginates(repo, db):
     repo.add(submission(customer_id=2))
     repo.add(submission(customer_id=2, request_type=RequestType.WAFER, samples=(wafer_sample(1),)))
     db.commit()
-    assert repo.list(customer_id=2).total == 2
-    assert repo.list(request_type=RequestType.WAFER).total == 1
-    assert repo.list(status=TRStatus.CANCELLED).total == 0
-    page = repo.list(per_page=2, page=2)
+    assert repo.list(Scope(2)).total == 2
+    assert repo.list(Scope(None), request_type=RequestType.WAFER).total == 1
+    assert repo.list(Scope(None), status=TRStatus.CANCELLED).total == 0
+    page = repo.list(Scope(None), per_page=2, page=2)
     assert page.total == 5
     assert [s.tr_number for s in page.items] == ["TR00003", "TR00002"]
 

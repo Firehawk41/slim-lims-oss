@@ -20,5 +20,14 @@
   {% else %}
     <p class="muted">No personas are set up (run the demo seed).</p>
   {% endif %}
+  {% if request.app.state.labs %}
+    <p>This lab is yours alone: nobody else sees what you do here, and it is cleared after an hour idle.</p>
+    {% if request.session.get("lab") %}
+      <form method="post" action="{{ url_for('fresh_lab') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+        <button type="submit" class="btn btn--secondary">Start again with a fresh lab</button>
+      </form>
+    {% endif %}
+  {% endif %}
   <p class="hint">Staff with a real account: <a href="{{ url_for('login') }}">log in</a>.</p>
 {% endblock %}

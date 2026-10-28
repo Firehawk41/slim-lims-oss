@@ -32,6 +32,7 @@ from slim_prep.service.handoff import send_correction, send_to_results, sent_ver
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
+from slim_lims.domain import TRStatus
 from slim_lims.models import LAB_ROLE_SUPERVISOR, TRSampleRow, TRSubmissionRow, User
 from slim_lims.reference import ReferenceData
 from slim_lims.results import SEED_ACTOR, actor_for, reference_lookup
@@ -105,6 +106,9 @@ def send(session: Session, code: str, user: User, reference: ReferenceData, spec
     """Sends the batch to slim-data (first time) or its correction (after), then re-evaluates the batch
     there if it has readings. Raises slim-prep's PrepRefused / NotFound, or LookupError."""
     batch = books.get_batch(session, code).item
+    cancelled = [s.sample for s in batch.samples if _cancelled(session, s.sample)]
+    if cancelled:  # D-99: a cancelled TR takes no new work
+        raise LookupError(f"{', '.join(cancelled)}: the request was cancelled")
     analysis = next((a for a in reference.catalog_analyses() if a.code == batch.analysis), None)
     if analysis is None or batch.analysis not in PREP_ANALYSES:
         raise LookupError(f"analysis {batch.analysis!r} can't take prep batches here")
@@ -134,3 +138,12 @@ def send(session: Session, code: str, user: User, reference: ReferenceData, spec
         "changed": changed,
         "evaluated": evaluated,
     }
+
+
+def _cancelled(session: Session, sample_id: str) -> bool:
+    status = session.scalar(
+        select(TRSubmissionRow.status).where(
+            TRSubmissionRow.tr_number == SampleRef.parse(sample_id).tr_number
+        )
+    )
+    return status is not None and TRStatus(status) is TRStatus.CANCELLED

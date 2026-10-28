@@ -164,7 +164,10 @@ def seed_scenarios(
             complete = report_complete(report_view(session, tr_number), service.get(tr_number, sue))
             target = TRStatus.COMPLETE_REPORT if complete else TRStatus.PARTIAL_REPORT
             service.change_status(
-                tr_number, StatusChangeIn(to_status=target, note=f"report issue {issues[-1].id}"), sue
+                tr_number,
+                StatusChangeIn(to_status=target, note=f"report issue {issues[-1].id}"),
+                sue,
+                fact=True,
             )
     # The board's invoice columns (spec §13): one invoice sent, one paid, priced from the demo price list.
     seed_demo_quotes(session, reference, now.date())

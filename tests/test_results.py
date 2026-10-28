@@ -343,7 +343,7 @@ def test_demo_rules_refuse_a_catalog_without_ten_elements(app, db):
 
 
 def _users_form(client):
-    return csrf_from(client.get("/admin/users").text)
+    return csrf_from(client.get("/").text)
 
 
 def test_supervisor_sets_lab_roles(client, lab):
@@ -358,24 +358,57 @@ def test_supervisor_sets_lab_roles(client, lab):
     assert lab.get(User, analyst_id).lab_role == LAB_ROLE_REVIEWER
 
 
-def test_only_a_supervisor_changes_lab_roles(app, lab):
+def test_managing_users_is_a_supervisors_capability_by_default(app, lab):  # D-100
     with TestClient(app) as client:
         login(client, "an@lab.example")
-        boss = lab.scalars(select(User).where(User.initials == "JM")).one()
+        assert client.get("/admin/users").status_code == 403
+        assert '/admin/users">Users</a>' not in client.get("/").text
+        boss = lab.scalars(select(User.id).where(User.initials == "JM")).one()
+        lab.rollback()
         response = client.post(
-            f"/admin/users/{boss.id}/lab-role",
+            f"/admin/users/{boss}/lab-role",
             data={"csrf_token": _users_form(client), "lab_role": LAB_ROLE_ANALYST},
         )
-        assert "Only a supervisor" in response.text
-        form = {
-            "csrf_token": _users_form(client),
-            "email": "new@lab.example",
-            "role": "staff",
-            "password": PASSWORD,
-            "initials": "NW",
-            "lab_role": LAB_ROLE_REVIEWER,
-        }
-        assert "Only a supervisor" in client.post("/admin/users", data=form).text
+        assert "Managing users needs the capability" in response.text
+        deactivate = client.post(f"/admin/users/{boss}/active", data={"csrf_token": _users_form(client)})
+        assert "Managing users needs the capability" in deactivate.text
+        lab.expire_all()
+        assert lab.get(User, boss).is_active
+
+
+def test_a_supervisor_grants_user_admin_to_an_analyst_within_limits(app, lab):  # D-100
+    an, rv, boss = (lab.scalars(select(User.id).where(User.initials == i)).one() for i in ("AN", "RV", "JM"))
+    lab.rollback()  # end the test's read before the app writes (SQLite locks)
+    with TestClient(app) as sup, TestClient(app) as analyst:
+        login(sup, "staff@lab.example")
+        token = _users_form(sup)
+        granted = sup.post(
+            f"/admin/users/{an}/capabilities",
+            data={"csrf_token": token, "capability": "manage_users", "grant": "1"},
+        )
+        assert "may now: manage users" in granted.text
+
+        login(analyst, "an@lab.example")
+        page = analyst.get("/admin/users")
+        assert page.status_code == 200 and '/admin/users">Users</a>' in page.text
+        token = csrf_from(page.text)
+        form = {"csrf_token": token, "email": "new@lab.example", "role": "staff", "password": PASSWORD,
+                "initials": "NW", "lab_role": LAB_ROLE_REVIEWER}  # fmt: skip
+        assert "above their own" in analyst.post("/admin/users", data=form).text
+        made = analyst.post("/admin/users", data={**form, "lab_role": LAB_ROLE_ANALYST})
+        assert "Created staff user new@lab.example" in made.text
+        for target in (rv, boss):  # higher roles are out of reach
+            refused = analyst.post(f"/admin/users/{target}/active", data={"csrf_token": token})
+            assert "higher lab role" in refused.text
+        regrant = analyst.post(
+            f"/admin/users/{rv}/capabilities",
+            data={"csrf_token": token, "capability": "manage_users", "grant": "1"},
+        )
+        assert "Only someone who holds it by their lab role can grant it" in regrant.text
+
+        take_back = {"csrf_token": _users_form(sup), "capability": "manage_users", "grant": "0"}
+        sup.post(f"/admin/users/{an}/capabilities", data=take_back)
+        assert analyst.get("/admin/users").status_code == 403
 
 
 def test_staff_initials_are_unique(client, lab):
@@ -778,3 +811,31 @@ def test_the_api_takes_a_qtegra_export_with_its_options(client, lab):
     ]
     missing = client.post("/api/results/imports?kind=qtegra", files=files)
     assert missing.status_code == 422 and "prep batch" in missing.json()["detail"]
+
+
+# ---------------------------------------------------------------- D-99: a cancel the modules can stand behind
+
+
+def test_a_tr_with_released_results_or_a_report_cant_be_cancelled(app, lab):
+    released(app, 1)
+    with staff_api(app, "RV") as rv:
+        refused = rv.post("/api/submissions/TR00001/status", json={"to_status": TRStatus.CANCELLED})
+        assert refused.status_code == 409 and "results were released for it" in refused.json()["detail"]
+        rv.post("/api/results/reports/TR00001/issue")
+        refused = rv.post("/api/submissions/TR00001/status", json={"to_status": TRStatus.CANCELLED})
+        assert refused.status_code == 409 and "a report was issued for it" in refused.json()["detail"]
+
+
+def test_a_cancelled_tr_takes_no_decisions_or_releases(app, lab):
+    with staff_api(app, "AN") as an, staff_api(app, "RV") as rv:
+        upload(an, csv())
+        rv.post("/api/results/batches/PB-1/review", json={})
+        cancelled = rv.post("/api/submissions/TR00001/status", json={"to_status": TRStatus.CANCELLED})
+        assert cancelled.status_code == 200  # drafts and reviews don't block a cancel
+        release = rv.post("/api/results/samples/TR00001-01/analyses/5/release", json={})
+        assert release.status_code == 409 and "TR00001 was cancelled" in release.json()["detail"]
+        accept = rv.post(
+            "/api/results/samples/TR00001-02/analyses/5/analytes/Fe/accept",
+            json={"reason_category": "MDL taken from the method validation"},
+        )
+        assert accept.status_code == 409 and "cancelled" in accept.json()["detail"]
