@@ -6,6 +6,7 @@ from typing import Any
 from fastapi import Request
 from fastapi.templating import Jinja2Templates
 
+from slim_lims import __version__
 from slim_lims.security import csrf_token
 
 PACKAGE_DIR = Path(__file__).resolve().parent
@@ -13,6 +14,7 @@ STATIC_DIR = PACKAGE_DIR / "static"
 
 templates = Jinja2Templates(directory=PACKAGE_DIR / "templates")
 templates.env.globals["csrf_token"] = csrf_token
+templates.env.globals["app_version"] = __version__
 
 _FLASH_KEY = "_flashes"
 

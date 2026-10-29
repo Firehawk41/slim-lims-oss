@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from slim_lims import about
+from slim_lims import __version__, about
 from slim_lims.main import create_app
 from slim_lims.personas import sync_personas
 from tests.conftest import login, make_settings
@@ -44,6 +44,7 @@ def test_the_landing_page_starts_a_persona_in_one_click(demo_client):
 def test_the_landing_page_keeps_the_csp_and_shows_the_diagram(demo_client):
     page = demo_client.get("/about").text
     assert "<script" not in page and " style=" not in page  # no inline script or style (CSP)
+    assert f"YourLab running SlimLIMS v{__version__}" in page
     assert '<svg class="arch"' in page and "SlimLIMS architecture by department" in page
 
 
