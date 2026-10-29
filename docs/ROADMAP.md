@@ -13,9 +13,9 @@ package or import follows them.
 | Department | Covers | Modules today | Planned |
 |---|---|---|---|
 | **Admin** | Requests and the customer's view, quotes, invoicing, reports and their delivery | `slim-lims-oss` request and customer screens; invoicing V5 (`SLIM-Invoicing-Program/V5-LIMS-Module`); `slim-report-engine-oss` | Quote screens; report delivery (email) and PDF |
-| **Lab** | Check-in, sample custody, prep, instrument data in, results, report sign-off | `slim-data-oss` | `slim-samples` (custody, storage, retention); `slim-prep` (bench prep); instrument readers in slim-data; signatory step |
+| **Lab** | Check-in, sample custody, prep, instrument data in, results, report sign-off | `slim-data-oss` (readers `qtegra/1`, `paste/1`, `generic_csv/1`); `slim-prep-oss` (the prep book) | `slim-samples` (custody, storage, retention); signatory step |
 | **Quality** | QC trends, nonconformities and corrective actions, complaints, proficiency testing, equipment, competence, audits, validation | slim-domain's audit log; slim-data's `verify` | `slim-quality` |
-| **IT** | Reference data, logins, the app shell, operations | `slim-domain-oss`; the `slim-lims-oss` host | Password reset / MFA; VPS docker-compose, backups, monitoring |
+| **IT** | Reference data, logins, the app shell, operations | `slim-domain-oss`; the `slim-lims-oss` host | Password reset / MFA; VPS docker-compose, backups, monitoring (login rate limiting done, D-101) |
 
 Report sign-off is a Lab act (ISO 17025 §7.8) even though reports sit in Admin: the signatory step lives
 with the lab, delivery with Admin.
@@ -46,21 +46,20 @@ with the lab, delivery with Admin.
 | # | Department | Work | Why now |
 |---|---|---|---|
 | 0 | IT | ✅ **Jamie:** make slim-lims-oss public; delete the old Render service, `labportal-db` and the old Blueprint, then a new Blueprint from slim-lims-oss (database `slim-lims-db`); archive LabPortal; drop the slim-lims pair from any local "sync private → OSS" instruction. ✅ **Claude:** stale docs ("portal" → the app), invoicing in the README, ruff in slim-lims-oss CI (2026-10-26) | The live demo shows what's built |
-| 1 | Lab | ◐ QC sample roles in slim-data ✅ (D-87: CHECK / CRM, `qc_check@1`). `slim-prep`: prep batches, weights and volumes (dilution calculated, not typed), spike amounts with standard lot and expiry, balance and pipette used, who and when, the instrument run list; hands the batch to slim-data's existing batch API. QC sample roles in slim-data (check standard, CRM). One or two instrument file readers | Quality trends need this data |
-| 2 | Quality | `slim-quality` part 1, read-only: QC control charts (Westgard), trends per instrument, analyst, method (pooled precision → uncertainty, §7.6) and customer (turnaround, spec exceedances, a customer's own lot trend). Demo history: months of QC on two instruments with a planted drift, kept off the board. The software validation pack (§7.11) | The third standalone portfolio piece |
-| 3 | Admin + IT | Landing page and architecture diagram (by department) for the sandbox | A visitor understands it in 30 seconds |
+| 1 | Lab | ✅ QC sample roles in slim-data (D-87: CHECK / CRM, `qc_check`). `slim-prep`: prep batches, weights and volumes (dilution calculated, not typed), spike amounts with standard lot and expiry, balance and pipette used, who and when, the instrument run list; hands the batch to slim-data (D-95, D-96, D-105). Instrument readers `qtegra/1` and `paste/1` (D-88, D-89) | Quality trends need this data |
+| 2 | Admin + IT | Landing page and architecture diagram (by department) for the sandbox | A visitor understands it in 30 seconds; the sandbox is already public (swapped ahead of Quality, 2026-10-29) |
+| 3 | Quality | `slim-quality` part 1, read-only: QC control charts (Westgard), trends per instrument, analyst, method (pooled precision → uncertainty, §7.6) and customer (turnaround, spec exceedances, a customer's own lot trend). Demo history: months of QC on two instruments with a planted drift, kept off the board. The software validation pack (§7.11) | The third standalone portfolio piece |
 | 4 | Lab + Admin | `slim-samples`: condition on receipt, labels, storage, retention and disposal (§7.4); check-in moves here from the host. Report signatory (Lab), delivery by email and PDF (Admin) | Completes the sample's journey |
 | 5 | Quality | `slim-quality` part 2: nonconformities and corrective actions (§7.10, §8.7, raised from exceptions and amendments), complaints (§7.9), proficiency testing (§7.7.2), equipment and reference materials (§6.4, §6.5), competence (§6.2), risks (§8.5), internal audits and the management review pack (§8.8, §8.9). Quality-manager persona | A quality manager's dream |
-| 6 | Admin + IT | Quote screens (create, expire, customer requests a quote); reference-data upkeep (customers, chemicals, analyses, specs); password reset, MFA, login rate limiting | Day-to-day completeness |
+| 6 | Admin + IT | Quote screens (create, expire, customer requests a quote); reference-data upkeep (customers, chemicals, analyses, specs); password reset, MFA (login rate limiting done, D-101) | Day-to-day completeness |
 | 7 | IT | Ecosystem docker-compose for the VPS (Caddy, Postgres, the app), backups, monitoring | Agreed to come last |
 
 ## Open questions
 
 - ~~Samples and prep: one module or two?~~ Two, decided (slim-data D-86): `slim-prep` now (repo
   `slim-prep-oss`), `slim-samples` in phase 4.
-- **Prep book layout:** Jamie describes the bench's real steps and columns; the OSS version is invented
-  from that (D-86). slim-prep waits for it.
-- **Landing page timing:** phase 3 as drafted; earlier if a recruiter may look soon.
+- ~~Prep book layout~~ Settled: slim-prep is built from Jamie's description of the bench (D-86).
+- ~~Landing page timing~~ Phase 2, ahead of Quality (2026-10-29): the sandbox is already public.
 
 ## Where things are
 

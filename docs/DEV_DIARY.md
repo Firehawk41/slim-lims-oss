@@ -74,6 +74,13 @@ Tally and themes are updated now and then at the bottom.
 | C✓ | `docs/REVIEW_CHECKLIST.md`: ten fixed lenses; a module review when wired, an app review every two or three modules; every fixed finding ends in a guard test. | Reviews look for new holes, not old ones. |
 | C✓ | The three CLAUDE.md files say only what is true now; history stays in DECISIONS, the diary and git. | slim-lims's went from 22.7 kB to about 9 kB. |
 
+## 2026-10-29: roadmap clean-up
+
+| Kind | What | Notes |
+|---|---|---|
+| F | Phase 1 was done but still marked ◐; the prep-book and landing-page questions were stale; slim-data's CLAUDE.md still named the readers as next. | Claude first misread a stale local branch as "M2 part 2 next". |
+| C✓ | Landing page and architecture diagram move ahead of slim-quality (now phase 2); phase 6 stays after Quality. | The sandbox is already public with no 30-second explanation; quotes, reference upkeep and password reset add little for a visitor (no email in the sandbox). |
+
 ## Themes so far
 - **Domain facts are Jamie's, and they overrule Claude's defaults:** DF < 1, MDL averaging, standards as
   recipes, spike placement. Claude's "cautious" engineering defaults were wrong more than once where
