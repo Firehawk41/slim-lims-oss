@@ -50,13 +50,14 @@ def prep(lab, reference):  # noqa: F811
 
 
 def _standards(client, token):
+    today = client.app.state.lab_clock.today()  # the lab's day, not the machine's
     for step, source in (
         ("multi-element spike|20 ppm", "stock|Multi-element stock A|DEMO-0001"),
-        ("multi-element spike|50 ppb", f"standard|20 ppm|{TODAY.isoformat()}"),
+        ("multi-element spike|50 ppb", f"standard|20 ppm|{today.isoformat()}"),
     ):
         made = client.post(
             "/prep/standards",
-            data={"csrf_token": token, "step": step, "source": source, "prepared": TODAY.isoformat(),
+            data={"csrf_token": token, "step": step, "source": source, "prepared": today.isoformat(),
                   "pipettes": "P1000-1"},
         )  # fmt: skip
         assert made.status_code == 200 and "Standard recorded." in made.text, made.text
@@ -71,6 +72,7 @@ def _staff_id(session, initials="AN") -> str:
 def _grid(token, client, pour_out, gross="12.5000", final="2.6000", samples=("TR00001-01", "TR00001-02")):
     """The grid as the screen posts it: prepped an hour ago (lab time), poured out by `pour_out` (an id)."""
     at = f"{client.app.state.lab_clock.now() - timedelta(hours=1):%Y-%m-%dT%H:%M}"
+    today = client.app.state.lab_clock.today()  # the standard was made the lab's day
     values = {"csrf_token": token, "code": "PREP-0001", "method": "evaporation",
               "analysis": "10_elements_icpms", "balance": "BAL-1", "pour_out": pour_out, "pour_out_at": at,
               "prep_at": at}  # fmt: skip
@@ -79,7 +81,7 @@ def _grid(token, client, pour_out, gross="12.5000", final="2.6000", samples=("TR
         for n in (1, 2, 3):
             k = f"c_{i}_{n}"
             values |= {f"{k}_tare": "2.0000", f"{k}_cap": "0.5000", f"{k}_gross": gross, f"{k}_final": final}
-        values |= {f"c_{i}_3_s0_standard": f"50 ppb|{TODAY.isoformat()}", f"c_{i}_3_s0_volume": "10",
+        values |= {f"c_{i}_3_s0_standard": f"50 ppb|{today}", f"c_{i}_3_s0_volume": "10",
                    f"c_{i}_3_s0_pipette": "P100-1"}  # fmt: skip
     return values
 
