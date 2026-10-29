@@ -16,7 +16,7 @@
 <body class="{% if current_user and current_user.is_staff %}admin-theme {% endif %}{% block body_class %}{% endblock %}">
   <header class="site-header">
     <div class="site-header__inner">
-      <a href="{{ url_for('index') }}" class="site-header__brand">YourLab</a>
+      <a href="{{ url_for('index') }}" class="site-header__brand">YourLab <span class="site-header__product">SlimLIMS</span></a>
       <nav class="site-header__nav" aria-label="Main navigation">
         {% block nav %}
           {% if current_user %}
@@ -33,6 +33,7 @@
               <a href="{{ url_for('new_request') }}">New request</a>
             {% endif %}
             {% if request.app.state.settings.demo_personas %}
+              <a href="{{ url_for('about') }}">About</a>
               <a href="{{ url_for('demo_personas') }}">Switch persona</a>
             {% endif %}
             <form method="post" action="{{ url_for('logout') }}" class="nav-form">
@@ -40,6 +41,7 @@
               <button type="submit" class="nav-link-button">Logout</button>
             </form>
           {% else %}
+            <a href="{{ url_for('about') }}">About</a>
             <a href="{{ url_for('login') }}">Login</a>
           {% endif %}
         {% endblock %}
@@ -60,7 +62,7 @@
 
   <footer class="site-footer">
     <div class="site-footer__contact">
-      <p>&copy; YourLab. All rights reserved.</p>
+      <p>YourLab running SlimLIMS v{{ app_version }}</p>
     </div>
   </footer>
   {% block scripts %}{% endblock %}

@@ -418,3 +418,11 @@ input[type="radio"] {
   font-size: 0.9em;
   opacity: 0.9;
 }
+
+.site-header__product {
+  font-size: 0.6em;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+  margin-left: 0.35em;
+}

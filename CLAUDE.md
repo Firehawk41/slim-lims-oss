@@ -47,7 +47,7 @@ slim-report-engine (the report template). Each keeps its own tables and Alembic 
 shared database; `cli migrate` and the seed run them all.
 
 **Open:** deeper report-engine wiring (spec §13; changes other repos, needs the go-ahead); ecosystem
-docker-compose for the VPS (**deferred, do not start**); next: roadmap phase 2, the landing page and architecture diagram (`docs/ROADMAP.md`).
+docker-compose for the VPS (**deferred, do not start**); the landing page (`/about`) is live with placeholders; Jamie writes its words in `templates/about/_copy.html`; then roadmap phase 3 (`docs/ROADMAP.md`).
 
 ## How to run
 
@@ -95,6 +95,7 @@ slim_lims/
 ├── invoices.py, demo_prices.py    # invoicing V5; /invoices
 ├── reports.py       # issued reports: engine_renderer / plain_renderer, report_files
 ├── board.py         # the lab board (spec §13)
+├── about.py         # the landing page's facts (/about; its words: templates/about/_copy.html, Jamie's)
 ├── personas.py, demo_scenarios.py, demo_prep.py  # demo personas and seeded scenarios
 ├── api.py           # /api/submissions; service errors -> 422/403/404/409
 ├── routes.py, web.py, templates/, static/        # pages

@@ -81,6 +81,14 @@ Tally and themes are updated now and then at the bottom.
 | F | Phase 1 was done but still marked ◐; the prep-book and landing-page questions were stale; slim-data's CLAUDE.md still named the readers as next. | Claude first misread a stale local branch as "M2 part 2 next". |
 | C✓ | Landing page and architecture diagram move ahead of slim-quality (now phase 2); phase 6 stays after Quality. | The sandbox is already public with no 30-second explanation; quotes, reference upkeep and password reset add little for a visitor (no email in the sandbox). |
 
+## 2026-10-29: the landing page
+
+| Kind | What | Notes |
+|---|---|---|
+| J | Audience: hiring managers and HR, even if it is later sent to LIMS companies. | Engineering points get a line and a link; no chemistry assumed. |
+| J | Jamie writes every word of the page's prose: "we don't [want] AI slop in a portfolio piece". | Claude ships the structure, diagram and tests; the words sit in one file (`templates/about/_copy.html`) as short placeholders. Jamie then chose to merge with the placeholders and write later. |
+| J | Names: SlimLIMS for the software, YourLab for the fictional lab running it. | Header "YourLab SlimLIMS"; footer "YourLab running SlimLIMS v0.1.0" (the app version; Jamie); the landing page is titled SlimLIMS. |
+
 ## Themes so far
 - **Domain facts are Jamie's, and they overrule Claude's defaults:** DF < 1, MDL averaging, standards as
   recipes, spike placement. Claude's "cautious" engineering defaults were wrong more than once where

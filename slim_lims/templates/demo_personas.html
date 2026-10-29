@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import persona_buttons with context %}
 
 {% block title %}Demo personas — YourLab{% endblock %}
 
@@ -8,15 +9,7 @@
     <em>claimed</em> to be them (ASSERTED), never that you logged in. Switch at any time: four-eyes means
     whoever entered results can't review them, so try reviewing as someone else.</p>
   {% if personas %}
-    <div class="choice-row">
-      {% for persona, label in personas %}
-        <form method="post" action="{{ url_for('continue_as') }}">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
-          <input type="hidden" name="user_id" value="{{ persona.id }}">
-          <button type="submit" class="btn {{ 'btn--primary' if current_user and current_user.id == persona.id else 'btn--secondary' }}">{{ label }}</button>
-        </form>
-      {% endfor %}
-    </div>
+    {{ persona_buttons(personas) }}
   {% else %}
     <p class="muted">No personas are set up (run the demo seed).</p>
   {% endif %}

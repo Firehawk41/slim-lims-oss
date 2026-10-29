@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% from "_macros.html" import persona_buttons with context %}
+{% import "about/_copy.html" as copy %}
+
+{% block title %}SlimLIMS{% endblock %}
+{% block extra_head %}<link href="{{ url_for('static', path='css/about.css') }}" rel="stylesheet" />{% endblock %}
+
+{% block content %}
+  <section class="about-hero">
+    <h1>SlimLIMS</h1>
+    {{ copy.intro }}
+    {% if personas %}
+      {{ copy.try_it }}
+      {{ persona_buttons(personas) }}
+    {% endif %}
+  </section>
+
+  <section class="about-section" id="tour">
+    <h2>Follow one request</h2>
+    {{ copy.tour_intro }}
+    <ol class="about-tour">
+      {% for step in tour %}
+        <li>
+          <span class="about-tour__who">{{ step.persona }}</span>
+          <span class="about-tour__where">{{ step.screen }}</span>
+          <span class="placeholder">{{ copy.tour_steps[loop.index0] }}</span>
+        </li>
+      {% endfor %}
+    </ol>
+  </section>
+
+  <section class="about-section" id="architecture">
+    <h2>How it fits together</h2>
+    {{ copy.architecture }}
+    {% include "about/_diagram.svg" %}
+  </section>
+
+  <section class="about-section" id="highlights">
+    <h2>Worth a look</h2>
+    <ul class="about-highlights">
+      {% for item in highlights %}
+        <li>
+          <strong>{{ item.title }}</strong>
+          <span class="placeholder">{{ copy.highlights[loop.index0] }}</span>
+          <span class="about-links">
+            {% for link in item.links %}<a href="{{ link.url }}" rel="noopener">{{ link.text }}</a>{% endfor %}
+          </span>
+        </li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <section class="about-section" id="built">
+    <h2>How it was built</h2>
+    {{ copy.how_built }}
+    <ul class="about-repos">
+      {% for link in repos %}<li><a href="{{ link.url }}" rel="noopener">{{ link.text }}</a></li>{% endfor %}
+    </ul>
+  </section>
+{% endblock %}

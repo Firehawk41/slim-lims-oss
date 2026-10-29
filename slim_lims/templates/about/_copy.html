@@ -1,0 +1,42 @@
+{#- The landing page's words, all in one place (Jamie writes them). Layout: about/index.html.
+    Each block is imported by name; keep the names, change anything inside. -#}
+
+{% set intro %}
+  <p class="placeholder">[Placeholder: what SlimLIMS is and who it is for, in two sentences.]</p>
+{% endset %}
+
+{% set try_it %}
+  <p class="placeholder">[Placeholder: pick a persona; the lab is yours alone and fictional.]</p>
+{% endset %}
+
+{% set tour_intro %}
+  <p class="placeholder">[Placeholder: one request, start to finish.]</p>
+{% endset %}
+
+{#- One line per tour step, in order (the persona and screen are in index.html). -#}
+{% set tour_steps = [
+  "[Placeholder: submit a request.]",
+  "[Placeholder: check the samples in.]",
+  "[Placeholder: prep them.]",
+  "[Placeholder: import the readings.]",
+  "[Placeholder: review and release; four-eyes.]",
+  "[Placeholder: issue the report, send the invoice.]",
+] %}
+
+{% set architecture %}
+  <p class="placeholder">[Placeholder: modules by department; the host composes them.]</p>
+{% endset %}
+
+{#- One line per highlight, in the order of index.html's list. -#}
+{% set highlights = [
+  "[Placeholder: every result shows the rules that decided it.]",
+  "[Placeholder: nothing is overwritten; any past state can be shown.]",
+  "[Placeholder: verify replays every result.]",
+  "[Placeholder: whoever entered a result can't review it.]",
+  "[Placeholder: a lab per visitor.]",
+  "[Placeholder: OSS guard, CSRF, CSP.]",
+] %}
+
+{% set how_built %}
+  <p class="placeholder">[Placeholder: how it was built; who decided what.]</p>
+{% endset %}

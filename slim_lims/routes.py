@@ -13,12 +13,14 @@ from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from slim_lims import about as about_page
 from slim_lims import board, capabilities, invoices
 from slim_lims.api import Service, get_reference
 from slim_lims.auth import CurrentUser, RequireStaff, RequireUser
 from slim_lims.db import get_db
 from slim_lims.domain import ActorType, RequestType, TRStatus, TRSubmission, allowed_next_statuses
 from slim_lims.models import LAB_ROLE_ANALYST, LAB_ROLES, ROLE_CUSTOMER, ROLE_STAFF, User, UserCapability
+from slim_lims.personas import persona_choices
 from slim_lims.reference import ReferenceData
 from slim_lims.results import issued_documents
 from slim_lims.schemas import CheckInIn, ChemicalMatchIn, StatusChangeIn
@@ -40,6 +42,22 @@ def _int_or_none(value: str | None) -> int | None:
     return int(value) if value and value.strip().isdigit() else None
 
 
+@router.get("/about", name="about")
+def about(request: Request, db: DB):
+    """The landing page (roadmap phase 2): what SlimLIMS is, a tour, the architecture. Public."""
+    demo = request.app.state.settings.demo_personas
+    return render(
+        request,
+        "about/index.html",
+        {
+            "personas": persona_choices(db) if demo else [],
+            "tour": about_page.TOUR,
+            "highlights": about_page.HIGHLIGHTS,
+            "repos": about_page.REPOS,
+        },
+    )
+
+
 # ---------------------------------------------------------------- requests (customers and staff)
 
 
@@ -55,8 +73,9 @@ def index(
     mine: str = "",
 ):
     """The board (spec §13): every live TR where it has got to. Customers see their own, read-only."""
-    if user is None:
-        return RedirectResponse("/login", status_code=303)
+    if user is None:  # a demo visitor starts at the landing page; a real lab at the login
+        landing = "/about" if request.app.state.settings.demo_personas else "/login"
+        return RedirectResponse(landing, status_code=303)
     filters = {
         "customer": _int_or_none(customer),
         "analysis": _int_or_none(analysis),
