@@ -86,7 +86,7 @@ Tally and themes are updated now and then at the bottom.
 | Kind | What | Notes |
 |---|---|---|
 | J | Audience: hiring managers and HR, even if it is later sent to LIMS companies. | Engineering points get a line and a link; no chemistry assumed. |
-| J | Jamie writes every word of the page's prose: "we don't [want] AI slop in a portfolio piece". | Claude ships the structure, diagram and tests; the words sit in one file (`templates/about/_copy.html`) as short placeholders. The PR waits for them, since Render deploys from main. |
+| J | Jamie writes every word of the page's prose: "we don't [want] AI slop in a portfolio piece". | Claude ships the structure, diagram and tests; the words sit in one file (`templates/about/_copy.html`) as short placeholders. Jamie then chose to merge with the placeholders and write later. |
 | J | Names: SlimLIMS for the software, YourLab for the fictional lab running it. | Header "YourLab SlimLIMS"; footer "YourLab running SlimLIMS v0.1.0" (the app version; Jamie); the landing page is titled SlimLIMS. |
 
 ## Themes so far
