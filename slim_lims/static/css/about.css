@@ -1,0 +1,32 @@
+/* The landing page (templates/about). */
+.about-hero { padding: 1.5rem 0 0.5rem; }
+.about-hero h1 { margin-bottom: 0.25rem; }
+.about-section { margin: 2rem 0; }
+.placeholder { color: var(--color-text-muted); font-style: italic; }
+
+.about-tour { padding-left: 1.25rem; }
+.about-tour li { margin-bottom: 0.5rem; }
+.about-tour__who { font-weight: 700; margin-right: 0.5rem; }
+.about-tour__where { background: var(--color-section-bg); border: 1px solid var(--color-border);
+  border-radius: 3px; padding: 0 0.4rem; margin-right: 0.5rem; font-size: 0.9em; }
+
+.about-highlights { list-style: none; padding: 0; }
+.about-highlights li { border-left: 3px solid var(--color-primary); padding: 0.25rem 0 0.25rem 0.75rem;
+  margin-bottom: 0.75rem; display: flex; flex-direction: column; }
+.about-links { display: flex; flex-wrap: wrap; gap: 0.75rem; font-size: 0.85em; }
+.about-repos { columns: 2; }
+@media (max-width: 600px) { .about-repos { columns: 1; } }
+
+/* The diagram */
+.arch-scroll { overflow-x: auto; margin: 1rem 0; }
+.arch { width: 100%; min-width: 640px; height: auto; max-width: 960px; display: block; }
+.arch-box rect { fill: var(--color-section-bg); stroke: var(--color-border); stroke-width: 1.5; }
+.arch-host rect, .arch-db rect { fill: var(--color-primary); stroke: var(--color-primary-dark); }
+.arch-host text, .arch-db text { fill: #fff; }
+.arch-planned rect { fill: var(--color-bg); stroke-dasharray: 6 4; }
+.arch-planned text { fill: var(--color-text-muted); }
+.arch-name { font-size: 16px; font-weight: 700; fill: var(--color-text); }
+.arch-sub { font-size: 13px; fill: var(--color-text-muted); }
+.arch-dept { font-size: 15px; font-weight: 700; fill: var(--color-primary); text-transform: uppercase;
+  letter-spacing: 0.08em; }
+.arch-link { stroke: var(--color-primary); stroke-width: 2; }
