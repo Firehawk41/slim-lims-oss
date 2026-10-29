@@ -47,7 +47,7 @@ slim-report-engine (the report template). Each keeps its own tables and Alembic 
 shared database; `cli migrate` and the seed run them all.
 
 **Open:** deeper report-engine wiring (spec §13; changes other repos, needs the go-ahead); ecosystem
-docker-compose for the VPS (**deferred, do not start**); next work follows `docs/ROADMAP.md`.
+docker-compose for the VPS (**deferred, do not start**); next: roadmap phase 2, the landing page and architecture diagram (`docs/ROADMAP.md`).
 
 ## How to run
 
