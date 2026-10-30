@@ -142,3 +142,21 @@ def seed_demo(
         portal_engine.dispose()
         slim_engine.dispose()
     return report
+
+
+def upgrade_lab(database_url: str) -> None:
+    """Every migration (the app's and each module's) and the audit log, on a lab that already exists: what
+    a deploy adds reaches a visitor's lab (slim-data D-115). Nothing is seeded; running it twice changes
+    nothing."""
+    config = Config(str(Path(slim_lims.__file__).parent / "alembic.ini"))
+    config.attributes["database_url"] = database_url
+    command.upgrade(config, "head")
+    engine = make_engine(database_url)
+    try:
+        migrate_slim_data(engine)
+        migrate_slim_prep(engine)
+        migrate_slim_quality(engine)
+        migrate_invoicing(engine)
+        install_audit_log(engine)
+    finally:
+        engine.dispose()

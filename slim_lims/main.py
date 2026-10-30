@@ -16,7 +16,7 @@ from slim_lims.auth import LoginRequired, StaffRequired, login_redirect
 from slim_lims.auth import router as auth_router
 from slim_lims.config import Settings, load_settings
 from slim_lims.db import make_engine, make_session_factory
-from slim_lims.demo_seed import DEFAULT_OSS_DIR, seed_demo
+from slim_lims.demo_seed import DEFAULT_OSS_DIR, seed_demo, upgrade_lab
 from slim_lims.labs import Labs
 from slim_lims.labtime import LabClock
 from slim_lims.prep_routes import api_router as prep_api_router
@@ -42,6 +42,7 @@ def _labs(settings: Settings) -> Labs:
     labs = Labs(
         settings.database_url,
         seed=lambda url: seed_demo(url, oss_dir=oss_dir, lab_timezone=settings.lab_timezone),
+        upgrade=upgrade_lab,
     )
     labs.check()
     labs.start()

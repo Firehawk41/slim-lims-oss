@@ -32,7 +32,7 @@
     {{ form_open(1, wide=true) }}
       <table class="table"><thead><tr><th>Result</th><th>Released</th><th>On reports</th><th>Decision</th><th>Note</th></tr></thead>
         <tbody>{% for r in touched %}{% set label = impact_label(r) %}
-          <tr><td>{{ label }}{% if r.latest_version > r.version %} <span class="muted">(now v{{ r.latest_version }})</span>{% endif %}<br><span class="muted">batch {{ r.batch_code }}, runs {{ r.runs|join(", ") }}</span>
+          <tr><td>{{ label }}{% if r.latest_version > r.version %} <span class="muted">(now v{{ r.latest_version }})</span>{% endif %}<br><span class="muted">batch <a href="{{ url_for('results_batch', code=r.batch_code) }}">{{ r.batch_code }}</a>, runs {{ r.runs|join(", ") }}</span>
             <input type="hidden" name="impact_ref" value="{{ result_ref(r) }}"></td>
             <td>{{ r.released_by.display }}, {{ r.released_at.astimezone(zone).date() }}</td><td>{{ r.reports|join(", ") or "—" }}</td>
             <td><select name="impact_decision">{% for d in decisions %}<option value="{{ d.value }}">{{ d.label }}</option>{% endfor %}</select></td>

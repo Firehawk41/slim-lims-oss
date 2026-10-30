@@ -126,15 +126,17 @@ def _migrate() -> int:
 
 
 def _verify() -> int:
-    """slim-data's verify (D-76) and slim-prep's (P-22): exit 1 if a result doesn't replay, the audit
-    chain is broken or the prep book doesn't hold."""
+    """slim-data's verify (D-76), slim-prep's (P-22) and slim-quality's (app review 2026-10-30b Q7): exit 1
+    if a result doesn't replay, the audit chain is broken, the prep book or the quality records don't hold."""
     from slim_data.service.verify import verify
     from slim_prep.service.verify import verify as verify_prep
+    from slim_quality.service.verify import verify as verify_quality
 
     engine = make_engine(load_settings().database_url)
     with make_session_factory(engine)() as session:
         report = verify(session, chain_check(engine))
         prep = verify_prep(session)
+        quality = verify_quality(session)
     print(
         f"Replayed {report.versions} result versions: "
         + ("all match." if not report.mismatches else f"{len(report.mismatches)} don't match:")
@@ -153,7 +155,14 @@ def _verify() -> int:
     )
     for problem in prep.problems:
         print(f"  {problem}")
-    return 0 if report.ok and prep.ok else 1
+    print(
+        f"Quality: {quality.profiles} profile versions, {quality.limit_sets} limit sets, "
+        f"{quality.nonconformities} nonconformities: "
+        + ("all hold." if quality.ok else f"{len(quality.problems)} problems:")
+    )
+    for problem in quality.problems:
+        print(f"  {problem}")
+    return 0 if report.ok and prep.ok and quality.ok else 1
 
 
 def _empty_public(confirmed: bool, if_needed: bool = False) -> int:

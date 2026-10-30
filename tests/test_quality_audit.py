@@ -221,3 +221,34 @@ def test_the_demo_nonconformity_is_raised_once(db, issued):
     seed_demo_nonconformity(db, datetime.now(UTC))
     (nc,) = store.list_ncs(db)
     assert nc.state == NcState.OPEN and nc.instrument == "ICP-MS 1" and nc.analyte is None
+
+
+def test_q7_cli_verify_catches_a_nonconformity_written_around_the_rules(
+    engine, db, issued, monkeypatch, capsys
+):
+    """App review 2026-10-30b Q7: slim-quality's records are verified with the rest."""
+    import json
+
+    from slim_quality.domain.nonconformity import EntryKind, NcEntry
+
+    from slim_lims import cli
+    from slim_lims.quality import quality_actor
+    from tests.test_quality import persona
+
+    seed_demo_nonconformity(db, datetime.now(UTC))
+    manager = quality_actor(db, persona(db, "quinn@demo.example"))
+    (nc,) = store.list_ncs(db)
+    closed = NcEntry(kind=EntryKind.CLOSED, note="done", by=manager).model_dump(mode="json", exclude={"at"})
+    db.execute(
+        text("INSERT INTO quality_nc_entries (nc_id, kind, entry, by_id, by) VALUES (:n, 4, :e, :i, :b)"),
+        {
+            "n": nc.id,
+            "e": json.dumps(closed),
+            "i": manager.id,
+            "b": json.dumps(manager.model_dump(mode="json")),
+        },
+    )
+    db.commit()
+    monkeypatch.setenv("DATABASE_URL", engine.url.render_as_string(hide_password=False))
+    assert cli.main(["verify"]) == 1
+    assert "NC-0001 entry 1 (closed)" in capsys.readouterr().out

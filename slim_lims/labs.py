@@ -95,6 +95,7 @@ class Labs:
         self,
         url: str,
         seed: Callable[[str], object],
+        upgrade: Callable[[str], object] | None = None,
         spares: int = 2,
         cap: int = 25,
         idle: timedelta = timedelta(hours=1),
@@ -103,6 +104,7 @@ class Labs:
     ):
         self.url = without_schema(url)
         self.seed = seed
+        self.upgrade = upgrade  # brings a claimed lab up to the code now running (D-115)
         self.spares, self.cap, self.idle, self.clock = spares, cap, idle, clock
         self.background = background  # False: spares are made only by calling refill (tests)
         self.base = make_engine(self.url, poolclass=NullPool)
@@ -128,11 +130,21 @@ class Labs:
             )
 
     def start(self) -> None:
-        """Drops labs left half-seeded by a restart, then fills the spares in the background."""
+        """After a restart, which may be a deploy with new migrations (D-115; app review 2026-10-30b L1):
+        drops labs left half-seeded and every spare (seeded by the code that ran before; refilled from the
+        current seed), brings each claimed lab up to date with `upgrade` (dropping one that won't: its
+        visitor starts afresh), then fills the spares in the background."""
         with self.base.begin() as conn:
-            stale = conn.scalars(select(demo_labs.c.schema).where(demo_labs.c.state == PREPARING)).all()
-        for schema in stale:
-            self.drop(schema)
+            rows = conn.execute(select(demo_labs.c.schema, demo_labs.c.state)).all()
+        for schema, state in rows:
+            if state in (PREPARING, READY):
+                self.drop(schema)
+            elif self.upgrade is not None:
+                try:
+                    self.upgrade(with_schema(self.url, schema))
+                except Exception:
+                    log.exception("demo labs: %s didn't upgrade; dropped", schema)
+                    self.drop(schema)
         self.refill_in_background()
 
     # ------------------------------------------------------------ a visitor's lab

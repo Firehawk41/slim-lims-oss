@@ -5,6 +5,10 @@ issues, lets V5 price it into a sales order, moves the TR to invoiced and record
 all in the caller's one transaction. Payment is invoice data (`tr_invoices`), never a TR status.
 """
 
+import csv
+import io
+from decimal import Decimal, InvalidOperation
+
 import slim_invoicing
 from slim_data.persistence.results import issues_for_tr
 from slim_invoicing.persistence import migrate as invoicing_migrate
@@ -122,3 +126,27 @@ def price_lists(session: Session, reference: ReferenceData) -> list[slim_invoici
     for customer in reference.customer_choices():
         quotes.update((q.id, q) for q in quotes_for_customer(session, customer.id))
     return list(quotes.values())
+
+
+def accounting_csv(session: Session) -> str:
+    """Every sales order as V5's accounting import file, with every text cell a spreadsheet would run as a
+    formula written as text (app review 2026-10-30b I1). The PO number and the requester come from the
+    customer's request form: "=HYPERLINK(…)" as a contact name would otherwise run in accounting's Excel.
+    Numbers stay numbers (a negative amount is not a formula)."""
+    raw = io.StringIO()
+    slim_invoicing.write_csv(slim_invoicing.sales_orders(session), raw)
+    out = io.StringIO()
+    writer = csv.writer(out)
+    for row in csv.reader(io.StringIO(raw.getvalue())):
+        writer.writerow([_as_text(cell) for cell in row])
+    return out.getvalue()
+
+
+def _as_text(cell: str) -> str:
+    if cell[:1] not in ("=", "+", "-", "@", "\t", "\r"):
+        return cell
+    try:
+        Decimal(cell)
+        return cell
+    except InvalidOperation:
+        return "'" + cell

@@ -83,6 +83,28 @@ def test_spares_claims_idle_labs_and_the_cap(url):
         labs.drop(schema)
 
 
+def test_l1_a_restart_rebuilds_spares_and_upgrades_claimed_labs(url):
+    """App review 2026-10-30b L1 (D-115): spares and claimed labs outlived a deploy with the schema they
+    were seeded with, so a visitor could claim a lab without a new module's tables."""
+    old = Labs(url, _stand_in_seed, spares=1, background=False)
+    old.check()
+    mine = old.claim()
+    old.refill()
+    (spare,) = _schemas(url) - {mine}
+
+    upgraded = []
+    new = Labs(url, _stand_in_seed, upgrade=upgraded.append, spares=1, background=False)
+    new.start()  # a deploy: the spare goes, the claimed lab is brought up to date
+    assert _schemas(url) == {mine} and [schema_of(u) for u in upgraded] == [mine]
+    assert new.enter(mine) is not None
+
+    def broken(lab_url):
+        raise RuntimeError("migration failed")
+
+    Labs(url, _stand_in_seed, upgrade=broken, background=False).start()
+    assert mine not in _schemas(url)  # a lab that won't upgrade is dropped: its visitor starts afresh
+
+
 def test_a_half_seeded_lab_is_dropped(url):
     def broken(lab_url):
         _stand_in_seed(lab_url)
