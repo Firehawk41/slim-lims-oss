@@ -37,7 +37,7 @@ from slim_data.persistence.results import issues_for_tr, results_for_tr
 from slim_data.persistence.rulesets import ruleset_for
 from slim_data.pipeline.generic_csv import GenericCsv
 from slim_data.pipeline.paste import Paste
-from slim_data.pipeline.qtegra import Qtegra
+from slim_data.pipeline.qtegra import Qtegra2
 from slim_data.pipeline.reader import ResultReader
 from slim_data.service import workflow as wf
 from slim_data.service.imports import ImportReceipt, import_run
@@ -199,7 +199,7 @@ def publish_demo_rules(session: Session, reference: ReferenceData) -> dict[str, 
 # How readings come in (slim-data D-88): the upload page's choices, in the order shown.
 READERS = {
     "csv": "Result file (CSV, generic_csv/1)",
-    "qtegra": "Thermo Qtegra export (qtegra/1)",
+    "qtegra": "Thermo Qtegra export (qtegra/2)",
     "paste": "Pasted from Excel (paste/1)",
 }
 
@@ -226,7 +226,7 @@ def make_reader(
         raise ReaderChoiceError(f"unknown kind of data: {kind!r}")
     if not prep_batch.strip() or not analysis.strip():
         raise ReaderChoiceError("a Qtegra export needs its prep batch and analysis")
-    return Qtegra(
+    return Qtegra2(  # keeps each element's mode (D-106)
         prep_batch=prep_batch.strip(),
         analysis_code=analysis.strip(),
         analyst_id=user.initials or "",

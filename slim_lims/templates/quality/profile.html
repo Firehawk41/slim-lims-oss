@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Tools & profile — Quality — YourLab{% endblock %}
+{% block extra_head %}<link href="{{ url_for('static', path='css/quality.css') }}" rel="stylesheet" />{% endblock %}
+{% block content %}
+  <h1>Tools &amp; profile</h1>
+  {% include "quality/_nav.html" %}
+  <p class="hint">Which tools run on which measures, with what settings, and how severe each flag is. Change anything,
+    then <strong>Backtest</strong> (what it would have flagged over the last 6 months, nothing stored) or
+    <strong>Propose</strong> (a quality manager decides). Profile v{{ profile.version }}.</p>
+  {% if error %}<div class="form-error" role="alert">{{ error }}</div>{% endif %}
+
+  {% if backtest is defined %}
+  <section class="form-section">
+    <h2>Backtest: the last 6 months</h2>
+    <table class="table">
+      <thead><tr><th>Tool</th><th>Flag</th><th>In force</th><th>This profile</th></tr></thead>
+      <tbody>{% for r in backtest %}<tr><td>{{ r.tool }}</td><td>{{ r.code }}</td><td>{{ r.in_force }}</td><td>{{ r.candidate }}</td></tr>{% else %}<tr><td colspan="4" class="muted">No flags either way.</td></tr>{% endfor %}</tbody>
+    </table>
+  </section>
+  {% endif %}
+
+  <form method="post" action="{{ url_for('quality_profile_post') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+    {% for t in tools %}{% set s = t.setting %}
+    <div class="tool-card">
+      <h3><label><input type="checkbox" name="enabled" value="{{ t.key }}"{% if s.enabled %} checked{% endif %}> {{ t.title }}</label> <span class="muted">{{ t.key }}</span></h3>
+      <p class="hint">{{ t.doc }}</p>
+      <div class="inline-checks"><strong>On:</strong>
+        {% for m in measures %}<label><input type="checkbox" name="measure" value="{{ t.key }}|{{ m.value }}"{% if m in s.measures %} checked{% endif %}> {{ m.label }}</label>{% endfor %}
+      </div>
+      <div class="inline-checks">
+        {% for f in t.fields %}
+          {% if f.options is not none %}<strong>{{ f.name }}:</strong>
+            {% for o in f.options %}<label><input type="checkbox" name="rule" value="{{ t.key }}|{{ o }}"{% if o in t.params[f.name] %} checked{% endif %}> {{ o }}</label>{% endfor %}
+          {% else %}
+            <input type="hidden" name="param_key" value="{{ t.key }}|{{ f.name }}">
+            <label>{{ f.name }} <input type="text" name="param_value" size="6" value="{{ t.params[f.name] }}"></label>
+          {% endif %}
+        {% endfor %}
+      </div>
+      <div class="inline-checks"><strong>Severity:</strong>
+        {% for code, sev in t.codes.items() %}
+          <input type="hidden" name="sev_key" value="{{ t.key }}|{{ code }}">
+          <label>{{ code }} <select name="sev_value">{% for v in severities %}<option value="{{ v.name }}"{% if v == sev %} selected{% endif %}>{{ v.name }}</option>{% endfor %}</select></label>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+
+    <h2>Measures: provisional limits and acceptance windows</h2>
+    <table class="table">
+      <thead><tr><th>Measure</th><th>Provisional limits from</th><th>First points</th><th>Window low</th><th>Window high</th></tr></thead>
+      <tbody>{% for m in measures %}{% set p = policies[m] %}
+        <tr><td>{{ m.label }}<input type="hidden" name="pol_measure" value="{{ m.value }}"></td>
+          <td><select name="pol_method">{% for meth in methods %}<option value="{{ meth.value }}"{% if meth == p.method %} selected{% endif %}>{{ "mean ± SD" if meth.name == "HISTORY" else "median ± MAD" }}</option>{% endfor %}</select></td>
+          <td><input type="number" name="pol_points" min="3" max="500" value="{{ p.baseline_points }}"></td>
+          <td><input type="text" name="pol_low" size="7" value="{{ p.window_low if p.window_low is not none else '' }}"></td>
+          <td><input type="text" name="pol_high" size="7" value="{{ p.window_high if p.window_high is not none else '' }}"></td></tr>
+      {% endfor %}</tbody>
+    </table>
+    <p class="hint">Recoveries are fractions (0.75 = 75 %); the internal standard and RSD are in %.</p>
+    <label>Why (for a proposal) <input type="text" name="reason" maxlength="1000" value="{{ reason or '' }}"></label>
+    <div class="choice-row">
+      <button type="submit" name="action" value="backtest" class="btn btn--secondary">Backtest</button>
+      <button type="submit" name="action" value="propose" class="btn btn--primary">Propose</button>
+    </div>
+  </form>
+{% endblock %}

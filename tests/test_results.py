@@ -733,7 +733,7 @@ QTEGRA_FORM = {
 def test_the_upload_page_offers_each_way_in_and_the_analyses_with_rules(client, lab):
     login(client, "staff@lab.example")
     page = client.get("/results").text
-    assert "Thermo Qtegra export (qtegra/1)" in page and "Pasted from Excel (paste/1)" in page
+    assert "Thermo Qtegra export (qtegra/2)" in page and "Pasted from Excel (paste/1)" in page
     assert 'value="10_elements_icpms"' in page and 'value="26_elements_icpms"' not in page  # no ruleset
 
 

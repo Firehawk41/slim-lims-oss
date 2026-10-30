@@ -95,6 +95,8 @@ def main(argv: list[str] | None = None) -> int:
         print(
             f"slim-prep demo: an evaporation batch prepped, run, released and corrected on {report.prepped}."
         )
+    if report.qc_runs:
+        print(f"slim-quality demo: {report.qc_runs} QC runs on two instruments, with a planted drift.")
     print(f"{report.personas} demo personas (offered when DEMO_PERSONAS is on).")
     if report.scenarios:
         print("Demo scenarios: " + ", ".join(f"{name} {tr}" for name, tr in report.scenarios.items()))

@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}{{ key.label }} — Quality — YourLab{% endblock %}
+{% block extra_head %}<link href="{{ url_for('static', path='css/quality.css') }}" rel="stylesheet" />{% endblock %}
+{% macro val(v) %}{% if key.measure.is_recovery %}{{ "%.1f"|format(v * 100) }} %{% else %}{{ v }} {{ chart.series.unit }}{% endif %}{% endmacro %}
+{% block content %}
+  <h1>{{ key.label }}</h1>
+  {% include "quality/_nav.html" %}
+  <div class="chart-wrap">{{ svg|safe }}</div>
+  <p class="hint">Green: centre. Amber and red: ±2 and ±3 SD (dotted while provisional). Purple dashes: the acceptance
+    window. Teal: the forecast through the newest points. Blue dots: events. Hover a point for its flags.</p>
+
+  <section class="form-section">
+    <h2>Limits in force</h2>
+    {% set lim = chart.current %}
+    {% if lim %}
+      <dl class="kv-inline">
+        <div><dt>Centre</dt><dd>{{ val(lim.center) }}</dd></div>
+        <div><dt>SD</dt><dd>{{ val(lim.sd) }}</dd></div>
+        {% if lim.upper is not none %}<div><dt>Upper (one-sided)</dt><dd>{{ val(lim.upper) }}</dd></div>{% endif %}
+        <div><dt>Method</dt><dd>{{ lim.method.name.lower() }}{% if lim.provisional %} (provisional){% endif %}</dd></div>
+        <div><dt>Basis</dt><dd>{{ lim.basis or "—" }}</dd></div>
+      </dl>
+    {% else %}<p class="muted">None yet: too few points for provisional limits, and none approved.</p>{% endif %}
+    {% if chart.trend and chart.trend.days_to_limit is not none %}
+      <p><strong>Forecast:</strong> reaches {{ val(chart.trend.limit) }} in about {{ "%.0f"|format(chart.trend.days_to_limit) }} days at the current trend.</p>
+    {% endif %}
+    {% if limit_sets %}
+      <h3>Approved limit sets</h3>
+      <ul>{% for s in limit_sets %}<li>from {{ s.effective_from.date() }}: centre {{ val(s.limits.center) }}, SD {{ val(s.limits.sd) }} ({{ s.limits.basis or s.limits.method.name.lower() }})</li>{% endfor %}</ul>
+    {% endif %}
+  </section>
+
+  <section class="form-section">
+    <h2>Flags, newest first</h2>
+    {% if flags %}
+    <table class="table">
+      <thead><tr><th>When</th><th>Severity</th><th>Tool</th><th>Code</th><th>What</th></tr></thead>
+      <tbody>{% for f in flags[:50] %}
+        <tr><td>{{ f.at.strftime("%Y-%m-%d %H:%M") }}</td><td><span class="sev sev--{{ f.severity.name }}">{{ f.severity.name }}</span></td>
+          <td>{{ f.tool }}</td><td>{{ f.code }}</td><td>{{ f.message }}</td></tr>
+      {% endfor %}</tbody>
+    </table>
+    {% if flags|length > 50 %}<p class="muted">{{ flags|length - 50 }} older flags not listed.</p>{% endif %}
+    {% else %}<p class="muted">Nothing flagged.</p>{% endif %}
+  </section>
+
+  <section class="form-section">
+    <h2>Events and notes</h2>
+    <ul>
+      {% for e in events %}<li>{{ e.at.date() }} · {{ e.kind.label }}: {{ e.note }} ({{ e.by.display }})</li>{% endfor %}
+      {% for n in notes %}<li>Note on {{ n.ref }}: {{ n.note }} ({{ n.by.display }}, {{ n.at.date() }})</li>{% endfor %}
+      {% if not events and not notes %}<li class="muted">None.</li>{% endif %}
+    </ul>
+    <form method="post" action="{{ url_for('quality_note') }}" class="stack-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+      <input type="hidden" name="id" value="{{ key.slug }}">
+      <label>Point
+        <select name="ref">{% for p in points|reverse %}{% if loop.index <= 60 %}<option value="{{ p.ref }}">{{ p.at.strftime("%Y-%m-%d %H:%M") }} · {{ p.run_code }} · {{ val(p.value) }}</option>{% endif %}{% endfor %}</select></label>
+      <label>Note <input type="text" name="note" maxlength="1000" required></label>
+      <button type="submit" class="btn btn--secondary btn--small">Add note</button>
+    </form>
+    <form method="post" action="{{ url_for('quality_event') }}" class="stack-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+      <input type="hidden" name="id" value="{{ key.slug }}">
+      <input type="hidden" name="instrument" value="{{ key.instrument }}">
+      <label>Event on {{ key.instrument }}
+        <select name="kind">{% for k in event_kinds %}<option value="{{ k.value }}">{{ k.label }}</option>{% endfor %}</select></label>
+      <label>On <input type="date" name="on" value="{{ today }}" required></label>
+      <label>Only {{ key.analyte }}? <input type="text" name="analyte" maxlength="50" placeholder="blank: the whole instrument"></label>
+      <label>What was done <input type="text" name="note" maxlength="1000" required></label>
+      <button type="submit" class="btn btn--secondary btn--small">Record event</button>
+    </form>
+  </section>
+
+  <section class="form-section">
+    <h2>Propose limits</h2>
+    <p class="hint">From a baseline (the points measured between two dates), or entered (a certificate, or limits the lab sets).
+      In force from the date you give; a quality manager decides.</p>
+    <form method="post" action="{{ url_for('quality_limits') }}" class="stack-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+      <input type="hidden" name="id" value="{{ key.slug }}">
+      <label>Method
+        <select name="method">{% for m in methods %}<option value="{{ m.value }}">{{ {"HISTORY": "Baseline: mean ± SD", "ROBUST": "Baseline: median ± 1.4826 × MAD", "CERTIFICATE": "Entered (certificate)"}[m.name] }}</option>{% endfor %}</select></label>
+      <fieldset><legend>Baseline</legend>
+        <label>From <input type="date" name="start" value="{{ first_day }}"></label>
+        <label>To <input type="date" name="end" value="{{ today }}"></label>
+      </fieldset>
+      <fieldset><legend>Entered</legend>
+        <label>Centre <input type="text" name="center" inputmode="decimal"></label>
+        <label>SD <input type="text" name="sd" inputmode="decimal"></label>
+        <label>Upper (optional) <input type="text" name="upper" inputmode="decimal"></label>
+        <label>Basis <input type="text" name="basis" maxlength="300" placeholder="e.g. certificate 12345, lot 7"></label>
+      </fieldset>
+      <label>In force from <input type="date" name="effective" value="{{ first_day }}" required></label>
+      <label>Why <input type="text" name="reason" maxlength="1000" required></label>
+      <button type="submit" class="btn btn--primary">Propose limits</button>
+    </form>
+  </section>
+{% endblock %}

@@ -14,7 +14,7 @@ package or import follows them.
 |---|---|---|---|
 | **Admin** | Requests and the customer's view, quotes, invoicing, reports and their delivery | `slim-lims-oss` request and customer screens; invoicing V5 (`SLIM-Invoicing-Program/V5-LIMS-Module`); `slim-report-engine-oss` | Quote screens; report delivery (email) and PDF |
 | **Lab** | Check-in, sample custody, prep, instrument data in, results, report sign-off | `slim-data-oss` (readers `qtegra/1`, `paste/1`, `generic_csv/1`); `slim-prep-oss` (the prep book) | `slim-samples` (custody, storage, retention); signatory step |
-| **Quality** | QC trends, nonconformities and corrective actions, complaints, proficiency testing, equipment, competence, audits, validation | slim-domain's audit log; slim-data's `verify` | `slim-quality` |
+| **Quality** | QC trends, nonconformities and corrective actions, complaints, proficiency testing, equipment, competence, audits, validation | slim-domain's audit log; slim-data's `verify`; `slim-quality-oss` part 1 (QC charts and tools) | `slim-quality` parts 2 and 3 |
 | **IT** | Reference data, logins, the app shell, operations | `slim-domain-oss`; the `slim-lims-oss` host | Password reset / MFA; VPS docker-compose, backups, monitoring (login rate limiting done, D-101) |
 
 Report sign-off is a Lab act (ISO 17025 §7.8) even though reports sit in Admin: the signatory step lives
@@ -33,12 +33,13 @@ with the lab, delivery with Admin.
 ## Portfolio
 
 - **Crown jewel: the slim-lims sandbox.** One Testing Request end to end through all four
-  departments, with a demo persona for each role (customer, analyst, reviewer, supervisor; a quality
-  manager to come).
+  departments, with a demo persona for each role (customer, analyst, reviewer, supervisor, quality
+  manager, quality).
 - **Featured on their own:**
   1. **slim-data**: versioned rules engine, append-only records, time travel, `verify`.
   2. **Invoicing V1 → V5**: a design told across five versions, VBA to Python to a LIMS module.
-  3. **slim-quality** (once built): control charts with Westgard rules, trends a quality manager reads at a glance.
+  3. **slim-quality**: a quality manager's toolbox: control charts, Westgard rules, EWMA, CUSUM, forecasts
+     of when a series leaves its window, change control over the rules (slim-data D-109, D-110).
 - **Shown inside the sandbox story only:** slim-domain, slim-report-engine, slim-prep, slim-samples.
 
 ## Phases
@@ -48,9 +49,9 @@ with the lab, delivery with Admin.
 | 0 | IT | ✅ **Jamie:** make slim-lims-oss public; delete the old Render service, `labportal-db` and the old Blueprint, then a new Blueprint from slim-lims-oss (database `slim-lims-db`); archive LabPortal; drop the slim-lims pair from any local "sync private → OSS" instruction. ✅ **Claude:** stale docs ("portal" → the app), invoicing in the README, ruff in slim-lims-oss CI (2026-10-26) | The live demo shows what's built |
 | 1 | Lab | ✅ QC sample roles in slim-data (D-87: CHECK / CRM, `qc_check`). `slim-prep`: prep batches, weights and volumes (dilution calculated, not typed), spike amounts with standard lot and expiry, balance and pipette used, who and when, the instrument run list; hands the batch to slim-data (D-95, D-96, D-105). Instrument readers `qtegra/1` and `paste/1` (D-88, D-89) | Quality trends need this data |
 | 2 | Admin + IT | ◐ Landing page (`/about`; structure, diagram and tests built, Jamie's words to come) and architecture diagram (by department) for the sandbox | A visitor understands it in 30 seconds; the sandbox is already public (swapped ahead of Quality, 2026-10-29) |
-| 3 | Quality | `slim-quality` part 1, read-only: QC control charts (Westgard), trends per instrument, analyst, method (pooled precision → uncertainty, §7.6) and customer (turnaround, spec exceedances, a customer's own lot trend). Demo history: months of QC on two instruments with a planted drift, kept off the board. The software validation pack (§7.11) | The third standalone portfolio piece |
+| 3 | Quality | ✅ `slim-quality` part 1 (D-109, D-110): QC series per instrument × analyte × mode; a toolbox the quality manager switches on and tunes (Westgard rules, EWMA, CUSUM, one-sided exceedance, time-to-limit forecast, shared shift); limits from a baseline or a certificate; change control (quality users propose, managers decide), backtest, events, notes, signed QC reviews. Demo history: 90 days of QC on two instruments with planted cone wear, in QC-only batches (D-108), off the board. slim-data keeps the plasma mode (`qtegra/2`, D-106) | The third standalone portfolio piece |
 | 4 | Lab + Admin | `slim-samples`: condition on receipt, labels, storage, retention and disposal (§7.4); check-in moves here from the host. Report signatory (Lab), delivery by email and PDF (Admin) | Completes the sample's journey |
-| 5 | Quality | `slim-quality` part 2: nonconformities and corrective actions (§7.10, §8.7, raised from exceptions and amendments), complaints (§7.9), proficiency testing (§7.7.2), equipment and reference materials (§6.4, §6.5), competence (§6.2), risks (§8.5), internal audits and the management review pack (§8.8, §8.9). Quality-manager persona | A quality manager's dream |
+| 5 | Quality | `slim-quality` part 2, the audit tools: a one-click vertical audit of a released report (§7.5, §8.4), nonconformities and corrective actions with an impact assessment over released reports and an effectiveness check (§7.10, §8.7), complaints (§7.9), proficiency testing with z-score trends (§7.7.2), uncertainty from pooled QC (§7.6), equipment and reference materials (§6.4, §6.5; maintenance events exist), competence: who acted outside their authorisation (§6.2), risks (§8.5), internal audits, a readiness view per clause and the management review pack (§8.8, §8.9), the software validation pack (§7.11); turnaround and customer trends. Part 3 (parked): the tools' warnings on the review screen before release. Also parked: where each sample should be against its turnaround (D-111) | A quality manager's dream |
 | 6 | Admin + IT | Quote screens (create, expire, customer requests a quote); reference-data upkeep (customers, chemicals, analyses, specs); password reset, MFA (login rate limiting done, D-101) | Day-to-day completeness |
 | 7 | IT | Ecosystem docker-compose for the VPS (Caddy, Postgres, the app), backups, monitoring | Agreed to come last |
 
@@ -70,5 +71,6 @@ with the lab, delivery with Admin.
 | `SLIM-Invoicing-Program` | Admin | V1–V4 history; `V5-LIMS-Module` is the live library |
 | `slim-report-engine-oss` | Admin | Report templates; also the OSS demo reference data (`demo/demo.py`) |
 | `slim-domain-oss` | IT | Reference data, audit log |
+| `slim-quality-oss` | Quality | QC charts and tools, change control (D-109) |
 | `LabPortal` | — | Folded into slim-lims-oss (D-82); to archive |
 | private `Slim-LIMS`, `slim-domain`, `slim-raw-data` | — | Production. Never changed from here; never synced into OSS |

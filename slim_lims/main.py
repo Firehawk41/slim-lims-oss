@@ -21,6 +21,7 @@ from slim_lims.labs import Labs
 from slim_lims.labtime import LabClock
 from slim_lims.prep_routes import api_router as prep_api_router
 from slim_lims.prep_routes import router as prep_router
+from slim_lims.quality_routes import router as quality_router
 from slim_lims.reference import ReferenceData
 from slim_lims.reference_cache import ReferenceCache
 from slim_lims.reports import engine_renderer
@@ -108,6 +109,7 @@ def create_app(
     app.include_router(results_api_router)
     app.include_router(prep_router)
     app.include_router(prep_api_router)
+    app.include_router(quality_router)
     register_error_handlers(app)
 
     @app.exception_handler(LoginRequired)

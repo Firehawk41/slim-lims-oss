@@ -262,6 +262,8 @@ def _release(db, user, sample: SampleRef, analysis_id: int, data: SignOffIn):
 def _batch_rows(reference: ReferenceData, db: Session) -> list[dict[str, Any]]:
     rows = []
     for b in batches(db):
+        if b.qc_only:
+            continue  # QC runs have no results to review; their readings are on the quality charts
         analysis = reference.analysis(b.analysis_id)
         rows.append(
             {

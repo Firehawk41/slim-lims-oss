@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}QC reviews — Quality — YourLab{% endblock %}
+{% block extra_head %}<link href="{{ url_for('static', path='css/quality.css') }}" rel="stylesheet" />{% endblock %}
+{% block content %}
+  <h1>QC reviews</h1>
+  {% include "quality/_nav.html" %}
+  <p class="hint">The periodic review of the QC charts (ISO 17025 §7.7): a quality manager looks at the period and signs.
+    The flag counts they saw are kept with the signature.</p>
+  {% if actor.is_manager %}
+  <form method="post" action="{{ url_for('quality_sign_review') }}" class="stack-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+    <label>From <input type="date" name="period_from" value="{{ suggested[0] }}" required></label>
+    <label>To <input type="date" name="period_to" value="{{ suggested[1] }}" required></label>
+    <label>Findings and actions <textarea name="comment" rows="4" maxlength="4000" required></textarea></label>
+    <button type="submit" class="btn btn--primary">Sign the review</button>
+  </form>
+  {% endif %}
+  <table class="table">
+    <thead><tr><th>Period</th><th>Flags seen</th><th>Comment</th><th>Signed</th></tr></thead>
+    <tbody>{% for r in reviews %}
+      <tr><td>{{ r.period_from }} to {{ r.period_to }}</td>
+        <td>{% for k, v in r.summary.items() %}<span class="sev sev--{{ k }}">{{ k }} {{ v }}</span> {% endfor %}</td>
+        <td>{{ r.comment }}</td><td>{{ r.by.display }}, {{ r.at.strftime("%Y-%m-%d") }}</td></tr>
+    {% else %}<tr><td colspan="4" class="muted">None signed yet.</td></tr>{% endfor %}</tbody>
+  </table>
+{% endblock %}

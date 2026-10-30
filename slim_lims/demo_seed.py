@@ -39,6 +39,7 @@ from slim_lims.labtime import LabClock
 from slim_lims.oss_guard import assert_oss_database
 from slim_lims.personas import sync_personas
 from slim_lims.prep import migrate_slim_prep, publish_demo_prep
+from slim_lims.quality import migrate_slim_quality, seed_quality_history
 from slim_lims.reference_cache import load_reference
 from slim_lims.repositories import TRSubmissionRepository
 from slim_lims.results import SpecReader, migrate_slim_data, publish_demo_rules
@@ -55,6 +56,7 @@ class SeedReport:
     personas: int = 0
     scenarios: dict[str, str] = field(default_factory=dict)
     prepped: str | None = None
+    qc_runs: int = 0
 
 
 def load_oss_demo(oss_dir: Path):
@@ -117,6 +119,7 @@ def seed_demo(
 
         migrate_slim_data(portal_engine)
         migrate_slim_prep(portal_engine)
+        migrate_slim_quality(portal_engine)
         migrate_invoicing(portal_engine)
         report.audited = install_audit_log(portal_engine)  # before the scenarios: their writes chained (D-77)
         clock = LabClock(ZoneInfo(lab_timezone))  # the demo's dates are the lab's (review A8)
@@ -131,6 +134,8 @@ def seed_demo(
                 report.scenarios = seed_scenarios(session, reference, specs, clock.now())
                 session.commit()
                 report.prepped = seed_prep_scenario(session, reference, specs, clock.now())
+                session.commit()
+                report.qc_runs = seed_quality_history(session, reference, specs, clock.now())
                 session.commit()
     finally:
         portal_engine.dispose()

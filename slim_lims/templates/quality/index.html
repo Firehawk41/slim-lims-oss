@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Quality — YourLab{% endblock %}
+{% block extra_head %}<link href="{{ url_for('static', path='css/quality.css') }}" rel="stylesheet" />{% endblock %}
+{% block content %}
+  <h1>Quality</h1>
+  {% include "quality/_nav.html" %}
+  <p class="hint">Every QC series, worst first: what the profile's tools flagged in the last {{ filters.days }} days,
+    and when a forecast says a series will leave its acceptance window. Profile v{{ profile.version }}{% if profile.version == 0 %} (the starter profile){% endif %}.</p>
+
+  <dl class="kv-inline">
+    <div><dt>Open changes</dt><dd><a href="{{ url_for('quality_changes') }}">{{ open_changes|length }}</a></dd></div>
+    <div><dt>Last QC review</dt><dd>{% if last_review %}{{ last_review.period_from }} to {{ last_review.period_to }}, by {{ last_review.by.display }}{% else %}none yet{% endif %} (<a href="{{ url_for('quality_reviews') }}">reviews</a>)</dd></div>
+  </dl>
+
+  <form method="get" action="{{ url_for('quality_home') }}" class="choice-row">
+    <label>Instrument
+      <select name="instrument"><option value="">all</option>
+        {% for i in instruments %}<option value="{{ i }}"{% if filters.instrument == i %} selected{% endif %}>{{ i }}</option>{% endfor %}
+      </select></label>
+    <label>Measure
+      <select name="measure"><option value="">all</option>
+        {% for m in measures %}<option value="{{ m.value }}"{% if filters.measure == m.value|string %} selected{% endif %}>{{ m.label }}</option>{% endfor %}
+      </select></label>
+    <label>Days <input type="number" name="days" min="1" max="365" value="{{ filters.days }}"></label>
+    <button type="submit" class="btn btn--secondary btn--small">Show</button>
+  </form>
+
+  {% if statuses %}
+  <table class="table">
+    <thead><tr><th>Series</th><th>Status</th><th>Flags</th><th>Forecast</th><th>Points</th><th>Limits</th></tr></thead>
+    <tbody>
+    {% for s in statuses %}{% set c = s.chart %}
+      <tr>
+        <td><a href="{{ url_for('quality_series') }}?id={{ c.series.key.slug|urlencode }}">{{ c.series.key.label }}</a></td>
+        <td>{% if s.worst %}<span class="sev sev--{{ s.worst.name }}">{{ s.worst.name }}</span>{% else %}<span class="sev sev--none">OK</span>{% endif %}</td>
+        <td>{{ s.flags }}</td>
+        <td>{% if s.days_to_limit is not none %}window in ~{{ "%.0f"|format(s.days_to_limit) }} days{% else %}<span class="muted">—</span>{% endif %}</td>
+        <td>{{ c.series.points|length }}</td>
+        <td>{% if c.current %}{{ "provisional" if c.current.provisional else "approved" }}{% else %}<span class="muted">none yet</span>{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+    <p class="muted">No QC data yet: check standards, CRMs and blanks appear here once runs are imported.</p>
+  {% endif %}
+{% endblock %}

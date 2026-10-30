@@ -89,6 +89,21 @@ Tally and themes are updated now and then at the bottom.
 | J | Jamie writes every word of the page's prose: "we don't [want] AI slop in a portfolio piece". | Claude ships the structure, diagram and tests; the words sit in one file (`templates/about/_copy.html`) as short placeholders. Jamie then chose to merge with the placeholders and write later. |
 | J | Names: SlimLIMS for the software, YourLab for the fictional lab running it. | Header "YourLab SlimLIMS"; footer "YourLab running SlimLIMS v0.1.0" (the app version; Jamie); the landing page is titled SlimLIMS. |
 
+## 2026-10-29: slim-quality part 1
+
+| Kind | What | Notes |
+|---|---|---|
+| J | Westgard is a real-time tool; Jamie's labs run many short runs on one calibration and report as they go. So: before release (the gate) and after release (trends) are separate jobs; part 1 is after release, the before-release warnings parked as part 3. | Jamie asked "before or after release?" until the split was plain. |
+| J | ppt reality: contamination skews blanks and low checks; checks at 50–100 ppt, ±25 % window, cool vs hot plasma. | Shaped robust limits, one-sided blank tools, per-mode series. |
+| C→J | Claude narrowed to one tool (EWMA and a forecast, since ±25 % makes Westgard nearly idle); Jamie: a quality manager's dream needs many tools, toggled and tuned, plus audit tools. | Became the profile and toolbox (D-110) and the part 2 audit list (D-109). |
+| C→J | Claude added a channel model (isotopes, wavelengths, a reported-channel step), industry presets and mining tools; Jamie: "too deep in the weeds, keep it generic". | Kept: one optional `conditions` label (D-106). |
+| F | `qtegra/1` drops the plasma mode; Jamie: "why should plasma mode be dropped?" | Claude hadn't proposed dropping it; it explained the existing loss and kept the mode (D-106). |
+| J | A quality manager and quality users, not one quality role. | Two capabilities; managers decide, self-approval shown (D-109). |
+| J | Not modelling Jamie's lab: the product must suit a mining lab as well as a semiconductor lab. | Series keys and limit sources are generic. |
+| C✓ | Change control with propose/decide, backtest, limits set once from a baseline or certificate, SVG charts drawn on the server. | D-110. |
+| C✓ | QC-only batches for the demo history, over an internal TR or history made up on the fly. | D-108; Claude found that slim-data refused a batch with no samples. |
+| J | Where a sample should be against its turnaround: worth a view; parked. | D-111. |
+
 ## Themes so far
 - **Domain facts are Jamie's, and they overrule Claude's defaults:** DF < 1, MDL averaging, standards as
   recipes, spike placement. Claude's "cautious" engineering defaults were wrong more than once where
