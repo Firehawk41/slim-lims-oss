@@ -104,6 +104,17 @@ Tally and themes are updated now and then at the bottom.
 | C✓ | QC-only batches for the demo history, over an internal TR or history made up on the fly. | D-108; Claude found that slim-data refused a batch with no samples. |
 | J | Where a sample should be against its turnaround: worth a view; parked. | D-111. |
 
+## 2026-10-30: slim-quality review, then part 2's first slice
+
+| Kind | What | Notes |
+|---|---|---|
+| J | Use the remaining budget well: Claude proposed finish → review → midnight fix → design turn; Jamie agreed. | |
+| F | Module review: a stale profile approval undid a newer one; concurrent decisions were 500s; charts dated in UTC; bad series ids were 500s. | All fixed with guard tests (`REVIEW_2026-10-30.md`). |
+| F | The prep demo and a prep test failed every night between midnight UTC and midnight in the lab. | Dates crossed midnight; fixed in the wiring PR. |
+| C✓ | Part 2 starts with the vertical audit, then nonconformities; random pick or by number; no NC raised by a flag on its own; an impact assessment records decisions and never changes results. | D-112…D-114, "yes to all". |
+| C→C | The app first trusted the impact labels and a non-manager's refused assessment read as a form error. | Labels now built by the app; permission asked before the form is read (`Nonconformity.allows`). |
+| C→C | "Registered by an instrument file" was first shown as a failed audit check. | A legitimate path (D-24): a note, not a fault. |
+
 ## Themes so far
 - **Domain facts are Jamie's, and they overrule Claude's defaults:** DF < 1, MDL averaging, standards as
   recipes, spike placement. Claude's "cautious" engineering defaults were wrong more than once where

@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Audits — Quality — YourLab{% endblock %}
+{% block extra_head %}<link href="{{ url_for('static', path='css/quality.css') }}" rel="stylesheet" />{% endblock %}
+{% block content %}
+  <h1>Vertical audits</h1>
+  {% include "quality/_nav.html" %}
+  <p class="hint">Pick a released report and follow it end to end: the request, the prep book, the instrument file,
+    the calibration and QC, the rules that decided each result, who reviewed and released it, and the report file
+    itself (ISO 17025 §7.5, §8.4). Record what you found; findings raise a nonconformity.</p>
+  <form method="get" action="{{ url_for('quality_audit_random') }}" class="choice-row">
+    <label>Issued from <input type="date" name="start" value="{{ period[0] }}"></label>
+    <label>to <input type="date" name="end" value="{{ period[1] }}"></label>
+    <button type="submit" class="btn btn--primary">Audit a random report</button>
+  </form>
+  <h2>Reports issued {{ period[0] }} to {{ period[1] }}</h2>
+  <table class="table">
+    <thead><tr><th>Report</th><th>TR</th><th>Issued</th><th>Lines</th><th>Last audit</th></tr></thead>
+    <tbody>{% for i in issues %}{% set last = latest.get("issue:" ~ i.id) %}
+      <tr><td><a href="{{ url_for('quality_audit', issue_id=i.id) }}">Report {{ i.id }}</a>{% if i.amends %} (amends {{ i.amends }}){% endif %}</td>
+        <td>{{ i.tr_number }}</td><td>{{ i.created_at.astimezone(zone).strftime("%Y-%m-%d %H:%M") }}</td><td>{{ i.lines|length }}</td>
+        <td>{% if last %}<span class="sev sev--{{ 'none' if last.outcome.name == 'CONFORMING' else 'WARN' }}">{{ last.outcome.name.lower() }}</span> {{ last.at.astimezone(zone).date() }}{% else %}<span class="muted">never</span>{% endif %}</td></tr>
+    {% else %}<tr><td colspan="5" class="muted">No reports issued in this period.</td></tr>{% endfor %}</tbody>
+  </table>
+  <h2>Recent audits</h2>
+  <table class="table">
+    <thead><tr><th>When</th><th>What</th><th>Outcome</th><th>By</th></tr></thead>
+    <tbody>{% for r in records %}
+      <tr><td>{{ r.at.astimezone(zone).strftime("%Y-%m-%d") }}</td><td>{{ r.subject }}</td>
+        <td><span class="sev sev--{{ 'none' if r.outcome.name == 'CONFORMING' else 'WARN' }}">{{ r.outcome.name.lower() }}</span>{% if r.findings %} {{ r.findings }}{% endif %}</td><td>{{ r.by.display }}</td></tr>
+    {% else %}<tr><td colspan="4" class="muted">None yet.</td></tr>{% endfor %}</tbody>
+  </table>
+{% endblock %}

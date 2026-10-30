@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Nonconformities — Quality — YourLab{% endblock %}
+{% block extra_head %}<link href="{{ url_for('static', path='css/quality.css') }}" rel="stylesheet" />{% endblock %}
+{% macro row(n) %}<tr><td><a href="{{ url_for('quality_nc', nc_id=n.id) }}">{{ n.number }}</a></td><td>{{ n.title }}</td>
+  <td>{{ n.state.label }}</td><td>{{ n.instrument or "—" }}{% if n.analyte %} · {{ n.analyte }}{% endif %}</td>
+  <td>{{ n.source.label }}</td><td>{{ n.raised_by.display }}, {{ n.raised_at.astimezone(zone).date() }}</td></tr>{% endmacro %}
+{% block content %}
+  <h1>Nonconformities</h1>
+  {% include "quality/_nav.html" %}
+  <p class="hint">ISO 17025 §7.10 and §8.7. Raise one by hand, or from a flag, an event or an audit. Its state follows what
+    is recorded on it: assessed (which released results it touched, and what to do about each), action taken,
+    effective, closed.</p>
+  <h2>Open</h2>
+  <table class="table"><thead><tr><th>#</th><th>Title</th><th>State</th><th>Where</th><th>Source</th><th>Raised</th></tr></thead>
+    <tbody>{% for n in open %}{{ row(n) }}{% else %}<tr><td colspan="6" class="muted">None open.</td></tr>{% endfor %}</tbody></table>
+
+  <section class="form-section">
+    <h2>Raise a nonconformity</h2>
+    <form method="post" action="{{ url_for('quality_nc_raise') }}" class="stack-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+      <input type="hidden" name="source" value="{{ form.source }}">
+      <input type="hidden" name="ref" value="{{ form.ref }}">
+      <label>Title <input type="text" name="title" maxlength="200" required value="{{ form.title }}"></label>
+      <label>What happened <textarea name="description" rows="3" maxlength="4000" required>{{ form.description }}</textarea></label>
+      <fieldset><legend>Where and when (to find the released results it may have touched)</legend>
+        <label>Instrument <select name="instrument"><option value="">—</option>{% for i in instruments %}<option value="{{ i }}"{% if form.instrument == i %} selected{% endif %}>{{ i }}</option>{% endfor %}</select></label>
+        <label>Analyte <input type="text" name="analyte" maxlength="50" value="{{ form.analyte }}" placeholder="blank: every analyte"></label>
+        <label>From <input type="date" name="start" value="{{ form.start }}"></label>
+        <label>To <input type="date" name="end" value="{{ form.end }}"></label>
+      </fieldset>
+      {% if form.ref %}<p class="hint">From: {{ form.ref }}</p>{% endif %}
+      <button type="submit" class="btn btn--primary">Raise</button>
+    </form>
+  </section>
+
+  <h2>Closed</h2>
+  <table class="table"><thead><tr><th>#</th><th>Title</th><th>State</th><th>Where</th><th>Source</th><th>Raised</th></tr></thead>
+    <tbody>{% for n in closed %}{{ row(n) }}{% else %}<tr><td colspan="6" class="muted">None yet.</td></tr>{% endfor %}</tbody></table>
+{% endblock %}

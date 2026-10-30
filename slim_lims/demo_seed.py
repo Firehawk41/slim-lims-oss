@@ -39,7 +39,7 @@ from slim_lims.labtime import LabClock
 from slim_lims.oss_guard import assert_oss_database
 from slim_lims.personas import sync_personas
 from slim_lims.prep import migrate_slim_prep, publish_demo_prep
-from slim_lims.quality import migrate_slim_quality, seed_quality_history
+from slim_lims.quality import migrate_slim_quality, seed_demo_nonconformity, seed_quality_history
 from slim_lims.reference_cache import load_reference
 from slim_lims.repositories import TRSubmissionRepository
 from slim_lims.results import SpecReader, migrate_slim_data, publish_demo_rules
@@ -136,6 +136,7 @@ def seed_demo(
                 report.prepped = seed_prep_scenario(session, reference, specs, clock.now())
                 session.commit()
                 report.qc_runs = seed_quality_history(session, reference, specs, clock.now())
+                seed_demo_nonconformity(session, clock.now())
                 session.commit()
     finally:
         portal_engine.dispose()

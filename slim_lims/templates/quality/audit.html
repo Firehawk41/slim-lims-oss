@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% set issue = page.issue %}
+{% block title %}Audit of report {{ issue.id }} — Quality — YourLab{% endblock %}
+{% block extra_head %}<link href="{{ url_for('static', path='css/quality.css') }}" rel="stylesheet" />{% endblock %}
+{% macro ok(v) %}{% if v is none %}<span class="sev sev--INFO">note</span>{% elif v %}<span class="sev sev--none">✓</span>{% else %}<span class="sev sev--ACTION">✗</span>{% endif %}{% endmacro %}
+{% macro when(t) %}{{ t.astimezone(zone).strftime("%Y-%m-%d %H:%M") }}{% endmacro %}
+{% block content %}
+  <h1>Audit of report {{ issue.id }} ({{ issue.tr_number }})</h1>
+  {% include "quality/_nav.html" %}
+  <p>Issued {{ when(issue.created_at) }} by {{ issue.created_by.display }}{% if issue.amends %}, amending report {{ issue.amends }}{% endif %};
+    file <code>{{ issue.file_sha256[:16] }}…</code>. <a href="{{ url_for('results_report', tr_number=issue.tr_number) }}">The report as it stands</a>.</p>
+
+  <section class="form-section">
+    <h2>Summary</h2>
+    <table class="table"><tbody>
+      {% for c in page.checks %}<tr><td>{{ ok(c.ok) }}</td><td>{{ c.what }}</td><td class="muted">{{ c.detail }}</td></tr>{% endfor %}
+    </tbody></table>
+  </section>
+
+  <section class="form-section">
+    <h2>The request, as it stood when the report was issued</h2>
+    <table class="table">
+      <thead><tr><th>Version</th><th>When</th><th>Change</th><th>By</th></tr></thead>
+      <tbody>{% for v in page.tr_versions %}<tr><td>{{ v.version }}</td><td>{{ when(v.recorded_at) }}</td><td>{{ v.change }}</td><td>{{ v.actor_display }}</td></tr>{% else %}<tr><td colspan="4" class="muted">No history recorded.</td></tr>{% endfor %}</tbody>
+    </table>
+  </section>
+
+  {% for line in page.lines %}{% set r = line.result %}
+  <section class="form-section">
+    <h2>{{ r.sample }} · {{ r.analyte.code }}: {{ r.value }}{% if r.unit %} {{ r.unit }}{% endif %} <span class="muted">(version {{ r.version }}{% if r.latest_version > r.version %}, now v{{ r.latest_version }}{% endif %})</span></h2>
+    <dl class="kv-inline">
+      <div><dt>Verdict</dt><dd>{{ r.verdict }}{% if r.flags %}: {{ r.flags|map(attribute="code")|join(", ") }}{% endif %}</dd></div>
+      <div><dt>Ruleset</dt><dd>{{ r.ruleset_name }} (#{{ r.ruleset_id }}, <code>{{ r.ruleset_hash[:12] }}…</code>)</dd></div>
+      <div><dt>Replay</dt><dd>{{ ok(r.replay is none) }} {{ r.replay or "matches what was stored" }}</dd></div>
+      <div><dt>Made</dt><dd>{{ when(r.made_at) }} by {{ r.made_by.display }}{% if r.reason %}: {{ r.reason }}{% endif %}</dd></div>
+      <div><dt>Prep batch</dt><dd>{{ r.batch_code }} ({{ r.prep_method }})</dd></div>
+    </dl>
+    <h3>Sign-offs</h3>
+    <ul>{% for e in r.events %}<li>{{ e.kind.name.lower() }} by {{ e.actor.display }} ({{ e.actor.identity_source.name.lower() }}), {{ when(e.at) }}{% if e.solo %} <span class="sev sev--WARN">solo</span>{% endif %}{% if e.reason_category %}: {{ e.reason_category }}{% endif %}{% if e.note %} — {{ e.note }}{% endif %}</li>{% else %}<li class="muted">none</li>{% endfor %}</ul>
+
+    <h3>Prep book</h3>
+    {% if line.prep %}{% set b = line.prep.item %}
+      <p>{{ b.method }} on balance {{ b.balance }}; prepped by {{ b.prep.analyst }} at {{ when(b.prep.at) }}; book version {{ line.prep.version }}{% if line.prep.reason %} ({{ line.prep.reason }}){% endif %}. <a href="{{ url_for('prep_batch', code=r.batch_code) }}">The batch in the prep book</a>.</p>
+      {% if line.prep_sample %}
+      <table class="table">
+        <thead><tr><th>Cup</th><th>Kind</th><th>Gross / final (g)</th><th>Spikes</th></tr></thead>
+        <tbody>{% for cup in line.prep_sample.cups %}<tr><td>{{ cup.number }}</td><td>{{ cup.kind.name.lower() }}</td><td>{{ cup.weighing.gross }} / {{ cup.weighing.final }}</td>
+          <td>{% for s in cup.spikes %}{{ s.volume_ul }} µL of {{ s.standard }} ({{ s.concentration.value }} {{ s.concentration.unit }}, expires {{ s.expires }}), pipette {{ s.pipette }}{% if not loop.last %}; {% endif %}{% else %}—{% endfor %}</td></tr>{% endfor %}</tbody>
+      </table>{% endif %}
+    {% else %}<p class="muted">Not in the prep book: the batch was registered by an instrument file.</p>{% endif %}
+
+    <h3>Runs</h3>
+    <table class="table">
+      <thead><tr><th>Run</th><th>Instrument</th><th>Measured</th><th>File</th><th>Reader</th><th>Analyst / imported by</th></tr></thead>
+      <tbody>{% for run in r.runs %}<tr><td>{{ run.run_code }}</td><td>{{ run.instrument }}</td><td>{{ when(run.analyzed_at) }}</td>
+        <td>{% if run.file_kept %}<a href="{{ url_for('results_run_file', run_id=run.run_id) }}">{{ run.file_name }}</a>{% else %}{{ run.file_name }} <span class="muted">(not kept)</span>{% endif %}<br><code>{{ run.file_sha256[:16] }}…</code></td>
+        <td>{{ run.reader }} ({{ run.source_kind.name.lower() }})</td><td>{{ run.analyst.display }} / {{ run.imported_by.display }}</td></tr>{% endfor %}</tbody>
+    </table>
+    {% if r.calibrations %}<p>Calibration: {% for c in r.calibrations %}r {{ c.correlation or "—" }}, R² {{ c.determination or "—" }}, LOD {{ c.lod or "—" }}, BEC {{ c.bec or "—" }} {{ c.unit }}{% if c.conditions %} ({{ c.conditions }}){% endif %}{% if not loop.last %}; {% endif %}{% endfor %}</p>{% endif %}
+
+    <h3>Readings the engine saw</h3>
+    <table class="table">
+      <thead><tr><th>What</th><th>Rep</th><th>Value</th><th>Dilution</th><th>MDL</th><th>RSD %</th><th>ISTD %</th><th>Recovery</th></tr></thead>
+      <tbody>{% for x in r.readings %}<tr{% if x.excluded %} class="muted"{% endif %}><td>{{ x.role.name.lower() }}{% if x.conditions %} ({{ x.conditions }}){% endif %}{% if x.excluded %} — excluded{% endif %}</td>
+        <td>{{ x.replicate }}{% if x.attempt > 1 %}.{{ x.attempt }}{% endif %}</td><td>{{ x.value }} {{ x.unit }}</td><td>{{ x.dilution }}</td><td>{{ x.mdl or "—" }}</td><td>{{ x.rsd or "—" }}</td><td>{{ x.istd_recovery or "—" }}</td>
+        <td>{% if x.recovery is not none %}{{ "%.1f"|format(x.recovery * 100) }} % of {{ x.expected }}{% else %}—{% endif %}</td></tr>{% endfor %}</tbody>
+    </table>
+
+    <h3>QC around the run, as the charts stood then</h3>
+    {% for run, context in line.qc %}
+      <p><strong>{{ run.run_code }}</strong></p>
+      <ul>{% for c in context %}<li><a href="{{ url_for('quality_series') }}?id={{ c.chart.series.key.slug|urlencode }}">{{ c.chart.series.key.label }}</a>:
+        {% if c.limits %}limits {{ "provisional" if c.limits.provisional else c.limits.method.name.lower() }}{% else %}no limits yet{% endif %};
+        {% if c.flags %}{% for f in c.flags %}<span class="sev sev--{{ f.severity.name }}">{{ f.code }}</span> {{ f.at.astimezone(zone).date() }}{% if not loop.last %}, {% endif %}{% endfor %}{% else %}no flags that week{% endif %}</li>
+      {% else %}<li class="muted">No QC series for this instrument and analyte.</li>{% endfor %}</ul>
+    {% endfor %}
+  </section>
+  {% endfor %}
+
+  <section class="form-section">
+    <h2>Record this audit</h2>
+    {% if records %}<ul>{% for a in records %}<li>{{ a.at.astimezone(zone).date() }} {{ a.by.display }}: {{ a.outcome.name.lower() }}{% if a.findings %} — {{ a.findings }}{% endif %}</li>{% endfor %}</ul>{% endif %}
+    <form method="post" action="{{ url_for('quality_audit_record', issue_id=issue.id) }}" class="stack-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+      <label>Outcome <select name="outcome">{% for o in outcomes %}<option value="{{ o.value }}">{{ o.name.lower() }}</option>{% endfor %}</select></label>
+      <label>Findings <textarea name="findings" rows="3" maxlength="4000" placeholder="needed when there are findings"></textarea></label>
+      <button type="submit" class="btn btn--primary">Record the audit</button>
+    </form>
+  </section>
+{% endblock %}

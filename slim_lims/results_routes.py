@@ -21,17 +21,19 @@ doesn't allow (role, four-eyes, state) -> 409; a missing reason or a category th
 list -> 422; unknown batch/result -> 404.
 """
 
+import re
 from hashlib import sha256
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse, Response
 from pydantic import ValidationError
 from slim_data.domain.enums import Action
 from slim_data.domain.values import AnalyteRef, SampleRef
 from slim_data.domain.workflow import UnknownCategory, WorkflowError
 from slim_data.engine.ruleset import RulesetError
 from slim_data.persistence._rows import NotFound
+from slim_data.persistence.observations import get_run, run_file
 from slim_data.persistence.results import issues_for_tr, load_result
 from slim_data.persistence.rulesets import current_policy
 from slim_data.service import workflow as wf
@@ -587,6 +589,23 @@ def api_release(sample: str, analysis_id: int, data: SignOffIn, user: RequireSta
 @api_router.get("/reason-categories", summary="The reason categories accept and exception may give (D-72)")
 def api_reason_categories(user: RequireStaff, db: DB):
     return _categories(db)
+
+
+@router.get("/results/runs/{run_id}/file", name="results_run_file")
+def run_file_download(run_id: int, user: RequireStaff, db: DB):
+    """The instrument file a run was imported from, byte for byte (D-88): what an auditor asks for."""
+    content = run_file(db, run_id)
+    if content is None:
+        raise HTTPException(status_code=404, detail="That run's file isn't kept.")
+    name = re.sub(r"[^A-Za-z0-9._-]", "_", get_run(db, run_id).source.name)[:100] or "run"
+    return Response(
+        content,
+        media_type="application/octet-stream",
+        headers={
+            "Content-Disposition": f'attachment; filename="{name}"',
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 @router.get("/results/reports/{tr_number}", name="results_report")

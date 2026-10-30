@@ -10,3 +10,5 @@
 .tool-card h3 { margin: 0 0 .25rem; }
 .inline-checks label { display: inline-block; margin-right: 1rem; font-weight: normal; }
 .kv-inline { display: flex; flex-wrap: wrap; gap: .25rem 1.5rem; }
+.stack-form.wide-form { max-width: none; }
+.wide-form select { min-width: 11em; }

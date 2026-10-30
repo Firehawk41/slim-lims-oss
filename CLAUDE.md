@@ -48,8 +48,8 @@ shared database; `cli migrate` and the seed run them all.
 
 **Open:** deeper report-engine wiring (spec §13; changes other repos, needs the go-ahead); ecosystem
 docker-compose for the VPS (**deferred, do not start**); the landing page (`/about`) is live with
-placeholders; Jamie writes its words in `templates/about/_copy.html`. slim-quality part 1 is in (phase 3);
-next is roadmap phase 4 (`docs/ROADMAP.md`).
+placeholders; Jamie writes its words in `templates/about/_copy.html`. slim-quality part 1 is in (phase 3), and
+part 2 has begun (vertical audit, nonconformities); roadmap phase 4 or the rest of phase 5 next (`docs/ROADMAP.md`).
 
 ## How to run
 
@@ -94,7 +94,8 @@ slim_lims/
 ├── bridge.py        # to_slim_v1: TR -> slim-domain v1 TRSubmission
 ├── results.py, results_routes.py  # slim-data host side; /results, /api/results (staff)
 ├── prep.py, prep_routes.py        # slim-prep host side (TrSamples: its TR port); /prep, /api/prep (staff)
-├── quality.py, quality_routes.py  # slim-quality host side (QcSource over slim-data, demo QC history); /quality
+├── quality.py, quality_routes.py  # slim-quality host side: QcSource over slim-data, the vertical audit (composed
+│                                  #   from every module, D-113), NCs (D-114), demo QC history and NC; /quality
 ├── invoices.py, demo_prices.py    # invoicing V5; /invoices
 ├── reports.py       # issued reports: engine_renderer / plain_renderer, report_files
 ├── board.py         # the lab board (spec §13)
