@@ -125,6 +125,7 @@ Tally and themes are updated now and then at the bottom.
 | F | slim-quality: backtest judged a cut history; one QC level split by how a file wrote it; no verify for its records; NC entries could race. | Fixed with guard tests (Q5–Q8). |
 | F | The board read every batch whole, one by one. | One query (O1). |
 | C→J? | Raised, not built: pin module versions (R1); a slim-data handoff API for slim-prep (R2); V5 fixing its CSV (R3); payments as append-only rows (R4). | For Jamie. |
+| C✓ | Jamie: "1-4 please". R1–R4 built as recommended: D-116 (handoff API), D-117 (the host pins every module to a commit; libraries name each other unversioned), D-118 (V5's CSV safe at its source), D-119 (payments append-only rows; invoices append-only too). | Guards: `test_pins.py`, slim-prep's architecture test, V5's export test, `test_r4_…`. |
 
 ## Themes so far
 - **Domain facts are Jamie's, and they overrule Claude's defaults:** DF < 1, MDL averaging, standards as

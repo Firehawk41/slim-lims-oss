@@ -140,5 +140,26 @@ def test_i1_a_formula_typed_on_the_request_form_reaches_accounting_as_text(db, s
     header, body = rows[0], rows[1:]
     requester, po = header.index(REQUESTER), header.index(PO)
     assert body and all(r[requester] == "'" + formula and r[po] == "'@SUM(1)" for r in body)
-    assert invoices._as_text("-12.5") == "-12.5" and invoices._as_text("-x") == "'-x"
-    assert invoices._as_text("ok") == "ok"
+
+
+def test_r4_a_payment_is_a_row_added_and_invoices_are_append_only(db, seeded):
+    """App review 2026-10-30b R4 (D-119): marking paid adds a payment; nothing rewrites an invoice."""
+    from sqlalchemy import text
+    from sqlalchemy.exc import DBAPIError
+
+    from slim_lims.models import TRInvoicePaymentRow, TRInvoiceRow
+
+    paid = db.scalars(select(TRInvoicePaymentRow)).all()
+    assert len(paid) == 1 and paid[0].paid_on is not None  # the demo's clean_pass
+    invoice = db.get(TRInvoiceRow, paid[0].invoice_id)
+    assert (invoice.paid_on, invoice.paid_by) == (paid[0].paid_on, paid[0].paid_by)
+    db.rollback()
+    for statement in (
+        "UPDATE tr_invoices SET sent_by = 'x'",
+        "DELETE FROM tr_invoices",
+        "UPDATE tr_invoice_payments SET paid_by = 'x'",
+        "DELETE FROM tr_invoice_payments",
+    ):
+        with pytest.raises(DBAPIError, match="append-only"):
+            db.execute(text(statement))
+        db.rollback()

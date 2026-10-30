@@ -238,23 +238,27 @@ def _seed_counter(target, connection, **_kw) -> None:
     connection.execute(target.insert().values(id=1, last_value=0))
 
 
-@event.listens_for(TRVersionRow.__table__, "after_create")
-def _versions_append_only(target, connection, **_kw) -> None:
-    # The triggers migration 0010 makes; keeps metadata.create_all (tests, demos) equivalent.
+def append_only(connection, table: str) -> None:
+    """Refuses UPDATE and DELETE on `table` (and TRUNCATE on Postgres): the triggers migrations 0010 and
+    0011 make, so metadata.create_all (tests, demos) is equivalent."""
     if connection.dialect.name == "postgresql":
         connection.exec_driver_sql(
-            "CREATE OR REPLACE FUNCTION tr_versions_append_only() RETURNS trigger LANGUAGE plpgsql AS $$ "
-            "BEGIN RAISE EXCEPTION 'tr_versions is append-only'; END $$"
+            f"CREATE OR REPLACE FUNCTION {table}_append_only() RETURNS trigger LANGUAGE plpgsql AS $$ "
+            f"BEGIN RAISE EXCEPTION '{table} is append-only'; END $$"
         )
         connection.exec_driver_sql(
-            "CREATE TRIGGER tr_versions_append_only BEFORE UPDATE OR DELETE ON tr_versions "
-            "FOR EACH ROW EXECUTE FUNCTION tr_versions_append_only()"
+            f"CREATE TRIGGER {table}_append_only BEFORE UPDATE OR DELETE ON {table} "
+            f"FOR EACH ROW EXECUTE FUNCTION {table}_append_only()"
+        )
+        connection.exec_driver_sql(
+            f"CREATE TRIGGER {table}_no_truncate BEFORE TRUNCATE ON {table} "
+            f"FOR EACH STATEMENT EXECUTE FUNCTION {table}_append_only()"
         )
     else:
         for operation in ("UPDATE", "DELETE"):
             connection.exec_driver_sql(
-                f"CREATE TRIGGER tr_versions_no_{operation.lower()} BEFORE {operation} ON tr_versions "
-                "BEGIN SELECT RAISE(ABORT, 'tr_versions is append-only'); END"
+                f"CREATE TRIGGER {table}_no_{operation.lower()} BEFORE {operation} ON {table} "
+                f"BEGIN SELECT RAISE(ABORT, '{table} is append-only'); END"
             )
 
 
@@ -277,8 +281,8 @@ class AnalysisCatalogRow(Base):
 
 
 # ---------------------------------------------------------------- invoices (spec §13)
-# Stands in for the invoicing module until it is rewired to read SLIM: one row per invoice sent for a
-# TR, paid when the payment arrives. The invoicing program will write these instead of staff clicks.
+# One row per invoice sent for a TR (V5 prices it), one row per payment recorded against it. Both
+# append-only (slim-data D-119): a payment is a fact added, never a field changed.
 
 
 class TRInvoiceRow(Base):
@@ -290,9 +294,38 @@ class TRInvoiceRow(Base):
     )
     sent_on: Mapped[date] = mapped_column(Date)
     sent_by: Mapped[str] = mapped_column(String(254))
-    paid_on: Mapped[date | None] = mapped_column(Date, nullable=True)
-    paid_by: Mapped[str] = mapped_column(String(254), default="")
     recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+    payments: Mapped[list["TRInvoicePaymentRow"]] = relationship(
+        lazy="selectin", order_by="TRInvoicePaymentRow.id", viewonly=True
+    )
+
+    @property
+    def paid_on(self) -> date | None:
+        return self.payments[0].paid_on if self.payments else None
+
+    @property
+    def paid_by(self) -> str:
+        return self.payments[0].paid_by if self.payments else ""
+
+
+class TRInvoicePaymentRow(Base):
+    """A payment recorded against an invoice (slim-data D-119). Append-only (triggers, migration 0011)."""
+
+    __tablename__ = "tr_invoice_payments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    invoice_id: Mapped[int] = mapped_column(ForeignKey("tr_invoices.id"), index=True)
+    paid_on: Mapped[date] = mapped_column(Date)
+    paid_by: Mapped[str] = mapped_column(String(254))
+    recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+
+
+def _append_only_after_create(target, connection, **_kw) -> None:
+    append_only(connection, target.name)
+
+
+for _table in (TRVersionRow.__table__, TRInvoiceRow.__table__, TRInvoicePaymentRow.__table__):
+    event.listen(_table, "after_create", _append_only_after_create)
 
 
 class ReportFileRow(Base):
