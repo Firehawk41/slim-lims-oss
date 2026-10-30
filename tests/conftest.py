@@ -5,6 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 from slim_data.persistence import migrate as slim_data_migrate
 from slim_invoicing.persistence import migrate as invoicing_migrate
+from slim_quality.persistence import migrate as quality_migrate
 
 from slim_lims.config import Settings
 from slim_lims.db import Base, make_engine, make_session_factory
@@ -48,6 +49,8 @@ def engine(tmp_path):
         slim_data_migrate.upgrade(connection)
         invoicing_migrate.downgrade(connection)  # and invoicing's (slim-data D-83)
         invoicing_migrate.upgrade(connection)
+        quality_migrate.downgrade(connection)  # and slim-quality's (D-109)
+        quality_migrate.upgrade(connection)
     yield engine
     engine.dispose()
 

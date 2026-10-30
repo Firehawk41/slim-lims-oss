@@ -2,8 +2,8 @@
 
 > ## ⚠️ OSS ONLY — read first
 > A **portfolio demo** on the **open-source** SLIM repos only (`slim-domain-oss`, `slim-report-engine-oss`,
-> `slim-data-oss`, `slim-prep-oss`) and their fictional demo data. **Never connect it to PreciLab (or any
-> real lab) production databases, shares or services.** Enforced: `slim_lims/oss_guard.py` refuses any URL
+> `slim-data-oss`, `slim-prep-oss`, `slim-quality-oss`) and their fictional demo data. **Never connect it
+> to PreciLab (or any real lab) production databases, shares or services.** Enforced: `slim_lims/oss_guard.py` refuses any URL
 > containing "precilab" and any host but localhost / 127.0.0.1 / `db` / `postgres` unless listed in
 > `PORTAL_ALLOWED_DB_HOSTS`; every connection goes through `db.make_engine` (`tests/test_oss_guard.py`);
 > `.env` is read from the current directory only. Do not weaken any of this.
@@ -42,12 +42,14 @@ and release results, issue reports and invoice; the lab board (`/`) shows it all
 replaces the Excel TR form; emailed `.xlsx` forms stay supported by slim-domain's parsers.
 
 **Modules (required libraries):** slim-data (results: import, rules engine, review, release, reports),
-slim-prep (the prep book), invoicing V5 (`slim_invoicing`), slim-domain (SLIM tables, audit log),
-slim-report-engine (the report template). Each keeps its own tables and Alembic version table in the
+slim-prep (the prep book), slim-quality (QC charts and tools, change control), invoicing V5
+(`slim_invoicing`), slim-domain (SLIM tables, audit log), slim-report-engine (the report template). Each keeps its own tables and Alembic version table in the
 shared database; `cli migrate` and the seed run them all.
 
 **Open:** deeper report-engine wiring (spec §13; changes other repos, needs the go-ahead); ecosystem
-docker-compose for the VPS (**deferred, do not start**); the landing page (`/about`) is live with placeholders; Jamie writes its words in `templates/about/_copy.html`; then roadmap phase 3 (`docs/ROADMAP.md`).
+docker-compose for the VPS (**deferred, do not start**); the landing page (`/about`) is live with
+placeholders; Jamie writes its words in `templates/about/_copy.html`. slim-quality part 1 is in (phase 3);
+next is roadmap phase 4 (`docs/ROADMAP.md`).
 
 ## How to run
 
@@ -92,11 +94,12 @@ slim_lims/
 ├── bridge.py        # to_slim_v1: TR -> slim-domain v1 TRSubmission
 ├── results.py, results_routes.py  # slim-data host side; /results, /api/results (staff)
 ├── prep.py, prep_routes.py        # slim-prep host side (TrSamples: its TR port); /prep, /api/prep (staff)
+├── quality.py, quality_routes.py  # slim-quality host side (QcSource over slim-data, demo QC history); /quality
 ├── invoices.py, demo_prices.py    # invoicing V5; /invoices
 ├── reports.py       # issued reports: engine_renderer / plain_renderer, report_files
 ├── board.py         # the lab board (spec §13)
 ├── about.py         # the landing page's facts (/about; its words: templates/about/_copy.html, Jamie's)
-├── personas.py, demo_scenarios.py, demo_prep.py  # demo personas and seeded scenarios
+├── personas.py, demo_scenarios.py, demo_prep.py  # demo personas (quality ones hold a capability) and scenarios
 ├── api.py           # /api/submissions; service errors -> 422/403/404/409
 ├── routes.py, web.py, templates/, static/        # pages
 ├── audit.py         # slim-domain's audit log (Postgres; per lab schema)
@@ -114,7 +117,8 @@ scripts/seed_demo.py; tests/ (SQLite per test, or Postgres via TEST_DATABASE_URL
 - **Access:** every listing takes a `Scope` (D-103); customers see only their customer's TRs (others 404).
   Roles: `customer` (needs `customer_id`) and `staff` (needs `initials`, `lab_role`). Managing users is a
   capability (D-100). Personas (`DEMO_PERSONAS`) are chosen, not logged in: ASSERTED, refused by /login.
-  Staff act in modules as `results.actor_for(user)` / `prep.prep_actor_for(user)`.
+  Staff act in modules as `results.actor_for(user)` / `prep.prep_actor_for(user)` /
+  `quality.quality_actor(db, user)` (needs the *quality* or *quality manager* capability, D-109).
 - **Machine access:** `Authorization: Bearer $LIMS_API_TOKEN` (spec §12), only `auth.LIMS_ROUTES`, no CSRF,
   no session. Keep `tests/test_lims_contract.py` passing.
 - **CSRF:** every router has `dependencies=[Depends(csrf_protect)]`; forms send `csrf_token`, fetch sends

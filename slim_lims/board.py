@@ -140,6 +140,8 @@ def _batch_index(session: Session) -> dict[tuple[SampleRef, int], str]:
     """(sample, analysis ID) -> its newest prep batch. One pass over the batches per board."""
     index = {}
     for summary in reversed(batches(session)):  # oldest first, so the newest batch wins
+        if summary.qc_only:
+            continue  # an instrument's QC run (slim-data D-108): no samples, nothing on the board
         for sample in get_batch(session, summary.code).samples:
             index[(sample, summary.analysis_id)] = summary.code
     return index

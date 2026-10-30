@@ -43,6 +43,9 @@ def seed_prep_scenario(
     if books.list_batches(session):
         return None
     now = now or datetime.now(UTC)
+    made = (
+        now - timedelta(hours=4)
+    ).date()  # the standards, made before the batch (now − 3 h) on its day or earlier
     host = PortalDemoHost(session, reference, specs, now.date())
     analyst = host.users["analyst"]
     tr = host.new_tr("prepped_evaporation", 2, False, host.analyses["10_elements"][1])
@@ -51,11 +54,9 @@ def seed_prep_scenario(
 
     # 1. the spike standards, from the stock
     who = prep_actor_for(analyst)
-    twenty = record_standard(session, rules_id, RECIPE, "20 ppm", (stock.name, stock.lot), now.date(), who,
+    twenty = record_standard(session, rules_id, RECIPE, "20 ppm", (stock.name, stock.lot), made, who,
                              ("P1000-1",)).item  # fmt: skip
-    fifty = record_standard(
-        session, rules_id, RECIPE, "50 ppb", twenty.ref, now.date(), who, ("P1000-1",)
-    ).item
+    fifty = record_standard(session, rules_id, RECIPE, "50 ppb", twenty.ref, made, who, ("P1000-1",)).item
 
     # 2. the prep batch, sent to results
     samples = TrSamples(session, reference)

@@ -1,0 +1,12 @@
+/* slim-quality pages (D-109): severity chips and the server-drawn charts. */
+.sev { display: inline-block; padding: 0 .5em; border-radius: .6em; font-size: .85em; font-weight: 600; }
+.sev--ACTION { background: #fde2e7; color: #a61b37; }
+.sev--WARN { background: #fff3cd; color: #7a5a00; }
+.sev--INFO { background: #e3f1fb; color: #1a5f8f; }
+.sev--none { background: #e8f5ec; color: #1e6b3a; }
+.qc-chart { width: 100%; height: auto; max-width: 960px; background: #fff; }
+.chart-wrap { overflow-x: auto; }
+.tool-card { border: 1px solid #d1d8e0; border-radius: 6px; padding: .75rem 1rem; margin: .75rem 0; }
+.tool-card h3 { margin: 0 0 .25rem; }
+.inline-checks label { display: inline-block; margin-right: 1rem; font-weight: normal; }
+.kv-inline { display: flex; flex-wrap: wrap; gap: .25rem 1.5rem; }

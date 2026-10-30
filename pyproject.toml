@@ -24,6 +24,8 @@ dependencies = [
     "slim-data @ git+https://github.com/Firehawk41/slim-data-oss@main",
     # The prep book (slim-prep P6). Co-developing: pip install -e ../slim-prep-oss
     "slim-prep @ git+https://github.com/Firehawk41/slim-prep-oss@main",
+    # The quality module (slim-data D-109). Co-developing: pip install -e ../slim-quality-oss
+    "slim-quality @ git+https://github.com/Firehawk41/slim-quality-oss@main",
     # slim-domain: its hash-chained audit log over the shared database (slim-data D-77), and the bridge.
     "slim-domain @ git+https://github.com/Firehawk41/slim-domain-oss@main",
     # Invoicing V5 (slim-data D-83): a subfolder of the invoicing repo. Co-developing: pip install -e ../SLIM-Invoicing-Program/V5-LIMS-Module

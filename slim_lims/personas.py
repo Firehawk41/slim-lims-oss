@@ -15,7 +15,8 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from slim_lims.models import ROLE_STAFF, User
+from slim_lims.capabilities import PERSONA_GRANTABLE
+from slim_lims.models import ROLE_STAFF, User, UserCapability
 from slim_lims.security import hash_password
 
 PERSONAS_CSV = Path(__file__).resolve().parent / "data" / "demo_personas.csv"
@@ -29,6 +30,7 @@ class Persona:
     lab_role: int | None
     initials: str | None
     customer_id: int | None
+    capabilities: frozenset[str] = frozenset()
 
 
 def load_personas(path: Path = PERSONAS_CSV) -> list[Persona]:
@@ -41,6 +43,7 @@ def load_personas(path: Path = PERSONAS_CSV) -> list[Persona]:
                 lab_role=int(row["lab_role"]) if row["lab_role"].strip() else None,
                 initials=row["initials"].strip().upper() or None,
                 customer_id=int(row["customer_id"]) if row["customer_id"].strip() else None,
+                capabilities=frozenset(c for c in (row.get("capabilities") or "").split("|") if c.strip()),
             )
             for row in csv.DictReader(f)
         ]
@@ -61,8 +64,25 @@ def sync_personas(session: Session, personas: list[Persona] | None = None) -> in
         user.lab_role = p.lab_role if p.role == ROLE_STAFF else None
         user.initials = p.initials if p.role == ROLE_STAFF else None
         user.customer_id = None if p.role == ROLE_STAFF else p.customer_id
+        session.flush()
+        _sync_capabilities(session, user, p.capabilities if p.role == ROLE_STAFF else frozenset())
     session.flush()
     return len(personas)
+
+
+def _sync_capabilities(session: Session, user: User, wanted: frozenset[str]) -> None:
+    """A persona holds exactly the capabilities its row gives, and only those a persona may hold."""
+    unknown = wanted - PERSONA_GRANTABLE
+    if unknown:
+        raise ValueError(f"a persona can't hold {', '.join(sorted(unknown))}")
+    held = {
+        c.capability: c
+        for c in session.scalars(select(UserCapability).where(UserCapability.user_id == user.id))
+    }
+    for capability in wanted - held.keys():
+        session.add(UserCapability(user_id=user.id, capability=capability, granted_by=user.id))
+    for capability in held.keys() - wanted:
+        session.delete(held[capability])
 
 
 def persona_choices(session: Session) -> list[tuple[User, str]]:

@@ -1,5 +1,7 @@
-email,label,role,lab_role,initials,customer_id
-customer@demo.example,Casey (customer A),customer,,,1
-ana@demo.example,Ana (analyst),staff,1,ANA,
-rob@demo.example,Rob (reviewer),staff,2,ROB,
-sue@demo.example,Sue (supervisor),staff,3,SUE,
+email,label,role,lab_role,initials,customer_id,capabilities
+customer@demo.example,Casey (customer A),customer,,,1,
+ana@demo.example,Ana (analyst),staff,1,ANA,,
+rob@demo.example,Rob (reviewer),staff,2,ROB,,
+sue@demo.example,Sue (supervisor),staff,3,SUE,,
+quinn@demo.example,Quinn (quality manager),staff,1,QM,,quality_manager
+uma@demo.example,Uma (quality),staff,1,QU,,quality
