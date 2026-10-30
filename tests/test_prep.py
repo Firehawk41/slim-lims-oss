@@ -355,9 +355,11 @@ def _mercury_line(session) -> dict:
     mercury = Stock(name="Multi-element stock A", lot="DEMO-HG", concentration=thousand, elements=("Hg",),
                     expires=TODAY + timedelta(days=365))  # fmt: skip
     books.save_stock(session, mercury, SEED_PREP_ACTOR)
-    yesterday = TODAY - timedelta(days=1)
+    # Two days back: TODAY is the UTC date, a day ahead of the lab's after midnight UTC, and the page's
+    # 20 ppm standard is made on the lab's today; one day back could be the same name and date.
+    earlier = TODAY - timedelta(days=2)
     made = record_standard(session, rules(session).id, "multi-element spike", "20 ppm",
-                           (mercury.name, mercury.lot), yesterday, SEED_PREP_ACTOR).item  # fmt: skip
+                           (mercury.name, mercury.lot), earlier, SEED_PREP_ACTOR).item  # fmt: skip
     session.commit()
     return SpikeLine.of(made, Decimal(5), "P100-1").model_dump(mode="json")
 
