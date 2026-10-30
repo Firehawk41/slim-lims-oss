@@ -68,7 +68,8 @@ ruff check . && ruff format --check .
 `docker compose up --build`: Postgres 16 + a one-shot seed + the app with personas. **Render**
 (`render.yaml`): a lab per visitor (`DEMO_LABS`, D-102): public is emptied once (`cli empty-public --yes
 --if-needed`), the shared lab is `DATABASE_SCHEMA=lab_shared`, each visitor's first persona claims a
-seeded schema of their own. The service is `slim-lims-oss`, the database `slim-lims-db` (renaming it makes
+seeded schema of their own; a restart (a deploy) drops the spares and upgrades every claimed lab (D-115).
+The service is `slim-lims-oss`, the database `slim-lims-db` (renaming it makes
 Render create a second; the free plan allows one). CI: {SQLite, Postgres 16} × {3.11, 3.12}.
 
 ## File map
@@ -88,7 +89,7 @@ slim_lims/
 ├── security.py      # bcrypt, CSRF, LoginThrottle (D-101), headers + body-size middleware
 ├── labtime.py       # LabClock: the lab's now / today (D-101)
 ├── labs.py          # a lab per visitor: Labs (claim, spares, sweep), with_schema (D-102)
-├── demo_seed.py     # seed_demo(url): the whole demo seed (scripts/seed_demo.py and each lab)
+├── demo_seed.py     # seed_demo(url): the whole demo seed (scripts/seed_demo.py and each lab); upgrade_lab (D-115)
 ├── auth.py          # current_user, require_*; /login, /logout, /demo/personas, fresh lab
 ├── reference.py, reference_cache.py, slim_tables.py, catalog.py  # SLIM reference data (read-only) + analysis catalog
 ├── bridge.py        # to_slim_v1: TR -> slim-domain v1 TRSubmission
@@ -96,7 +97,7 @@ slim_lims/
 ├── prep.py, prep_routes.py        # slim-prep host side (TrSamples: its TR port); /prep, /api/prep (staff)
 ├── quality.py, quality_routes.py  # slim-quality host side: QcSource over slim-data, the vertical audit (composed
 │                                  #   from every module, D-113), NCs (D-114), demo QC history and NC; /quality
-├── invoices.py, demo_prices.py    # invoicing V5; /invoices
+├── invoices.py, demo_prices.py    # invoicing V5; /invoices; the accounting CSV, formula cells as text
 ├── reports.py       # issued reports: engine_renderer / plain_renderer, report_files
 ├── board.py         # the lab board (spec §13)
 ├── about.py         # the landing page's facts (/about; its words: templates/about/_copy.html, Jamie's)

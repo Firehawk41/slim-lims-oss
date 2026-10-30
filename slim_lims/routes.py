@@ -1,7 +1,6 @@
 """Server-rendered pages. Data changes go through SubmissionService, exactly like the JSON API;
 the submission form itself is JavaScript (static/js/request_form.js) posting to /api/submissions."""
 
-import io
 import uuid
 from datetime import date
 from typing import Annotated
@@ -197,10 +196,8 @@ def invoices_home(request: Request, user: RequireStaff, db: DB, reference: Refer
 @router.get("/invoices.csv", name="invoices_csv")
 def invoices_csv(user: RequireStaff, db: DB):
     """Every sales order as the accounting import file (V4's columns)."""
-    out = io.StringIO()
-    slim_invoicing.write_csv(slim_invoicing.sales_orders(db), out)
     return Response(
-        out.getvalue(),
+        invoices.accounting_csv(db),
         media_type="text/csv",
         headers={"Content-Disposition": 'attachment; filename="sales_orders.csv"'},
     )

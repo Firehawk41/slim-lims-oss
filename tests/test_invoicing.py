@@ -121,3 +121,24 @@ def test_customer_as_own_quote_comes_first_and_sets_its_terms(db, seeded, refere
         if p.processing_time == line.processing_time
     )
     assert line.rate < listed  # its own price, not the list's
+
+
+REQUESTER, PO = "Name of Requester", "PO Number"
+
+
+def test_i1_a_formula_typed_on_the_request_form_reaches_accounting_as_text(db, seeded):
+    """App review 2026-10-30b I1: the requester and PO number are the customer's own words."""
+    from sqlalchemy import text
+
+    formula = '=HYPERLINK("http://x","x")'
+    db.execute(
+        text("UPDATE inv_sales_orders SET requester_name = :r, po_number = :p"),
+        {"r": formula, "p": "@SUM(1)"},
+    )
+    db.commit()
+    rows = list(csv.reader(io.StringIO(invoices.accounting_csv(db))))
+    header, body = rows[0], rows[1:]
+    requester, po = header.index(REQUESTER), header.index(PO)
+    assert body and all(r[requester] == "'" + formula and r[po] == "'@SUM(1)" for r in body)
+    assert invoices._as_text("-12.5") == "-12.5" and invoices._as_text("-x") == "'-x"
+    assert invoices._as_text("ok") == "ok"

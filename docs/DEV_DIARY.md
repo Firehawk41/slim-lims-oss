@@ -115,6 +115,17 @@ Tally and themes are updated now and then at the bottom.
 | C→C | The app first trusted the impact labels and a non-manager's refused assessment read as a form error. | Labels now built by the app; permission asked before the form is read (`Nonconformity.allows`). |
 | C→C | "Registered by an instrument file" was first shown as a failed audit check. | A legitimate path (D-24): a note, not a fault. |
 
+## 2026-10-30: app review of the seams
+
+| Kind | What | Notes |
+|---|---|---|
+| J | Review the boundaries between all modules for vulnerabilities and optimizations. | `REVIEW_2026-10-30b.md`. |
+| F | Demo labs outlived deploys with old schemas: a visitor could claim a spare without the newest tables. | D-115: spares rebuilt, claimed labs upgraded at start. |
+| F | The accounting CSV ran formulas typed on the request form (invoicing V5 doesn't guard what slim-prep does). | Guarded in the host; V5's own fix raised (R3). |
+| F | slim-quality: backtest judged a cut history; one QC level split by how a file wrote it; no verify for its records; NC entries could race. | Fixed with guard tests (Q5–Q8). |
+| F | The board read every batch whole, one by one. | One query (O1). |
+| C→J? | Raised, not built: pin module versions (R1); a slim-data handoff API for slim-prep (R2); V5 fixing its CSV (R3); payments as append-only rows (R4). | For Jamie. |
+
 ## Themes so far
 - **Domain facts are Jamie's, and they overrule Claude's defaults:** DF < 1, MDL averaging, standards as
   recipes, spike placement. Claude's "cautious" engineering defaults were wrong more than once where

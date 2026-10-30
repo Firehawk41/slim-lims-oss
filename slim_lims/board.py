@@ -22,9 +22,8 @@ from dataclasses import dataclass, field
 from slim_data.domain.enums import ResultStatus, Verdict
 from slim_data.domain.results import Result
 from slim_data.domain.values import SampleRef
-from slim_data.persistence.observations import get_batch
 from slim_data.persistence.results import issues_for_tr, results_for_tr
-from slim_data.service.views import batches
+from slim_data.service.views import batches, samples_by_batch
 from sqlalchemy.orm import Session
 
 from slim_lims.domain import TRStatus, TRSubmission
@@ -137,12 +136,12 @@ def _chip_state(results: list[Result], on_last_issue: set) -> str:
 
 
 def _batch_index(session: Session) -> dict[tuple[SampleRef, int], str]:
-    """(sample, analysis ID) -> its newest prep batch. One pass over the batches per board."""
+    """(sample, analysis ID) -> its newest prep batch. Two reads per board, whatever the number of batches
+    (app review 2026-10-30b O1: it read every batch whole, one by one)."""
     index = {}
+    samples = samples_by_batch(session)  # a QC-only batch (D-108) has none: nothing on the board
     for summary in reversed(batches(session)):  # oldest first, so the newest batch wins
-        if summary.qc_only:
-            continue  # an instrument's QC run (slim-data D-108): no samples, nothing on the board
-        for sample in get_batch(session, summary.code).samples:
+        for sample in samples.get(summary.code, ()):
             index[(sample, summary.analysis_id)] = summary.code
     return index
 
