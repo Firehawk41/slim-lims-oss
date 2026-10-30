@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Changes — Quality — YourLab{% endblock %}
 {% block extra_head %}<link href="{{ url_for('static', path='css/quality.css') }}" rel="stylesheet" />{% endblock %}
-{% macro what(c) %}{% if c.profile %}Profile: {{ c.profile.tools|selectattr("enabled")|map(attribute="tool")|join(", ") }} on{% else %}Limits for {{ c.limit_set.series.label }}: centre {{ c.limit_set.limits.center }}, SD {{ c.limit_set.limits.sd }}, from {{ c.limit_set.effective_from.date() }} ({{ c.limit_set.limits.basis or c.limit_set.limits.method.name.lower() }}){% endif %}{% endmacro %}
+{% macro what(c) %}{% if c.profile %}Profile: {{ diffs[c.id]|join("; ") or "no difference from the profile then in force" }}{% else %}Limits for {{ c.limit_set.series.label }}: centre {{ "%.4g"|format(c.limit_set.limits.center|float) }}, SD {{ "%.3g"|format(c.limit_set.limits.sd|float) }}, from {{ c.limit_set.effective_from.date() }} ({{ c.limit_set.limits.basis or c.limit_set.limits.method.name.lower() }}){% endif %}{% endmacro %}
 {% block content %}
   <h1>Changes to the quality rules</h1>
   {% include "quality/_nav.html" %}

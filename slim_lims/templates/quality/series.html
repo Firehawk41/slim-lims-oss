@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ key.label }} — Quality — YourLab{% endblock %}
 {% block extra_head %}<link href="{{ url_for('static', path='css/quality.css') }}" rel="stylesheet" />{% endblock %}
-{% macro val(v) %}{% if key.measure.is_recovery %}{{ "%.1f"|format(v * 100) }} %{% else %}{{ v }} {{ chart.series.unit }}{% endif %}{% endmacro %}
+{% macro val(v) %}{% if key.measure.is_recovery %}{{ "%.2f"|format(v * 100) }} %{% else %}{{ "%.4g"|format(v|float) }} {{ chart.series.unit }}{% endif %}{% endmacro %}
 {% block content %}
   <h1>{{ key.label }}</h1>
   {% include "quality/_nav.html" %}

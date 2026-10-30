@@ -24,7 +24,7 @@ from pydantic import ValidationError
 from slim_quality.domain.changes import NotAllowed
 from slim_quality.domain.enums import EventKind, LimitMethod, Measure, Severity
 from slim_quality.domain.limits import Limits
-from slim_quality.domain.profile import MeasurePolicy, Profile, ToolSetting
+from slim_quality.domain.profile import MeasurePolicy, Profile, ToolSetting, differences
 from slim_quality.domain.series import SeriesKey
 from slim_quality.monitors.registry import TOOLS
 from slim_quality.monitors.runner import ProfileError
@@ -397,10 +397,14 @@ def quality_profile_post(
 def quality_changes(request: Request, user: RequireStaff, db: DB):
     actor = _actor(db, user)
     changes = store.list_changes(db)
+    diffs = {
+        c.id: differences(q.current_profile(db, as_of=c.proposed_at), c.profile) for c in changes if c.profile
+    }
     return render(
         request,
         "quality/changes.html",
         {
+            "diffs": diffs,
             "actor": actor,
             "open": [c for c in changes if c.decision is None],
             "decided": [c for c in changes if c.decision],
