@@ -34,10 +34,11 @@
     <h2>Flags, newest first</h2>
     {% if flags %}
     <table class="table">
-      <thead><tr><th>When</th><th>Severity</th><th>Tool</th><th>Code</th><th>What</th></tr></thead>
+      <thead><tr><th>When</th><th>Severity</th><th>Tool</th><th>Code</th><th>What</th><th></th></tr></thead>
       <tbody>{% for f in flags[:50] %}
         <tr><td>{{ f.at.astimezone(zone).strftime("%Y-%m-%d %H:%M") }}</td><td><span class="sev sev--{{ f.severity.name }}">{{ f.severity.name }}</span></td>
-          <td>{{ f.tool }}</td><td>{{ f.code }}</td><td>{{ f.message }}</td></tr>
+          <td>{{ f.tool }}</td><td>{{ f.code }}</td><td>{{ f.message }}</td>
+          <td><a href="{{ url_for('quality_ncs') }}?{{ {'title': f.code ~ ' on ' ~ key.label, 'description': f.message, 'source': 2, 'ref': f.tool ~ ' ' ~ f.code ~ ' ' ~ f.at.isoformat(), 'instrument': key.instrument, 'analyte': key.analyte, 'start': (f.at - window_days).astimezone(zone).date(), 'end': today}|urlencode }}">Raise NC</a></td></tr>
       {% endfor %}</tbody>
     </table>
     {% if flags|length > 50 %}<p class="muted">{{ flags|length - 50 }} older flags not listed.</p>{% endif %}
@@ -47,7 +48,8 @@
   <section class="form-section">
     <h2>Events and notes</h2>
     <ul>
-      {% for e in events %}<li>{{ e.at.astimezone(zone).date() }} · {{ e.kind.label }}: {{ e.note }} ({{ e.by.display }})</li>{% endfor %}
+      {% for e in events %}<li>{{ e.at.astimezone(zone).date() }} · {{ e.kind.label }}: {{ e.note }} ({{ e.by.display }})
+        <a href="{{ url_for('quality_ncs') }}?{{ {'title': e.kind.label ~ ' on ' ~ e.instrument, 'description': e.note, 'source': 3, 'ref': 'event:' ~ e.id, 'instrument': e.instrument, 'analyte': e.analyte or ''}|urlencode }}">Raise NC</a></li>{% endfor %}
       {% for n in notes %}<li>Note on {{ n.ref }}: {{ n.note }} ({{ n.by.display }}, {{ n.at.astimezone(zone).date() }})</li>{% endfor %}
       {% if not events and not notes %}<li class="muted">None.</li>{% endif %}
     </ul>

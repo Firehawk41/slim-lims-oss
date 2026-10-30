@@ -5,20 +5,32 @@ its demo history.
   without one. Quality manager > quality (a manager also decides changes and signs QC reviews).
 * `SlimDataQc`: slim-quality's `QcSource` over slim-data's QC history (D-107). Modules never import
   each other; this is where they meet.
+* `audit_page`: the vertical audit of one released report, composed from every module's read API
+  (D-113); `random_issue` picks one. `touched`: what a nonconformity's window touched (D-114).
 * `seed_quality_history`: months of invented QC runs (slim-quality's demo history), imported through
   slim-data as Qtegra exports (qtegra/2, D-106) into QC-only batches (D-108): stored, verifiable, off
   the board. With the maintenance event and one open change, so a visitor has something to decide.
 """
 
-from datetime import datetime, timedelta
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
+from hashlib import sha256
+from random import SystemRandom
 from zoneinfo import ZoneInfo
 
 from slim_data.demo.qtegra_export import export, measurement
+from slim_data.domain.enums import EventKind
+from slim_data.domain.results import ReportIssue
+from slim_data.service.audit import ResultAudit, issues_between, released_in_window, report_audit
 from slim_data.service.quality import qc_history
 from slim_data.service.views import batches
+from slim_prep.persistence import books
+from slim_prep.persistence._rows import NotFound as PrepNotFound
 from slim_quality.demo import history as demo
 from slim_quality.domain.actor import QualityActor
-from slim_quality.domain.enums import EventKind, QualityRole
+from slim_quality.domain.enums import EventKind as QualityEventKind
+from slim_quality.domain.enums import QualityRole, Severity
+from slim_quality.domain.nonconformity import NcSource
 from slim_quality.domain.qc import CalibrationRecord, QcRecord, to_series
 from slim_quality.persistence import migrate as quality_migrate
 from slim_quality.persistence import store
@@ -26,9 +38,11 @@ from slim_quality.service import quality as q
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
-from slim_lims import capabilities
+from slim_lims import capabilities, reports
+from slim_lims.audit import chain_check
 from slim_lims.models import User
 from slim_lims.reference import ReferenceData
+from slim_lims.repositories import TRSubmissionRepository
 from slim_lims.results import (
     StaffDirectory,
     actor_for,
@@ -199,7 +213,7 @@ def seed_quality_history(
     user = quality_actor(session, people["user"])
     q.record_event(
         session,
-        EventKind.MAINTENANCE,
+        QualityEventKind.MAINTENANCE,
         demo.INSTRUMENTS[0],
         demo.maintenance_at(now),
         "Cones cleaned, torch aligned",
@@ -216,3 +230,186 @@ def seed_quality_history(
     )
     assert manager is not None and store.list_changes(session, open_only=True)
     return len(runs)
+
+
+# --- the vertical audit (D-113) -----------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Check:
+    """One line of the audit's summary: True passed, False failed, None a note (not checked, or a fact to
+    look at that isn't a fault, such as a batch registered by an instrument file)."""
+
+    what: str
+    ok: bool | None
+    detail: str = ""
+
+
+@dataclass(frozen=True)
+class TrVersion:
+    version: int
+    recorded_at: datetime
+    change: str
+    actor_display: str
+
+
+@dataclass(frozen=True)
+class AuditLine:
+    result: ResultAudit
+    prep: object | None  # slim-prep's Recorded[PrepBatch] as it stood, or None (registered by a file)
+    prep_sample: object | None  # that batch's entry for this sample
+    qc: list  # slim-quality ContextLines, per run: (run, lines)
+
+
+@dataclass(frozen=True)
+class AuditPage:
+    issue: ReportIssue
+    tr_versions: list
+    file_matches: bool | None  # None: the file isn't kept
+    lines: list[AuditLine]
+    checks: list[Check]
+    chain_broken: tuple[int, ...] | None  # None: not checked (SQLite, or no audit log)
+
+
+def audit_page(db: Session, issue_id: int) -> AuditPage:
+    """A released report, end to end, from every module's read API (slim-data D-112, D-113)."""
+    found = report_audit(db, issue_id)
+    issue = found.issue
+    html = reports.stored(db, issue.file_sha256)
+    file_matches = None if html is None else sha256(html.encode()).hexdigest() == issue.file_sha256
+    repo = TRSubmissionRepository(db)
+    tr = repo.get_by_tr_number(issue.tr_number)
+    versions = []
+    for v in [] if tr is None else repo.versions(tr.id):
+        at = v.recorded_at if v.recorded_at.tzinfo else v.recorded_at.replace(tzinfo=UTC)  # SQLite: naive UTC
+        if at <= issue.created_at:
+            versions.append(TrVersion(v.version, at, v.change, v.actor_display))
+    charts_then: dict = {}
+    lines = []
+    for r in found.lines:
+        prep = prep_sample = None
+        try:
+            prep = books.get_batch(db, r.batch_code, as_of=r.made_at)
+            prep_sample = next((s for s in prep.item.samples if s.sample == str(r.sample)), None)
+        except PrepNotFound:
+            pass
+        if r.made_at not in charts_then:
+            charts_then[r.made_at] = q.charts(db, SlimDataQc(db), as_of=r.made_at)
+        qc = [
+            (run, q.context_at(charts_then[r.made_at], run.instrument, r.analyte.code, run.analyzed_at))
+            for run in r.runs
+        ]
+        lines.append(AuditLine(result=r, prep=prep, prep_sample=prep_sample, qc=qc))
+    checker = chain_check(db.get_bind())
+    broken = None if checker is None else tuple(checker(db.connection()))
+    return AuditPage(
+        issue=issue,
+        tr_versions=versions,
+        file_matches=file_matches,
+        lines=lines,
+        checks=_checks(file_matches, lines, broken),
+        chain_broken=broken,
+    )
+
+
+def _checks(file_matches, lines: list[AuditLine], broken) -> list[Check]:
+    results = [line.result for line in lines]
+    replays = [f"{r.sample} {r.analyte.code}: {r.replay}" for r in results if r.replay]
+    four_eyes, solo = [], []
+    for r in results:
+        entered = (
+            set(r.analyst_ids) | {run.analyst.id for run in r.runs} | {run.imported_by.id for run in r.runs}
+        )
+        for e in r.events:
+            if e.kind in (EventKind.REVIEWED, EventKind.RELEASED):
+                if e.solo:
+                    solo.append(f"{r.sample} {r.analyte.code} {e.kind.name.lower()} solo: {e.note}")
+                elif e.actor.id in entered:
+                    four_eyes.append(f"{r.sample} {r.analyte.code}: {e.kind.name.lower()} by who entered it")
+    files = [run.run_code for r in results for run in r.runs if not run.file_kept]
+    unprepped = sorted({line.result.batch_code for line in lines if line.prep is None})
+    actions = [
+        f"{run.run_code}: {c.chart.series.key.label} {f.code}"
+        for line in lines
+        for run, context in line.qc
+        for c in context
+        for f in c.flags
+        if f.severity == Severity.ACTION
+    ]
+    amended = [
+        f"{r.sample} {r.analyte.code} v{r.version} (now v{r.latest_version})"
+        for r in results
+        if r.latest_version > r.version
+    ]
+    return [
+        Check(
+            "The report file matches its hash",
+            file_matches,
+            "" if file_matches is not None else "the file isn't kept",
+        ),
+        Check("Every result replays exactly through its ruleset", not replays, "; ".join(replays)),
+        Check("Nobody reviewed or released results they entered", not four_eyes, "; ".join(four_eyes)),
+        Check("Solo sign-offs", not solo, "; ".join(solo) or "none"),
+        Check("Every run's raw file is kept", not files, ", ".join(files)),
+        Check(
+            "Every batch is in the prep book",
+            None if unprepped else True,  # a file may register a batch (D-24): a note, not a fault
+            f"registered by an instrument file: {', '.join(unprepped)}" if unprepped else "",
+        ),
+        Check("No ACTION flags on the QC around the runs", not actions, "; ".join(dict.fromkeys(actions))),
+        Check("No result on it has been amended since", not amended, "; ".join(amended)),
+        Check(
+            "The audit log's chain is intact",
+            None if broken is None else not broken,
+            "not checked (no audit log here)"
+            if broken is None
+            else (f"{len(broken)} entries broken" if broken else ""),
+        ),
+    ]
+
+
+def random_issue(db: Session, start: datetime, end: datetime) -> int | None:
+    found = issues_between(db, start, end)
+    return SystemRandom().choice(found).id if found else None
+
+
+# --- nonconformities (D-114) ----------------------------------------------------------------------
+
+
+def result_ref(r) -> str:
+    return f"{r.sample}|{r.analyte.analysis_id}|{r.analyte.code}|{r.version}"
+
+
+def impact_label(r) -> str:
+    """How a touched result reads on the assessment (built here, never taken from the form)."""
+    unit = f" {r.unit}" if r.unit else ""
+    return f"{r.sample} {r.analyte.code} v{r.version}: {r.value}{unit}"
+
+
+def touched(db: Session, nc) -> list:
+    """The released results the nonconformity's window may have touched (slim-data D-112)."""
+    if nc.instrument is None or nc.window_from is None:
+        return []
+    return released_in_window(db, nc.instrument, nc.analyte, nc.window_from, nc.window_to)
+
+
+def seed_demo_nonconformity(db: Session, now: datetime) -> None:
+    """The planted cone wear, raised from its flag by the quality user, left open for a visitor."""
+    if store.list_ncs(db):
+        return
+    user = quality_actor(db, db.scalars(select(User).where(User.email == QUALITY_PERSONAS["user"])).first())
+    if user is None:
+        return
+    q.raise_nc(
+        db,
+        "Internal standard drifting low on ICP-MS 1",
+        "The internal standard's EWMA and Westgard 4_1s flag a steady fall on ICP-MS 1 over five weeks; "
+        "the check standards creep up while still inside ±25 %. Suspect cone wear. Which released "
+        "results does it touch?",
+        user,
+        NcSource.FLAG,
+        "ICP-MS 1 internal standard recovery",
+        demo.INSTRUMENTS[0],
+        None,
+        (now - timedelta(days=demo.WEAR_DAYS), now),
+    )

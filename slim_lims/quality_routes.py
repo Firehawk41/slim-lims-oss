@@ -9,6 +9,10 @@
     POST /quality/profile             action=backtest (nothing stored) or action=propose
     /quality/changes                  open changes and the history; POST /quality/changes/{id}/decide
     /quality/reviews                  signed QC reviews; POST signs one (quality manager)
+    /quality/audit                    reports issued in a period; "audit a random one" (D-113)
+    /quality/audit/{issue}            the vertical audit of one report; POST records it (findings → an NC)
+    /quality/ncs                      the nonconformity register; POST raises one (D-114)
+    /quality/ncs/{id}                 one NC: what its window touched, its entries; POST …/entries adds one
 
 Without a quality capability: 403. Deciding and signing need the manager's (slim-quality refuses too).
 """
@@ -21,9 +25,21 @@ from typing import Annotated, Any, get_args
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import ValidationError
+from slim_data.persistence._rows import NotFound as DataNotFound
+from slim_data.persistence.results import get_issue
+from slim_data.service.audit import issues_between
+from slim_quality.domain.audits import AuditOutcome
 from slim_quality.domain.changes import NotAllowed
 from slim_quality.domain.enums import EventKind, LimitMethod, Measure, Severity
 from slim_quality.domain.limits import Limits
+from slim_quality.domain.nonconformity import (
+    EntryKind,
+    ImpactDecision,
+    ImpactLine,
+    NcEntry,
+    NcSource,
+    NcState,
+)
 from slim_quality.domain.profile import MeasurePolicy, Profile, ToolSetting, differences
 from slim_quality.domain.series import SeriesKey
 from slim_quality.monitors.registry import TOOLS
@@ -36,7 +52,15 @@ from sqlalchemy.orm import Session
 from slim_lims.auth import RequireStaff
 from slim_lims.db import get_db
 from slim_lims.labtime import LabClock, lab_clock
-from slim_lims.quality import SlimDataQc, quality_actor
+from slim_lims.quality import (
+    SlimDataQc,
+    audit_page,
+    impact_label,
+    quality_actor,
+    random_issue,
+    result_ref,
+    touched,
+)
 from slim_lims.security import csrf_protect
 from slim_lims.web import flash, render
 
@@ -149,6 +173,7 @@ def quality_series(request: Request, user: RequireStaff, db: DB, clock: Clock, i
             "methods": list(LimitMethod),
             "event_kinds": list(EventKind),
             "first_day": points[0].at.astimezone(clock.zone).date() if points else clock.today(),
+            "window_days": timedelta(days=14),  # a flag's NC looks back two weeks by default
             "today": clock.today(),
         },
     )
@@ -484,3 +509,286 @@ def quality_sign_review(
     db.commit()
     flash(request, "QC review signed.")
     return _back(request, "quality_reviews")
+
+
+# ---------------------------------------------------------------- the vertical audit (D-113)
+
+
+def _period(clock: LabClock, start: str, end: str) -> tuple[date, date]:
+    today = clock.today()
+    try:
+        return (
+            date.fromisoformat(start) if start else today - timedelta(days=90),
+            date.fromisoformat(end) if end else today,
+        )
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Dates as YYYY-MM-DD.") from None
+
+
+@router.get("/quality/audit", name="quality_audits", response_class=HTMLResponse)
+def quality_audits(
+    request: Request, user: RequireStaff, db: DB, clock: Clock, start: str = "", end: str = ""
+):
+    actor = _actor(db, user)
+    first, last = _period(clock, start, end)
+    issues = list(reversed(issues_between(db, _day(str(first), clock), _day(str(last), clock, True))))
+    records = store.audits(db)
+    latest = {}
+    for r in reversed(records):
+        latest[r.subject_ref] = r
+    return render(
+        request,
+        "quality/audits.html",
+        {
+            "actor": actor,
+            "issues": issues,
+            "latest": latest,
+            "records": records[:20],
+            "period": (first, last),
+            "zone": clock.zone,
+        },
+    )
+
+
+@router.get("/quality/audit/random", name="quality_audit_random")
+def quality_audit_random(
+    request: Request, user: RequireStaff, db: DB, clock: Clock, start: str = "", end: str = ""
+):
+    _actor(db, user)
+    first, last = _period(clock, start, end)
+    picked = random_issue(db, _day(str(first), clock), _day(str(last), clock, True))
+    if picked is None:
+        flash(request, "No report was issued in that period.")
+        return _back(request, "quality_audits", start=str(first), end=str(last))
+    return RedirectResponse(str(request.url_for("quality_audit", issue_id=picked)), status_code=303)
+
+
+@router.get("/quality/audit/{issue_id}", name="quality_audit", response_class=HTMLResponse)
+def quality_audit(request: Request, issue_id: int, user: RequireStaff, db: DB, clock: Clock):
+    actor = _actor(db, user)
+    try:
+        page = audit_page(db, issue_id)
+    except DataNotFound:
+        raise HTTPException(status_code=404, detail="No such report issue.") from None
+    return render(
+        request,
+        "quality/audit.html",
+        {
+            "actor": actor,
+            "page": page,
+            "zone": clock.zone,
+            "records": store.audits(db, f"issue:{issue_id}"),
+            "outcomes": list(AuditOutcome),
+        },
+    )
+
+
+@router.post("/quality/audit/{issue_id}", name="quality_audit_record")
+def quality_audit_record(
+    request: Request,
+    issue_id: int,
+    user: RequireStaff,
+    db: DB,
+    outcome: Annotated[int, Form()],
+    findings: Annotated[str, Form(max_length=4000)] = "",
+):
+    actor = _actor(db, user)
+    try:
+        issue = get_issue(db, issue_id)
+        record = q.record_audit(
+            db,
+            f"Report {issue.id} ({issue.tr_number})",
+            f"issue:{issue.id}",
+            AuditOutcome(outcome),
+            findings.strip(),
+            actor,
+        )
+    except DataNotFound:
+        raise HTTPException(status_code=404, detail="No such report issue.") from None
+    except (ValueError, ValidationError) as error:
+        raise HTTPException(status_code=422, detail=f"The audit: {error}") from None
+    db.commit()
+    if record.outcome == AuditOutcome.FINDINGS:
+        flash(request, "Audit recorded with findings: raise a nonconformity for them below.")
+        return _back(
+            request,
+            "quality_ncs",
+            title=f"Audit of report {issue.id} ({issue.tr_number})",
+            description=record.findings,
+            source=str(int(NcSource.AUDIT)),
+            ref=f"audit:{record.id}",
+        )
+    flash(request, "Audit recorded: conforming.")
+    return _back(request, "quality_audits")
+
+
+# ---------------------------------------------------------------- nonconformities (D-114)
+
+
+@router.get("/quality/ncs", name="quality_ncs", response_class=HTMLResponse)
+def quality_ncs(
+    request: Request,
+    user: RequireStaff,
+    db: DB,
+    clock: Clock,
+    title: str = "",
+    description: str = "",
+    source: int = int(NcSource.MANUAL),
+    ref: str = "",
+    instrument: str = "",
+    analyte: str = "",
+    start: str = "",
+    end: str = "",
+):
+    actor = _actor(db, user)
+    ncs = store.list_ncs(db)
+    instruments = sorted({s.key.instrument for s in SlimDataQc(db).series()})
+    return render(
+        request,
+        "quality/ncs.html",
+        {
+            "actor": actor,
+            "open": [n for n in ncs if n.state != NcState.CLOSED],
+            "closed": [n for n in ncs if n.state == NcState.CLOSED],
+            "instruments": instruments,
+            "sources": list(NcSource),
+            "form": {
+                "title": title,
+                "description": description,
+                "source": source,
+                "ref": ref,
+                "instrument": instrument,
+                "analyte": analyte,
+                "start": start,
+                "end": end or str(clock.today()),
+            },
+            "zone": clock.zone,
+        },
+    )
+
+
+@router.post("/quality/ncs", name="quality_nc_raise")
+def quality_nc_raise(
+    request: Request,
+    user: RequireStaff,
+    db: DB,
+    clock: Clock,
+    title: Annotated[str, Form(max_length=200)],
+    description: Annotated[str, Form(max_length=4000)],
+    source: Annotated[int, Form()] = int(NcSource.MANUAL),
+    ref: Annotated[str, Form(max_length=200)] = "",
+    instrument: Annotated[str, Form(max_length=100)] = "",
+    analyte: Annotated[str, Form(max_length=50)] = "",
+    start: Annotated[str, Form()] = "",
+    end: Annotated[str, Form()] = "",
+):
+    actor = _actor(db, user)
+    window = None
+    if start.strip() or end.strip():
+        window = (_day(start, clock), _day(end, clock, True))
+    try:
+        nc = q.raise_nc(
+            db,
+            title.strip(),
+            description.strip(),
+            actor,
+            NcSource(source),
+            ref.strip(),
+            instrument.strip(),
+            analyte.strip(),
+            window,
+        )
+    except (ValueError, ValidationError) as error:
+        raise HTTPException(status_code=422, detail=f"The nonconformity: {error}") from None
+    db.commit()
+    flash(request, f"{nc.number} raised.")
+    return RedirectResponse(str(request.url_for("quality_nc", nc_id=nc.id)), status_code=303)
+
+
+@router.get("/quality/ncs/{nc_id}", name="quality_nc", response_class=HTMLResponse)
+def quality_nc(request: Request, nc_id: int, user: RequireStaff, db: DB, clock: Clock):
+    actor = _actor(db, user)
+    try:
+        nc = store.get_nc(db, nc_id)
+    except store.NotFound:
+        raise HTTPException(status_code=404, detail="No such nonconformity.") from None
+    action = nc.latest_action
+    evidence = []
+    if action is not None and nc.instrument:
+        evidence = q.flags_since(q.charts(db, SlimDataQc(db)), nc.instrument, nc.analyte, action.at)
+    return render(
+        request,
+        "quality/nc.html",
+        {
+            "actor": actor,
+            "nc": nc,
+            "touched": touched(db, nc),
+            "result_ref": result_ref,
+            "impact_label": impact_label,
+            "decisions": list(ImpactDecision),
+            "evidence": evidence,
+            "zone": clock.zone,
+            "today": clock.today(),
+        },
+    )
+
+
+@router.post("/quality/ncs/{nc_id}/entries", name="quality_nc_entry")
+def quality_nc_entry(
+    request: Request,
+    nc_id: int,
+    user: RequireStaff,
+    db: DB,
+    kind: Annotated[int, Form()],
+    note: Annotated[str, Form(max_length=4000)] = "",
+    root_cause: Annotated[str, Form(max_length=2000)] = "",
+    action: Annotated[str, Form(max_length=2000)] = "",
+    owner: Annotated[str, Form(max_length=100)] = "",
+    due: Annotated[str, Form()] = "",
+    effective: Annotated[str, Form()] = "",
+    impact_ref: Annotated[list[str], Form()] = [],  # noqa: B006 (FastAPI copies defaults)
+    impact_decision: Annotated[list[str], Form()] = [],  # noqa: B006
+    impact_note: Annotated[list[str], Form()] = [],  # noqa: B006
+):
+    actor = _actor(db, user)
+    try:
+        nc = store.get_nc(db, nc_id)
+    except store.NotFound:
+        raise HTTPException(status_code=404, detail="No such nonconformity.") from None
+    try:
+        entry_kind = EntryKind(kind)
+        nc.allows(entry_kind, actor)  # a refusal first, before the form is read
+        expected = {result_ref(r): r for r in touched(db, nc)} if entry_kind == EntryKind.ASSESSED else {}
+        impact = []
+        for ref, decision, line_note in zip(impact_ref, impact_decision, impact_note, strict=False):
+            if ref not in expected:
+                raise ValueError(f"{ref} is not a result this window touched")
+            impact.append(
+                ImpactLine(
+                    ref=ref,
+                    label=impact_label(expected[ref]),
+                    decision=ImpactDecision(int(decision)),
+                    note=line_note.strip(),
+                )
+            )
+        if expected and set(expected) - {line.ref for line in impact}:
+            raise ValueError("decide every result the window touched")
+        entry = NcEntry(
+            kind=entry_kind,
+            note=note.strip(),
+            impact=tuple(impact),
+            root_cause=root_cause.strip(),
+            action=action.strip(),
+            owner=owner.strip(),
+            due=date.fromisoformat(due) if due.strip() else None,
+            effective=None if entry_kind != EntryKind.EFFECTIVENESS else effective == "1",
+            by=actor,
+        )
+        nc = q.add_nc_entry(db, nc_id, entry)
+    except NotAllowed as refused:
+        raise HTTPException(status_code=403, detail=str(refused)) from None
+    except (ValueError, ValidationError) as error:
+        raise HTTPException(status_code=422, detail=f"The entry: {error}") from None
+    db.commit()
+    flash(request, f"{nc.number}: {nc.state.label.lower()}.")
+    return RedirectResponse(str(request.url_for("quality_nc", nc_id=nc_id)), status_code=303)

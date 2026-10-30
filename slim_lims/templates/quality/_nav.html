@@ -2,6 +2,8 @@
   <a href="{{ url_for('quality_home') }}">Overview</a> ·
   <a href="{{ url_for('quality_profile') }}">Tools &amp; profile</a> ·
   <a href="{{ url_for('quality_changes') }}">Changes</a> ·
-  <a href="{{ url_for('quality_reviews') }}">QC reviews</a>
+  <a href="{{ url_for('quality_reviews') }}">QC reviews</a> ·
+  <a href="{{ url_for('quality_audits') }}">Audits</a> ·
+  <a href="{{ url_for('quality_ncs') }}">Nonconformities</a>
   <span class="muted"> — you are a quality {{ "manager" if actor.is_manager else "user" }}</span>
 </p>

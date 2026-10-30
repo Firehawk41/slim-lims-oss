@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}{{ nc.number }} — Quality — YourLab{% endblock %}
+{% block extra_head %}<link href="{{ url_for('static', path='css/quality.css') }}" rel="stylesheet" />{% endblock %}
+{% macro when(t) %}{{ t.astimezone(zone).strftime("%Y-%m-%d %H:%M") }}{% endmacro %}
+{% macro form_open(kind, wide=false) %}<form method="post" action="{{ url_for('quality_nc_entry', nc_id=nc.id) }}" class="stack-form{{ ' wide-form' if wide }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}"><input type="hidden" name="kind" value="{{ kind }}">{% endmacro %}
+{% block content %}
+  <h1>{{ nc.number }}: {{ nc.title }}</h1>
+  {% include "quality/_nav.html" %}
+  <dl class="kv-inline">
+    <div><dt>State</dt><dd><strong>{{ nc.state.label }}</strong></dd></div>
+    <div><dt>Raised</dt><dd>{{ nc.raised_by.display }}, {{ when(nc.raised_at) }} ({{ nc.source.label|lower }}{% if nc.source_ref %}: {{ nc.source_ref }}{% endif %})</dd></div>
+    <div><dt>Where</dt><dd>{{ nc.instrument or "—" }}{% if nc.instrument %} · {{ nc.analyte or "every analyte" }}{% endif %}</dd></div>
+    {% if nc.window_from %}<div><dt>Window</dt><dd>{{ nc.window_from.astimezone(zone).date() }} to {{ nc.window_to.astimezone(zone).date() }}</dd></div>{% endif %}
+  </dl>
+  <p>{{ nc.description }}</p>
+
+  <section class="form-section">
+    <h2>Record</h2>
+    <ol>{% for e in nc.entries %}<li><strong>{{ e.kind.name.lower() }}</strong> by {{ e.by.display }}, {{ when(e.at) }}{% if e.note %}: {{ e.note }}{% endif %}
+      {% if e.impact %}<ul>{% for i in e.impact %}<li>{{ i.label }}: <strong>{{ i.decision.label }}</strong>{% if i.note %} — {{ i.note }}{% endif %}</li>{% endfor %}</ul>{% endif %}
+      {% if e.kind.name == "ACTION" %}<br>Root cause: {{ e.root_cause }}. Action: {{ e.action }}. Owner: {{ e.owner }}{% if e.due %}, due {{ e.due }}{% endif %}.{% endif %}
+      {% if e.effective is not none %} — <span class="sev sev--{{ 'none' if e.effective else 'WARN' }}">{{ "effective" if e.effective else "not effective" }}</span>{% endif %}</li>
+    {% else %}<li class="muted">Nothing recorded yet.</li>{% endfor %}</ol>
+  </section>
+
+  {% if nc.state.name != "CLOSED" %}
+  <section class="form-section">
+    <h2>Impact: released results the window touched</h2>
+    {% if not nc.window_from %}<p class="muted">No instrument and window: nothing to look up; assess with a note.</p>{% endif %}
+    {% if actor.is_manager %}
+    {{ form_open(1, wide=true) }}
+      <table class="table"><thead><tr><th>Result</th><th>Released</th><th>On reports</th><th>Decision</th><th>Note</th></tr></thead>
+        <tbody>{% for r in touched %}{% set label = impact_label(r) %}
+          <tr><td>{{ label }}{% if r.latest_version > r.version %} <span class="muted">(now v{{ r.latest_version }})</span>{% endif %}<br><span class="muted">batch {{ r.batch_code }}, runs {{ r.runs|join(", ") }}</span>
+            <input type="hidden" name="impact_ref" value="{{ result_ref(r) }}"></td>
+            <td>{{ r.released_by.display }}, {{ r.released_at.astimezone(zone).date() }}</td><td>{{ r.reports|join(", ") or "—" }}</td>
+            <td><select name="impact_decision">{% for d in decisions %}<option value="{{ d.value }}">{{ d.label }}</option>{% endfor %}</select></td>
+            <td><input type="text" name="impact_note" maxlength="500"></td></tr>
+        {% else %}<tr><td colspan="5" class="muted">No released result was measured on this instrument in the window.</td></tr>{% endfor %}</tbody></table>
+      <label>Assessment <textarea name="note" rows="2" maxlength="4000" placeholder="needed when nothing was touched"></textarea></label>
+      <p class="hint">"Amend report" is done in Results as a correction of that result; this records the decision.</p>
+      <button type="submit" class="btn btn--primary">Record the assessment</button>
+    </form>
+    {% else %}
+      <ul>{% for r in touched %}<li>{{ r.sample }} {{ r.analyte.code }} v{{ r.version }}: {{ r.value }} {{ r.unit or "" }} (reports {{ r.reports|join(", ") or "—" }})</li>{% else %}<li class="muted">None.</li>{% endfor %}</ul>
+      <p class="muted">A quality manager records the assessment.</p>
+    {% endif %}
+  </section>
+
+  {% if nc.state.value >= 2 %}
+  <section class="form-section">
+    <h2>Corrective action</h2>
+    {{ form_open(2) }}
+      <label>Root cause <textarea name="root_cause" rows="2" maxlength="2000" required></textarea></label>
+      <label>Action <textarea name="action" rows="2" maxlength="2000" required></textarea></label>
+      <label>Owner <input type="text" name="owner" maxlength="100" required></label>
+      <label>Due <input type="date" name="due"></label>
+      <button type="submit" class="btn btn--secondary">Record the action</button>
+    </form>
+  </section>
+  {% endif %}
+
+  {% if nc.state.name == "ACTION_TAKEN" %}
+  <section class="form-section">
+    <h2>Effectiveness</h2>
+    <p>Flags on {{ nc.instrument or "—" }} since the action ({{ when(nc.latest_action.at) }}): <strong>{{ evidence|length }}</strong>
+      {% for f in evidence[-5:] %}<span class="sev sev--{{ f.severity.name }}">{{ f.code }}</span> {% endfor %}</p>
+    {{ form_open(3) }}
+      <label>Effective? <select name="effective"><option value="1">yes</option><option value="0">no: a new action is needed</option></select></label>
+      <label>Evidence <textarea name="note" rows="2" maxlength="4000"></textarea></label>
+      <button type="submit" class="btn btn--secondary">Record the check</button>
+    </form>
+  </section>
+  {% endif %}
+
+  {% if nc.state.name == "EFFECTIVE" and actor.is_manager %}
+  <section class="form-section">
+    <h2>Close</h2>
+    {{ form_open(4) }}
+      <label>Closing note <input type="text" name="note" maxlength="4000" required></label>
+      <button type="submit" class="btn btn--primary">Close {{ nc.number }}</button>
+    </form>
+  </section>
+  {% endif %}
+
+  <section class="form-section">
+    <h2>Note</h2>
+    {{ form_open(5) }}
+      <label>Note <input type="text" name="note" maxlength="4000" required></label>
+      <button type="submit" class="btn btn--secondary btn--small">Add a note</button>
+    </form>
+  </section>
+  {% endif %}
+{% endblock %}
