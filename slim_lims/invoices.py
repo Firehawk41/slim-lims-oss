@@ -2,12 +2,11 @@
 
 "Invoice" on a complete-report TR builds V5's `BillableRequest` from the TR and slim-data's report
 issues, lets V5 price it into a sales order, moves the TR to invoiced and records the invoice as sent,
-all in the caller's one transaction. Payment is invoice data (`tr_invoices`), never a TR status.
+all in the caller's one transaction. Payment is invoice data (a `tr_invoice_payments` row, D-119), never
+a TR status.
 """
 
-import csv
 import io
-from decimal import Decimal, InvalidOperation
 
 import slim_invoicing
 from slim_data.persistence.results import issues_for_tr
@@ -17,7 +16,7 @@ from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
 from slim_lims.domain import PaymentMethod, TRStatus, TRSubmission
-from slim_lims.models import TRInvoiceRow, User
+from slim_lims.models import TRInvoicePaymentRow, TRInvoiceRow, User
 from slim_lims.reference import ReferenceData
 from slim_lims.schemas import StatusChangeIn
 from slim_lims.services import Conflict, Forbidden, SubmissionService
@@ -106,7 +105,8 @@ def mark_sent(
 
 
 def mark_paid(session: Session, service: SubmissionService, tr_number: str, user: User) -> TRInvoiceRow:
-    """Records payment of the TR's newest invoice. Staff only."""
+    """Records payment of the TR's newest invoice: a payment row added, the invoice untouched (D-119).
+    Staff only."""
     if not user.is_staff:
         raise Forbidden("only lab staff record payments")
     submission = service.get(tr_number, user)
@@ -115,8 +115,13 @@ def mark_paid(session: Session, service: SubmissionService, tr_number: str, user
         raise Conflict(f"{tr_number} has no invoice to pay")
     if invoice.paid_on is not None:
         raise Conflict(f"{tr_number}'s invoice was paid on {invoice.paid_on}")
-    invoice.paid_on, invoice.paid_by = service.lab_today(), user.initials or user.email
+    session.add(
+        TRInvoicePaymentRow(
+            invoice_id=invoice.id, paid_on=service.lab_today(), paid_by=user.initials or user.email
+        )
+    )
     session.flush()
+    session.refresh(invoice, ["payments"])
     return invoice
 
 
@@ -129,24 +134,9 @@ def price_lists(session: Session, reference: ReferenceData) -> list[slim_invoici
 
 
 def accounting_csv(session: Session) -> str:
-    """Every sales order as V5's accounting import file, with every text cell a spreadsheet would run as a
-    formula written as text (app review 2026-10-30b I1). The PO number and the requester come from the
-    customer's request form: "=HYPERLINK(…)" as a contact name would otherwise run in accounting's Excel.
-    Numbers stay numbers (a negative amount is not a formula)."""
-    raw = io.StringIO()
-    slim_invoicing.write_csv(slim_invoicing.sales_orders(session), raw)
+    """Every sales order as V5's accounting import file. V5 writes any text cell a spreadsheet would run
+    as a formula as text (slim-data D-118; app review 2026-10-30b I1): the PO number and the requester
+    come from the customer's request form."""
     out = io.StringIO()
-    writer = csv.writer(out)
-    for row in csv.reader(io.StringIO(raw.getvalue())):
-        writer.writerow([_as_text(cell) for cell in row])
+    slim_invoicing.write_csv(slim_invoicing.sales_orders(session), out)
     return out.getvalue()
-
-
-def _as_text(cell: str) -> str:
-    if cell[:1] not in ("=", "+", "-", "@", "\t", "\r"):
-        return cell
-    try:
-        Decimal(cell)
-        return cell
-    except InvalidOperation:
-        return "'" + cell

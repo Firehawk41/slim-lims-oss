@@ -43,7 +43,9 @@ replaces the Excel TR form; emailed `.xlsx` forms stay supported by slim-domain'
 
 **Modules (required libraries):** slim-data (results: import, rules engine, review, release, reports),
 slim-prep (the prep book), slim-quality (QC charts and tools, change control), invoicing V5
-(`slim_invoicing`), slim-domain (SLIM tables, audit log), slim-report-engine (the report template). Each keeps its own tables and Alembic version table in the
+(`slim_invoicing`), slim-domain (SLIM tables, audit log), slim-report-engine (the report template).
+**Pinned (D-117):** each is installed at a merged commit, the same in `pyproject.toml`, CI and `render.yaml`
+(`tests/test_pins.py`); bump a pin in a host PR. Each keeps its own tables and Alembic version table in the
 shared database; `cli migrate` and the seed run them all.
 
 **Open:** deeper report-engine wiring (spec §13; changes other repos, needs the go-ahead); ecosystem
@@ -81,7 +83,7 @@ slim_lims/
 ├── db.py            # Base (app tables only), make_engine (the only way to connect), get_db (the visitor's lab)
 ├── oss_guard.py     # OSS-only guard (called by make_engine)
 ├── domain/          # spec §3–4: enums, tr (TRSubmission, ...), workflow (transitions); pure
-├── models.py        # User, TR tables, tr_versions (append-only, D-104), user_capabilities, invoices, report_files
+├── models.py        # User, TR tables, tr_versions (D-104), invoices + payments (D-119; all three append-only), user_capabilities, report_files
 ├── repositories.py  # TRSubmissionRepository: the only TR writer; gapless numbers; versions / as_of (D-104)
 ├── scope.py         # Scope.for_user: whose TRs a listing shows; fails closed (D-103)
 ├── services.py      # SubmissionService: submit, check-in, status (facts only, D-99), history
@@ -97,7 +99,7 @@ slim_lims/
 ├── prep.py, prep_routes.py        # slim-prep host side (TrSamples: its TR port); /prep, /api/prep (staff)
 ├── quality.py, quality_routes.py  # slim-quality host side: QcSource over slim-data, the vertical audit (composed
 │                                  #   from every module, D-113), NCs (D-114), demo QC history and NC; /quality
-├── invoices.py, demo_prices.py    # invoicing V5; /invoices; the accounting CSV, formula cells as text
+├── invoices.py, demo_prices.py    # invoicing V5; /invoices; the accounting CSV (V5 writes formula cells as text, D-118)
 ├── reports.py       # issued reports: engine_renderer / plain_renderer, report_files
 ├── board.py         # the lab board (spec §13)
 ├── about.py         # the landing page's facts (/about; its words: templates/about/_copy.html, Jamie's)
@@ -143,4 +145,4 @@ scripts/seed_demo.py; tests/ (SQLite per test, or Postgres via TEST_DATABASE_URL
   invoice; a cancel is refused once a report was issued or a result released. **Each time a module is
   wired, re-check which statuses are still set by hand.**
 - Payment: PO number or credit card (the lab calls; no card data stored). RUSH = outside business hours.
-- Every change to a TR is kept whole in `tr_versions` (D-104).
+- Every change to a TR is kept whole in `tr_versions` (D-104); a payment is a row added, never an edit (D-119).

@@ -39,15 +39,18 @@ jobs:
       - uses: actions/checkout@v5
       # The report engine's demo seed (demo/demo.py) for the bridge and real-report tests, beside this
       # checkout where they look for it.
-      - run: git clone --depth 1 https://github.com/Firehawk41/slim-report-engine-oss ../slim-report-engine-oss
+      - run: >-
+          git clone https://github.com/Firehawk41/slim-report-engine-oss ../slim-report-engine-oss
+          && git -C ../slim-report-engine-oss checkout 12584cd6c3ef35ca2ff386fd204acf830e90e237
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python }}
-      # slim-data and slim-domain come from their GitHub repos (pyproject.toml); the report engine
-      # too, so the bridge tests run instead of skipping. slim-domain is named again here: the report
-      # engine asks for it by bare name, which pip won't match to the editable install's git URL.
+      # The modules come from their GitHub repos at the commits pyproject.toml pins (D-117); the report
+      # engine too, at the checkout's pin, so the bridge tests run instead of skipping. slim-domain is
+      # named again here: the report engine asks for it by bare name, which pip won't match to the
+      # editable install's git URL.
       - run: >-
           pip install -e ".[dev]"
-          "slim-domain @ git+https://github.com/Firehawk41/slim-domain-oss@main"
-          "slim-report-engine @ git+https://github.com/Firehawk41/slim-report-engine-oss@main"
+          "slim-domain @ git+https://github.com/Firehawk41/slim-domain-oss@7b97dada57eb27440a4d63be4263d84263c1647d"
+          "slim-report-engine @ git+https://github.com/Firehawk41/slim-report-engine-oss@12584cd6c3ef35ca2ff386fd204acf830e90e237"
       - run: pytest -q

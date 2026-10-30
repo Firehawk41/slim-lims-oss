@@ -16,8 +16,9 @@ services:
     plan: free
     # The demo seed loads SLIM's fictional reference data from slim-report-engine-oss's demo/demo.py.
     buildCommand: >-
-      rm -rf vendor && git clone --depth 1 https://github.com/Firehawk41/slim-report-engine-oss vendor/slim-report-engine-oss
-      && pip install . "slim-domain @ git+https://github.com/Firehawk41/slim-domain-oss@main" ./vendor/slim-report-engine-oss
+      rm -rf vendor && git clone https://github.com/Firehawk41/slim-report-engine-oss vendor/slim-report-engine-oss
+      && git -C vendor/slim-report-engine-oss checkout 12584cd6c3ef35ca2ff386fd204acf830e90e237
+      && pip install . "slim-domain @ git+https://github.com/Firehawk41/slim-domain-oss@7b97dada57eb27440a4d63be4263d84263c1647d" ./vendor/slim-report-engine-oss
     # The seed runs every migration and installs the audit log; re-running it changes nothing
     # (SLIM data, ruleset, personas and scenarios are each skipped once present).
     # Demo labs (slim-data D-102): public keeps no app tables (emptied once, the first start after the

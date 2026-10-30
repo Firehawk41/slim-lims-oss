@@ -20,16 +20,19 @@ dependencies = [
     "python-dotenv>=1.0",
     "psycopg2-binary>=2.9",
     "tzdata",  # zoneinfo data for LAB_TIMEZONE on slim container images
+    # Every SLIM module is pinned to a merged commit (slim-data D-117): a module's main moving never
+    # changes what this app runs. Bump a pin in a host PR, with the CI workflow and render.yaml
+    # (tests/test_pins.py checks they agree).
     # Analytical results module (D-70). Not on PyPI; co-developing: pip install -e ../slim-data-oss
-    "slim-data @ git+https://github.com/Firehawk41/slim-data-oss@main",
+    "slim-data @ git+https://github.com/Firehawk41/slim-data-oss@89c98aba78901ef8f01de686d2e42d308f004d67",
     # The prep book (slim-prep P6). Co-developing: pip install -e ../slim-prep-oss
-    "slim-prep @ git+https://github.com/Firehawk41/slim-prep-oss@main",
+    "slim-prep @ git+https://github.com/Firehawk41/slim-prep-oss@68979e828cba23fc26daf3132ce3c67fbdaa94fc",
     # The quality module (slim-data D-109). Co-developing: pip install -e ../slim-quality-oss
-    "slim-quality @ git+https://github.com/Firehawk41/slim-quality-oss@main",
+    "slim-quality @ git+https://github.com/Firehawk41/slim-quality-oss@abf9ed5a0923d80aa1ae6ec1bcd94c5099770eb2",
     # slim-domain: its hash-chained audit log over the shared database (slim-data D-77), and the bridge.
-    "slim-domain @ git+https://github.com/Firehawk41/slim-domain-oss@main",
+    "slim-domain @ git+https://github.com/Firehawk41/slim-domain-oss@7b97dada57eb27440a4d63be4263d84263c1647d",
     # Invoicing V5 (slim-data D-83): a subfolder of the invoicing repo. Co-developing: pip install -e ../SLIM-Invoicing-Program/V5-LIMS-Module
-    "slim-invoicing @ git+https://github.com/Firehawk41/SLIM-Invoicing-Program@main#subdirectory=V5-LIMS-Module",
+    "slim-invoicing @ git+https://github.com/Firehawk41/SLIM-Invoicing-Program@95de40153620d4f23676167eb28cb0286475bcef#subdirectory=V5-LIMS-Module",
 ]
 
 [project.optional-dependencies]
