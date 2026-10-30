@@ -61,6 +61,15 @@ def _back(request: Request, name: str, **query) -> RedirectResponse:
     return RedirectResponse(url, status_code=303)
 
 
+def _chart(db: Session, slug: str):
+    """The series a form names, or 404: ids come from the page but are typed by whoever posts."""
+    try:
+        SeriesKey.from_slug(slug)
+        return q.chart(db, SlimDataQc(db), slug)
+    except (ValueError, store.NotFound):
+        raise HTTPException(status_code=404, detail="No such series.") from None
+
+
 def _day(text: str, clock: LabClock, end: bool = False) -> datetime:
     try:
         day = date.fromisoformat(text.strip())
@@ -119,11 +128,8 @@ def quality_home(
 @router.get("/quality/series", name="quality_series", response_class=HTMLResponse)
 def quality_series(request: Request, user: RequireStaff, db: DB, clock: Clock, id: str = ""):
     actor = _actor(db, user)
-    try:
-        key = SeriesKey.from_slug(id)
-        chart = q.chart(db, SlimDataQc(db), key.slug)
-    except (ValueError, store.NotFound):
-        raise HTTPException(status_code=404, detail="No such series.") from None
+    chart = _chart(db, id)
+    key = chart.series.key
     events = [e for e in store.events(db, key.instrument) if e.analyte in (None, key.analyte)]
     points = chart.series.points
     return render(
@@ -133,7 +139,8 @@ def quality_series(request: Request, user: RequireStaff, db: DB, clock: Clock, i
             "actor": actor,
             "chart": chart,
             "key": key,
-            "svg": render_svg(chart, events),
+            "svg": render_svg(chart, events, clock.zone),
+            "zone": clock.zone,
             "flags": list(reversed(chart.flags)),
             "points": points,
             "events": events,
@@ -159,6 +166,8 @@ def quality_note(
     actor = _actor(db, user)
     if not note.strip():
         raise HTTPException(status_code=422, detail="Write the note.")
+    if ref not in {p.ref for p in _chart(db, id).series.points}:
+        raise HTTPException(status_code=422, detail="That point is not on this chart.")
     q.add_note(db, id, ref, note.strip(), actor)
     db.commit()
     flash(request, "Note added.")
@@ -208,7 +217,7 @@ def quality_limits(
     basis: Annotated[str, Form(max_length=300)] = "",
 ):
     actor = _actor(db, user)
-    chart = q.chart(db, SlimDataQc(db), id)
+    chart = _chart(db, id)
     try:
         if LimitMethod(method) == LimitMethod.CERTIFICATE:
             c, s = _number(center, "Centre"), _number(sd, "SD")
@@ -394,7 +403,7 @@ def quality_profile_post(
 
 
 @router.get("/quality/changes", name="quality_changes", response_class=HTMLResponse)
-def quality_changes(request: Request, user: RequireStaff, db: DB):
+def quality_changes(request: Request, user: RequireStaff, db: DB, clock: Clock):
     actor = _actor(db, user)
     changes = store.list_changes(db)
     diffs = {
@@ -404,6 +413,7 @@ def quality_changes(request: Request, user: RequireStaff, db: DB):
         request,
         "quality/changes.html",
         {
+            "zone": clock.zone,
             "diffs": diffs,
             "actor": actor,
             "open": [c for c in changes if c.decision is None],
@@ -428,6 +438,8 @@ def quality_decide(
         raise HTTPException(status_code=404, detail="No such change.") from None
     except NotAllowed as refused:
         raise HTTPException(status_code=403, detail=str(refused)) from None
+    except q.ChangeConflict as conflict:
+        raise HTTPException(status_code=409, detail=str(conflict)) from None
     db.commit()
     flash(request, f"Change {change.id} {change.status.name.lower()}.")
     return _back(request, "quality_changes")
@@ -445,6 +457,7 @@ def quality_reviews(request: Request, user: RequireStaff, db: DB, clock: Clock):
         {
             "actor": actor,
             "reviews": store.reviews(db),
+            "zone": clock.zone,
             "suggested": (previous_end.replace(day=1), previous_end),
         },
     )

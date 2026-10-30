@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Changes — Quality — YourLab{% endblock %}
 {% block extra_head %}<link href="{{ url_for('static', path='css/quality.css') }}" rel="stylesheet" />{% endblock %}
-{% macro what(c) %}{% if c.profile %}Profile: {{ diffs[c.id]|join("; ") or "no difference from the profile then in force" }}{% else %}Limits for {{ c.limit_set.series.label }}: centre {{ "%.4g"|format(c.limit_set.limits.center|float) }}, SD {{ "%.3g"|format(c.limit_set.limits.sd|float) }}, from {{ c.limit_set.effective_from.date() }} ({{ c.limit_set.limits.basis or c.limit_set.limits.method.name.lower() }}){% endif %}{% endmacro %}
+{% macro what(c) %}{% if c.profile %}Profile: {{ diffs[c.id]|join("; ") or "no difference from the profile then in force" }}{% else %}Limits for {{ c.limit_set.series.label }}: centre {{ "%.4g"|format(c.limit_set.limits.center|float) }}, SD {{ "%.3g"|format(c.limit_set.limits.sd|float) }}, from {{ c.limit_set.effective_from.astimezone(zone).date() }} ({{ c.limit_set.limits.basis or c.limit_set.limits.method.name.lower() }}){% endif %}{% endmacro %}
 {% block content %}
   <h1>Changes to the quality rules</h1>
   {% include "quality/_nav.html" %}
@@ -11,7 +11,7 @@
   {% for c in open %}
     <div class="tool-card">
       <p><strong>#{{ c.id }}</strong> {{ what(c) }}</p>
-      <p>Why: {{ c.reason }} — {{ c.proposed_by.display }}, {{ c.proposed_at.strftime("%Y-%m-%d %H:%M") }}</p>
+      <p>Why: {{ c.reason }} — {{ c.proposed_by.display }}, {{ c.proposed_at.astimezone(zone).strftime("%Y-%m-%d %H:%M") }}</p>
       {% if actor.is_manager %}
       <form method="post" action="{{ url_for('quality_decide', change_id=c.id) }}" class="choice-row">
         <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
@@ -27,8 +27,8 @@
     <thead><tr><th>#</th><th>What</th><th>Proposed</th><th>Decision</th></tr></thead>
     <tbody>{% for c in decided %}
       <tr><td>{{ c.id }}</td><td>{{ what(c) }}<br><span class="muted">{{ c.reason }}</span></td>
-        <td>{{ c.proposed_by.display }}, {{ c.proposed_at.date() }}</td>
-        <td>{{ c.status.name.lower() }} by {{ c.decision.by.display }}, {{ c.decision.at.date() }}{% if c.self_approved %} <span class="sev sev--WARN">self-approved</span>{% endif %}{% if c.decision.note %}: {{ c.decision.note }}{% endif %}</td></tr>
+        <td>{{ c.proposed_by.display }}, {{ c.proposed_at.astimezone(zone).date() }}</td>
+        <td>{{ c.status.name.lower() }} by {{ c.decision.by.display }}, {{ c.decision.at.astimezone(zone).date() }}{% if c.self_approved %} <span class="sev sev--WARN">self-approved</span>{% endif %}{% if c.decision.note %}: {{ c.decision.note }}{% endif %}</td></tr>
     {% else %}<tr><td colspan="4" class="muted">None yet.</td></tr>{% endfor %}</tbody>
   </table>
 {% endblock %}

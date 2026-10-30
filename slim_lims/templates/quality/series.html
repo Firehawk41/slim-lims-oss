@@ -26,7 +26,7 @@
     {% endif %}
     {% if limit_sets %}
       <h3>Approved limit sets</h3>
-      <ul>{% for s in limit_sets %}<li>from {{ s.effective_from.date() }}: centre {{ val(s.limits.center) }}, SD {{ val(s.limits.sd) }} ({{ s.limits.basis or s.limits.method.name.lower() }})</li>{% endfor %}</ul>
+      <ul>{% for s in limit_sets %}<li>from {{ s.effective_from.astimezone(zone).date() }}: centre {{ val(s.limits.center) }}, SD {{ val(s.limits.sd) }} ({{ s.limits.basis or s.limits.method.name.lower() }})</li>{% endfor %}</ul>
     {% endif %}
   </section>
 
@@ -36,7 +36,7 @@
     <table class="table">
       <thead><tr><th>When</th><th>Severity</th><th>Tool</th><th>Code</th><th>What</th></tr></thead>
       <tbody>{% for f in flags[:50] %}
-        <tr><td>{{ f.at.strftime("%Y-%m-%d %H:%M") }}</td><td><span class="sev sev--{{ f.severity.name }}">{{ f.severity.name }}</span></td>
+        <tr><td>{{ f.at.astimezone(zone).strftime("%Y-%m-%d %H:%M") }}</td><td><span class="sev sev--{{ f.severity.name }}">{{ f.severity.name }}</span></td>
           <td>{{ f.tool }}</td><td>{{ f.code }}</td><td>{{ f.message }}</td></tr>
       {% endfor %}</tbody>
     </table>
@@ -47,15 +47,15 @@
   <section class="form-section">
     <h2>Events and notes</h2>
     <ul>
-      {% for e in events %}<li>{{ e.at.date() }} · {{ e.kind.label }}: {{ e.note }} ({{ e.by.display }})</li>{% endfor %}
-      {% for n in notes %}<li>Note on {{ n.ref }}: {{ n.note }} ({{ n.by.display }}, {{ n.at.date() }})</li>{% endfor %}
+      {% for e in events %}<li>{{ e.at.astimezone(zone).date() }} · {{ e.kind.label }}: {{ e.note }} ({{ e.by.display }})</li>{% endfor %}
+      {% for n in notes %}<li>Note on {{ n.ref }}: {{ n.note }} ({{ n.by.display }}, {{ n.at.astimezone(zone).date() }})</li>{% endfor %}
       {% if not events and not notes %}<li class="muted">None.</li>{% endif %}
     </ul>
     <form method="post" action="{{ url_for('quality_note') }}" class="stack-form">
       <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
       <input type="hidden" name="id" value="{{ key.slug }}">
       <label>Point
-        <select name="ref">{% for p in points|reverse %}{% if loop.index <= 60 %}<option value="{{ p.ref }}">{{ p.at.strftime("%Y-%m-%d %H:%M") }} · {{ p.run_code }} · {{ val(p.value) }}</option>{% endif %}{% endfor %}</select></label>
+        <select name="ref">{% for p in points|reverse %}{% if loop.index <= 60 %}<option value="{{ p.ref }}">{{ p.at.astimezone(zone).strftime("%Y-%m-%d %H:%M") }} · {{ p.run_code }} · {{ val(p.value) }}</option>{% endif %}{% endfor %}</select></label>
       <label>Note <input type="text" name="note" maxlength="1000" required></label>
       <button type="submit" class="btn btn--secondary btn--small">Add note</button>
     </form>

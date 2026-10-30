@@ -263,3 +263,48 @@ def test_a_manager_signs_the_qc_review(visitor, db):
         ).status_code
         == 403
     )
+
+
+# --- review 2026-10-30 ----------------------------------------------------------------------------
+
+
+def test_q3_a_bad_series_or_point_is_404_or_422_never_500(visitor, db):
+    continue_as(visitor, db, "uma@demo.example")
+    token = token_of(visitor.get("/quality").text)
+    slug = next(s.key.slug for s in SlimDataQc(db).series() if s.key.measure == Measure.ISTD_RECOVERY)
+    db.rollback()
+    note = {"csrf_token": token, "id": slug, "ref": "reading:999999", "note": "x"}
+    assert visitor.post("/quality/notes", data=note).status_code == 422  # not a point of this chart
+    for bad in ("nope", "9|ICP-MS 1||||", "x" * 500):
+        assert visitor.post("/quality/notes", data=note | {"id": bad}).status_code == 404
+        limits = {"csrf_token": token, "id": bad, "method": "1", "effective": "2026-10-01", "reason": "r"}
+        assert visitor.post("/quality/limits", data=limits).status_code == 404
+
+
+def test_q1_approving_a_stale_profile_proposal_is_409(visitor, db):
+    from slim_quality.service import quality as q
+
+    uma = quality_actor(db, persona(db, "uma@demo.example"))
+    stale = store.list_changes(db, open_only=True)[0]  # the seeded CUSUM proposal, made on v0
+    newer = q.propose_profile(db, q.STARTER, "another", uma)
+    db.commit()
+    continue_as(visitor, db, "quinn@demo.example")
+    token = token_of(visitor.get("/quality/changes").text)
+    assert (
+        visitor.post(
+            f"/quality/changes/{newer.id}/decide", data={"csrf_token": token, "approve": "1"}
+        ).status_code
+        == 200
+    )
+    refused = visitor.post(f"/quality/changes/{stale.id}/decide", data={"csrf_token": token, "approve": "1"})
+    assert refused.status_code == 409 and "propose again" in refused.text
+
+
+def test_q2_the_pages_show_the_labs_time(visitor, db):
+    continue_as(visitor, db, "quinn@demo.example")
+    slug = next(s.key.slug for s in SlimDataQc(db).series() if s.key.measure == Measure.ISTD_RECOVERY)
+    db.rollback()
+    page = visitor.get(f"/quality/series?id={quote(slug)}").text
+    # The demo runs at 08:30 UTC here (the seed's NOW); the lab is in Chicago (UTC−5 in October).
+    shown = re.findall(r'<option value="reading:[^>]*>(\S+ \d\d):', page)
+    assert shown and all(when.endswith(" 03") for when in shown)

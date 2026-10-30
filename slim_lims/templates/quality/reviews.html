@@ -20,7 +20,7 @@
     <tbody>{% for r in reviews %}
       <tr><td>{{ r.period_from }} to {{ r.period_to }}</td>
         <td>{% for k, v in r.summary.items() %}<span class="sev sev--{{ k }}">{{ k }} {{ v }}</span> {% endfor %}</td>
-        <td>{{ r.comment }}</td><td>{{ r.by.display }}, {{ r.at.strftime("%Y-%m-%d") }}</td></tr>
+        <td>{{ r.comment }}</td><td>{{ r.by.display }}, {{ r.at.astimezone(zone).strftime("%Y-%m-%d") }}</td></tr>
     {% else %}<tr><td colspan="4" class="muted">None signed yet.</td></tr>{% endfor %}</tbody>
   </table>
 {% endblock %}
