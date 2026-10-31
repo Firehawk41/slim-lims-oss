@@ -32,6 +32,7 @@ from slim_lims.audit import install_audit_log
 from slim_lims.catalog import SyncReport, sync_analysis_catalog
 from slim_lims.db import make_engine, make_session_factory
 from slim_lims.demo_prep import seed_prep_scenario
+from slim_lims.demo_samples import seed_demo_bottles
 from slim_lims.demo_scenarios import seed_scenarios
 from slim_lims.invoices import migrate_invoicing
 from slim_lims.labs import ensure_schema
@@ -43,6 +44,7 @@ from slim_lims.quality import migrate_slim_quality, seed_demo_nonconformity, see
 from slim_lims.reference_cache import load_reference
 from slim_lims.repositories import TRSubmissionRepository
 from slim_lims.results import SpecReader, migrate_slim_data, publish_demo_rules
+from slim_lims.samples import migrate_slim_samples, publish_demo_samples
 
 DEFAULT_OSS_DIR = Path(slim_lims.__file__).resolve().parents[2] / "slim-report-engine-oss"
 
@@ -56,6 +58,7 @@ class SeedReport:
     personas: int = 0
     scenarios: dict[str, str] = field(default_factory=dict)
     prepped: str | None = None
+    bottles: int = 0
     qc_runs: int = 0
 
 
@@ -119,6 +122,7 @@ def seed_demo(
 
         migrate_slim_data(portal_engine)
         migrate_slim_prep(portal_engine)
+        migrate_slim_samples(portal_engine)
         migrate_slim_quality(portal_engine)
         migrate_invoicing(portal_engine)
         report.audited = install_audit_log(portal_engine)  # before the scenarios: their writes chained (D-77)
@@ -127,6 +131,7 @@ def seed_demo(
             reference = load_reference(slim_engine, portal_engine)
             report.analyses = publish_demo_rules(session, reference)
             publish_demo_prep(session, reference, clock.today())
+            publish_demo_samples(session)
             report.personas = sync_personas(session)
             session.commit()
             if scenarios:
@@ -134,6 +139,8 @@ def seed_demo(
                 report.scenarios = seed_scenarios(session, reference, specs, clock.now())
                 session.commit()
                 report.prepped = seed_prep_scenario(session, reference, specs, clock.now())
+                session.commit()
+                report.bottles = seed_demo_bottles(session, reference, clock.today())
                 session.commit()
                 report.qc_runs = seed_quality_history(session, reference, specs, clock.now())
                 seed_demo_nonconformity(session, clock.now())
@@ -155,6 +162,7 @@ def upgrade_lab(database_url: str) -> None:
     try:
         migrate_slim_data(engine)
         migrate_slim_prep(engine)
+        migrate_slim_samples(engine)
         migrate_slim_quality(engine)
         migrate_invoicing(engine)
         install_audit_log(engine)

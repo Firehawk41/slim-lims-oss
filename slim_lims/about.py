@@ -67,6 +67,7 @@ REPOS = (
     Link("slim-lims-oss", label="slim-lims-oss: the host"),
     Link("slim-data-oss", label="slim-data-oss: results"),
     Link("slim-prep-oss", label="slim-prep-oss: the prep book"),
+    Link("slim-samples-oss", label="slim-samples-oss: bottles, custody, retention"),
     Link("slim-domain-oss", label="slim-domain-oss: reference data, audit log"),
     Link("slim-report-engine-oss", label="slim-report-engine-oss: reports"),
     Link("slim-data-oss", "docs/DECISIONS.md", "Decisions"),

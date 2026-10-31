@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from tests.conftest import csrf_from, login, login_api
+from tests.factories import BOTTLES
 from tests.test_api_submissions import payload
 
 
@@ -66,6 +67,7 @@ def test_staff_receives_and_progresses(submitted):
     response = submitted.post(
         "/requests/TR00001/check-in",
         data={
+            **BOTTLES,
             "csrf_token": csrf_from(page),
             "date_received": lab_today().isoformat(),
             "received_by": "JM",
@@ -87,6 +89,7 @@ def test_bad_status_change_is_flashed_not_500(submitted):
     response = submitted.post(
         "/requests/TR00001/check-in",
         data={
+            **BOTTLES,
             "csrf_token": csrf_from(page),
             "date_received": future,
             "received_by": "JM",
@@ -203,6 +206,7 @@ def test_check_in_page_blocks_unmatched_and_is_staff_only(client, staff_user, cu
     response = client.post(
         "/requests/TR00001/check-in",
         data={
+            **BOTTLES,
             "csrf_token": csrf_from(page),
             "date_received": lab_today().isoformat(),
             "received_by": "JM",
@@ -213,6 +217,7 @@ def test_check_in_page_blocks_unmatched_and_is_staff_only(client, staff_user, cu
     response = client.post(
         "/requests/TR00001/check-in",
         data={
+            **BOTTLES,
             "csrf_token": csrf_from(page),
             "date_received": lab_today().isoformat(),
             "received_by": "JM",

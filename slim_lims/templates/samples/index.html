@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}Samples — YourLab{% endblock %}
+{% block body_class %}page-wide{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <h1>Samples</h1>
+    <a href="{{ url_for('samples_rules') }}">The lab's lists and periods</a>
+  </div>
+  <p class="hint">Every bottle logged at check-in, where it is and how long it is kept. Nothing is disposed of by
+    itself: a person records it.</p>
+  <nav class="tabs" aria-label="Which bottles">
+    {% for key, label in shows.items() %}
+      <a href="{{ url_for('samples_home') }}?show={{ key }}"{% if key == show %} aria-current="page" class="active"{% endif %}>{{ label }}
+        {% if key == "due" and counts.due %}<span class="badge badge--rush">{{ counts.due }}</span>{% endif %}
+        {% if key == "held" and counts.held %}<span class="badge badge--submitted">{{ counts.held }}</span>{% endif %}</a>
+    {% endfor %}
+  </nav>
+  {% if counts.overdue %}<p class="form-error" role="status">{{ counts.overdue }} bottle{{ "" if counts.overdue == 1 else "s" }} past the retention date.</p>{% endif %}
+  {% if containers %}
+    <table class="table">
+      <thead><tr>
+        <th scope="col">Sample</th><th scope="col">Bottle</th><th scope="col">Where</th><th scope="col">Keep until</th>
+        <th scope="col">State</th>
+      </tr></thead>
+      <tbody>
+        {% for c in containers %}
+          <tr>
+            <td><a href="{{ url_for('samples_container', container_id=c.id) }}">{{ c.sample }}</a></td>
+            <td>{{ c.position }}: {{ c.current_count }} × {{ c.current_type[1] }}</td>
+            <td>{% if c.current_location %}{{ rules.location(c.current_location).label if rules.location(c.current_location) else c.current_location }}{% else %}—{% endif %}</td>
+            <td>{{ c.retention_due }}{% if c.overdue(today) %} <span class="badge badge--rush">overdue</span>{% elif c.due(today) %} <span class="badge badge--submitted">due</span>{% endif %}</td>
+            <td>
+              {% if not c.active %}{{ "Disposed" if c.outcome.name == "DISPOSED" else "Returned" }} {{ c.finished_on.strftime("%Y-%m-%d") }}
+              {% elif c.held %}On hold: {{ c.hold_reason }}
+              {% else %}In the lab{% endif %}
+              {% for cond in c.current_conditions %}<span class="badge badge--{{ 'rush' if cond.effect.name != 'NONE' else 'submitted' }}">{{ cond.label }}</span>{% endfor %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="muted">Nothing here.</p>
+  {% endif %}
+{% endblock %}

@@ -29,6 +29,8 @@ from slim_lims.results import SpecReader
 from slim_lims.results_routes import api_router as results_api_router
 from slim_lims.results_routes import router as results_router
 from slim_lims.routes import router as pages_router
+from slim_lims.samples_routes import api_router as samples_api_router
+from slim_lims.samples_routes import router as samples_router
 from slim_lims.security import BodySizeLimitMiddleware, LoginThrottle, SecurityHeadersMiddleware
 from slim_lims.web import STATIC_DIR, render
 
@@ -110,6 +112,8 @@ def create_app(
     app.include_router(results_api_router)
     app.include_router(prep_router)
     app.include_router(prep_api_router)
+    app.include_router(samples_router)
+    app.include_router(samples_api_router)
     app.include_router(quality_router)
     register_error_handlers(app)
 

@@ -52,7 +52,7 @@ from slim_lims.auth import RequireStaff
 from slim_lims.db import get_db
 from slim_lims.labtime import LabClock, lab_clock
 from slim_lims.models import ROLE_STAFF, User
-from slim_lims.prep import PREP_ANALYSES, TrSamples, prep_actor_for, rules, send
+from slim_lims.prep import PREP_ANALYSES, TrSamples, prep_actor_for, refuse_blocked, rules, send
 from slim_lims.reference import ReferenceData
 from slim_lims.security import csrf_protect
 from slim_lims.web import flash, render
@@ -489,6 +489,7 @@ def prep_save_batch(
 
     def save():
         batch = _batch_from_grid(values, db, user, clock)
+        refuse_blocked(db, batch)
         reason = values.get("reason") or None
         rules_id = None if expected else rules(db).id  # a correction keeps its own (P-24)
         samples = TrSamples(db, reference)
@@ -676,6 +677,7 @@ def api_batch(code: str, user: RequireStaff, db: DB):
 def api_save_batch(data: BatchIn, user: RequireStaff, db: DB, clock: Clock, reference: Reference):
     def save():
         batch = _in_lab_time(data.batch, clock)
+        refuse_blocked(db, batch)
         rules_id = None if data.expected_version else rules(db).id  # a correction keeps its own (P-24)
         record_batch(
             db, batch, rules_id, prep_actor_for(user), TrSamples(db, reference), clock.now(),

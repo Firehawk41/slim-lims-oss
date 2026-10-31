@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% from "samples/_bottles.html" import bottles with context %}
+
+{% block title %}Log bottles {{ tr_number }} — YourLab{% endblock %}
+{% block body_class %}page-wide{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <h1>Log bottles for {{ tr_number }}</h1>
+    <a href="{{ url_for('request_detail', tr_number=tr_number) }}">Back to request</a>
+  </div>
+  {% if samples %}
+    <p class="hint">These samples were checked in without their bottles. Log how many and what kind arrived;
+      received today ({{ today }}).</p>
+    <form method="post" action="{{ url_for('samples_log_form', tr_number=tr_number) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+      {{ bottles(samples, {}, rules, rows, field, true) }}
+      <button type="submit" class="btn btn--primary">Log bottles</button>
+    </form>
+  {% else %}
+    <p>Every sample of {{ tr_number }} has its bottles logged.</p>
+  {% endif %}
+{% endblock %}

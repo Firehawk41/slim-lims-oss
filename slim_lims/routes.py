@@ -9,6 +9,8 @@ import slim_invoicing
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse, Response
 from pydantic import ValidationError
+from slim_samples.domain.problems import Refused as BottlesRefused
+from slim_samples.service import custody
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -22,6 +24,16 @@ from slim_lims.models import LAB_ROLE_ANALYST, LAB_ROLES, ROLE_CUSTOMER, ROLE_ST
 from slim_lims.personas import persona_choices
 from slim_lims.reference import ReferenceData
 from slim_lims.results import issued_documents
+from slim_lims.samples import (
+    BOTTLE_ROWS,
+    TrSampleLookup,
+    bottle_field,
+    check_in_with_bottles,
+    parse_bottles,
+)
+from slim_lims.samples import (
+    rules as sample_rules,
+)
 from slim_lims.schemas import CheckInIn, ChemicalMatchIn, StatusChangeIn
 from slim_lims.security import csrf_protect, hash_password
 from slim_lims.services import FACT_STATUSES, Conflict, Forbidden, NotFound, SubmissionRejected
@@ -104,6 +116,9 @@ def index(
             "paid_shown": board.PAID_SHOWN,
             "can_invoice": user.is_staff,
             "TRStatus": TRStatus,
+            "bottles_due": (
+                len(custody.due_for_disposal(db, request.app.state.lab_clock.today())) if user.is_staff else 0
+            ),
         },
     )
 
@@ -218,7 +233,7 @@ def new_request(request: Request, user: RequireUser):
 
 @router.get("/requests/{tr_number}", name="request_detail")
 def request_detail(
-    request: Request, tr_number: str, user: RequireUser, service: Service, reference: Reference
+    request: Request, tr_number: str, user: RequireUser, service: Service, reference: Reference, db: DB
 ):
     try:
         submission = service.get(tr_number, user)
@@ -241,8 +256,19 @@ def request_detail(
             "lab_today": service.lab_today(),
             "chemicals": reference.chemical_choices() if user.is_staff else [],
             "TRStatus": TRStatus,
+            "bottles": _bottles_of(db, reference, submission) if user.is_staff else None,
         },
     )
+
+
+def _bottles_of(db: Session, reference: ReferenceData, submission: TRSubmission) -> dict | None:
+    """Staff see each sample's bottles on the request (slim-samples): position -> its containers. Nothing
+    before check-in."""
+    if submission.status is TRStatus.SUBMITTED:
+        return None
+    infos = TrSampleLookup(db, reference).for_tr(submission.tr_number)
+    found = custody.containers_for(db, [i.sample for i in infos])
+    return {int(i.sample.rsplit("-", 1)[1]): found[i.sample] for i in infos}
 
 
 @router.get("/requests/{tr_number}/versions/{version}", name="request_version")
@@ -305,7 +331,7 @@ def change_status_form(
 
 @router.get("/requests/{tr_number}/check-in", name="check_in_page")
 def check_in_page(
-    request: Request, tr_number: str, user: RequireStaff, service: Service, reference: Reference
+    request: Request, tr_number: str, user: RequireStaff, service: Service, reference: Reference, db: DB
 ):
     try:
         submission = service.get(tr_number, user)
@@ -325,6 +351,11 @@ def check_in_page(
             "chemicals": reference.chemical_choices(),
             "lab_today": service.lab_today(),
             "TRStatus": TRStatus,
+            "bottle_samples": TrSampleLookup(db, reference).for_tr(tr_number),
+            "sample_names": {smp.position: smp.sample_name for smp in submission.samples},
+            "sample_rules": sample_rules(db).rules,
+            "bottle_rows": range(BOTTLE_ROWS),
+            "bottle_field": bottle_field,
         },
     )
 
@@ -342,6 +373,7 @@ def check_in_form(
     user: RequireStaff,
     service: Service,
     db: DB,
+    reference: Reference,
     form: Annotated[dict[str, str], Depends(form_fields)],
 ):
     try:
@@ -356,13 +388,18 @@ def check_in_form(
             chemicals=matches,
             note=form.get("note", ""),
         )
-        submission = service.check_in(tr_number, data, user)
+        lookup = TrSampleLookup(db, reference)
+        bottles = parse_bottles(form, lookup.for_tr(tr_number), sample_rules(db))
+        submission = check_in_with_bottles(db, service, reference, tr_number, data, bottles, user)
         db.commit()
         flash(
             request,
             f"{submission.tr_number} checked in: {len(submission.samples)} sample(s) logged into the LIMS.",
         )
         return _redirect(request, "request_detail", tr_number=tr_number)
+    except BottlesRefused as e:
+        db.rollback()
+        flash(request, "Bottles: " + "; ".join(f"{p.where}: {p.message}" for p in e.problems), "error")
     except (ValidationError, ValueError, Conflict, SubmissionRejected) as e:
         db.rollback()
         flash(request, _first_error(e) if isinstance(e, ValidationError) else str(e), "error")

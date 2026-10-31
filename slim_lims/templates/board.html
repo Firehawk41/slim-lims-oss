@@ -9,6 +9,10 @@
     <a class="btn btn--primary" href="{{ url_for('new_request') }}">New request</a>
   </div>
 
+  {% if current_user.is_staff and bottles_due %}
+    <p class="hint" role="status"><a href="{{ url_for('samples_home') }}?show=due">{{ bottles_due }} bottle{{ "" if bottles_due == 1 else "s" }}
+      past {{ "its" if bottles_due == 1 else "their" }} retention date</a>: record disposal or return.</p>
+  {% endif %}
   {% if current_user.is_staff %}
     <form method="get" class="filters" aria-label="Filter the board">
       <label>Customer

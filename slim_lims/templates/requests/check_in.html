@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "_macros.html" import badge with context %}
+{% from "samples/_bottles.html" import bottles with context %}
 
 {% block title %}Check in {{ s.tr_number }} — YourLab{% endblock %}
 {% block body_class %}page-wide{% endblock %}
@@ -61,6 +62,14 @@
           {% endfor %}
         </tbody>
       </table>
+    </section>
+
+    <section class="form-section">
+      <h2>Bottles received</h2>
+      <p class="hint">How many and what kind of bottle arrived for each sample, where it is stored, and anything
+        wrong with it. A condition may warn on the report for the analyses the bottle serves. Rows left on
+        "none" are ignored; each sample needs at least one.</p>
+      {{ bottles(bottle_samples, sample_names, sample_rules, bottle_rows, bottle_field, true) }}
     </section>
 
     <button type="submit" class="btn btn--primary">Accept into LIMS</button>

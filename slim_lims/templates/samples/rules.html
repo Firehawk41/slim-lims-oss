@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block title %}Sample lists — YourLab{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <h1>The lab's lists and periods</h1>
+    <a href="{{ url_for('samples_home') }}">Back to samples</a>
+  </div>
+  <p class="hint">Version {{ version }}. A bottle keeps the version it was received under; what a condition does is copied
+    onto the bottle when it is noted, so changing a list never rewrites a past report.</p>
+  <dl class="detail-list">
+    <dt>Kept for</dt><dd>{{ rules.retention_days }} days{% for o in rules.retention_overrides %}; customer {{ o.customer }}: {{ o.days }} days{% endfor %}</dd>
+    <dt>Container kinds</dt><dd>{{ rules.container_types|map(attribute="label")|join(", ") }}</dd>
+    <dt>Locations</dt><dd>{{ rules.locations|map(attribute="label")|join(", ") }}</dd>
+    <dt>Disposal methods</dt><dd>{{ rules.disposal_methods|join(", ") }}</dd>
+    <dt>Conditions</dt><dd>
+      {% for c in rules.conditions %}{{ c.label }} — {{ {"NONE": "recorded only", "WARN": "the report warns", "BLOCK": "blocks prep"}[c.effect.name] }}{% if not loop.last %}<br>{% endif %}{% endfor %}</dd>
+  </dl>
+  {% if may_publish %}
+    <section aria-labelledby="edit-heading">
+      <h2 id="edit-heading">Publish a new version</h2>
+      <p class="hint">Edit the lists below (effect: 1 recorded only, 2 the report warns, 3 blocks prep) and publish.
+        Customer overrides use the customer's ID.</p>
+      <form method="post" action="{{ url_for('samples_rules_form') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+        <textarea name="body" rows="24" cols="80" spellcheck="false" aria-label="The lab's rules as JSON">{{ body }}</textarea>
+        <div class="choice-row"><button type="submit" class="btn btn--primary">Publish</button></div>
+      </form>
+    </section>
+  {% else %}
+    <p class="muted">A supervisor publishes changes to these lists.</p>
+  {% endif %}
+{% endblock %}

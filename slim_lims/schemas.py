@@ -5,6 +5,7 @@ from datetime import date, time
 from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, StringConstraints
+from slim_samples.domain.containers import ContainerIn
 
 from slim_lims.domain import (
     PaymentMethod,
@@ -62,6 +63,9 @@ class CheckInIn(_Input):
     )
     chemicals: dict[int, int] = {}  # sample position -> SLIM chemical ID
     note: Annotated[Text, StringConstraints(max_length=2000)] = ""
+    # sample position -> the bottles received (slim-samples S-02). Optional here: the machine contract
+    # (spec §12) predates it; the check-in screen requires them (S-10).
+    containers: dict[int, list[ContainerIn]] = {}
 
 
 class ChemicalMatchIn(_Input):

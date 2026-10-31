@@ -22,7 +22,13 @@ def _pins() -> dict[str, set[str]]:
 
 def test_every_module_is_pinned_to_one_commit_everywhere():
     pins = _pins()
-    assert {"slim-data-oss", "slim-prep-oss", "slim-quality-oss", "slim-domain-oss"} <= pins.keys()
+    assert {
+        "slim-data-oss",
+        "slim-prep-oss",
+        "slim-samples-oss",
+        "slim-quality-oss",
+        "slim-domain-oss",
+    } <= pins.keys()
     assert "slim-report-engine-oss" in pins and "SLIM-Invoicing-Program" in pins
     for repo, refs in pins.items():
         assert len(refs) == 1, f"{repo} is pinned to {refs}"

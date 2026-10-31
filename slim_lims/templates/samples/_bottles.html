@@ -1,0 +1,52 @@
+{# The bottles section of check-in (S-02): per sample, rows of how many and what kind, where, in what state, for which analyses. #}
+{% macro bottles(infos, names, rules, rows, field, required) -%}
+  {% for info in infos %}
+    {% set pos = info.sample.rsplit("-", 1)[1]|int %}
+    <fieldset class="bottle-set">
+      <legend>{{ info.sample }}{% if names.get(pos) %} — {{ names[pos] }}{% endif %}
+        <span class="muted">({{ info.analyses|sort|join(", ") or "no analyses" }})</span></legend>
+      <table class="table bottle-table">
+        <thead><tr>
+          <th scope="col">Kind</th><th scope="col">How many</th><th scope="col">Stored at</th>
+          <th scope="col">Condition on receipt</th><th scope="col">Serves</th><th scope="col">Note</th>
+        </tr></thead>
+        <tbody>
+          {% for row in rows %}
+            <tr>
+              <td><select name="{{ field(pos, row, 'type') }}" aria-label="Kind of bottle, sample {{ pos }} row {{ row + 1 }}"
+                  {% if required and row == 0 %}required{% endif %}>
+                <option value="">{% if row == 0 %}Choose…{% else %}— none —{% endif %}</option>
+                {% for t in rules.container_types %}<option value="{{ t.code }}">{{ t.label }}</option>{% endfor %}
+              </select></td>
+              <td><input type="number" name="{{ field(pos, row, 'count') }}" value="1" min="1" max="999" class="narrow"
+                  aria-label="How many, sample {{ pos }} row {{ row + 1 }}"></td>
+              <td><select name="{{ field(pos, row, 'location') }}" aria-label="Stored at, sample {{ pos }} row {{ row + 1 }}">
+                {% for l in rules.locations %}<option value="{{ l.code }}">{{ l.label }}</option>{% endfor %}
+              </select></td>
+              <td>
+                {% if rules.conditions %}
+                  <details><summary>Problems?</summary>
+                    {% for c in rules.conditions %}
+                      <label class="check"><input type="checkbox" name="{{ field(pos, row, 'cond_' ~ c.code) }}" value="1"> {{ c.label }}</label>
+                    {% endfor %}
+                  </details>
+                {% endif %}
+              </td>
+              <td>
+                {% if info.analyses|length > 1 %}
+                  <details><summary>All</summary>
+                    <p class="hint">Tick only if this bottle serves some of them.</p>
+                    {% for a in info.analyses|sort %}
+                      <label class="check"><input type="checkbox" name="{{ field(pos, row, 'an_' ~ a) }}" value="1"> {{ a }}</label>
+                    {% endfor %}
+                  </details>
+                {% else %}all{% endif %}
+              </td>
+              <td><input name="{{ field(pos, row, 'note') }}" maxlength="500" aria-label="Note, sample {{ pos }} row {{ row + 1 }}"></td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </fieldset>
+  {% endfor %}
+{%- endmacro %}
