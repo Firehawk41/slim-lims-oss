@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}Labels {{ tr_number }} — YourLab{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <h1>Labels for {{ tr_number }}</h1>
+    <a href="{{ url_for('request_detail', tr_number=tr_number) }}">Back to request</a>
+  </div>
+  <p class="hint">Print this page. The code on each label is unique to the bottle, ready for a barcode later.</p>
+  <div class="label-sheet">
+    {% for l in labels %}
+      <div class="bottle-label">
+        <strong>{{ l.code }}</strong>
+        <div>{{ l.kind }}{% if l.count > 1 %} × {{ l.count }}{% endif %} · bottle {{ l.bottle }}</div>
+        <div>Received {{ l.received_on }}</div>
+        <div>Keep until {{ l.keep_until }}</div>
+      </div>
+    {% endfor %}
+  </div>
+{% endblock %}

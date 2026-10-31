@@ -75,3 +75,7 @@ def submission(**overrides) -> TRSubmission:
 
 
 TIME_LIMITED = dict(processing_time=ProcessingTime.TIME_LIMITED, requested_time=time(15, 0))
+
+
+# The check-in screen requires bottles for every sample (slim-samples S-10): one HDPE bottle each.
+BOTTLES = {f"b{position}_0_type": "hdpe" for position in range(1, 6)}

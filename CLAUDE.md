@@ -2,7 +2,7 @@
 
 > ## ⚠️ OSS ONLY — read first
 > A **portfolio demo** on the **open-source** SLIM repos only (`slim-domain-oss`, `slim-report-engine-oss`,
-> `slim-data-oss`, `slim-prep-oss`, `slim-quality-oss`) and their fictional demo data. **Never connect it
+> `slim-data-oss`, `slim-prep-oss`, `slim-samples-oss`, `slim-quality-oss`) and their fictional demo data. **Never connect it
 > to PreciLab (or any real lab) production databases, shares or services.** Enforced: `slim_lims/oss_guard.py` refuses any URL
 > containing "precilab" and any host but localhost / 127.0.0.1 / `db` / `postgres` unless listed in
 > `PORTAL_ALLOWED_DB_HOSTS`; every connection goes through `db.make_engine` (`tests/test_oss_guard.py`);
@@ -42,7 +42,7 @@ and release results, issue reports and invoice; the lab board (`/`) shows it all
 replaces the Excel TR form; emailed `.xlsx` forms stay supported by slim-domain's parsers.
 
 **Modules (required libraries):** slim-data (results: import, rules engine, review, release, reports),
-slim-prep (the prep book), slim-quality (QC charts and tools, change control), invoicing V5
+slim-prep (the prep book), slim-samples (bottles, custody, retention), slim-quality (QC charts and tools, change control), invoicing V5
 (`slim_invoicing`), slim-domain (SLIM tables, audit log), slim-report-engine (the report template).
 **Pinned (D-117):** each is installed at a merged commit, the same in `pyproject.toml`, CI and `render.yaml`
 (`tests/test_pins.py`); bump a pin in a host PR. Each keeps its own tables and Alembic version table in the
@@ -51,7 +51,7 @@ shared database; `cli migrate` and the seed run them all.
 **Open:** deeper report-engine wiring (spec §13; changes other repos, needs the go-ahead); ecosystem
 docker-compose for the VPS (**deferred, do not start**); the landing page (`/about`) is live with
 placeholders; Jamie writes its words in `templates/about/_copy.html`. slim-quality part 1 is in (phase 3), and
-part 2 has begun (vertical audit, nonconformities); roadmap phase 4 or the rest of phase 5 next (`docs/ROADMAP.md`).
+part 2 has begun (vertical audit, nonconformities); phase 4's first half is in (slim-samples: bottles at check-in, `/samples`, condition warnings on the report, the prep gate); its second half (report signatory, email/PDF delivery) or the rest of phase 5 next (`docs/ROADMAP.md`).
 
 ## How to run
 
@@ -96,7 +96,11 @@ slim_lims/
 ├── reference.py, reference_cache.py, slim_tables.py, catalog.py  # SLIM reference data (read-only) + analysis catalog
 ├── bridge.py        # to_slim_v1: TR -> slim-domain v1 TRSubmission
 ├── results.py, results_routes.py  # slim-data host side; /results, /api/results (staff)
-├── prep.py, prep_routes.py        # slim-prep host side (TrSamples: its TR port); /prep, /api/prep (staff)
+├── prep.py, prep_routes.py        # slim-prep host side (TrSamples: its TR port); /prep, /api/prep (staff);
+│                                  #   refuse_blocked: a blocking bottle condition stops a prep batch (S-04)
+├── samples.py, samples_routes.py  # slim-samples host side (TrSampleLookup: its TR port); check-in composed with the
+│                                  #   bottles (S-10); condition_notes for the report; /samples, /api/samples (staff)
+├── demo_samples.py                # the demo's bottles: a leaking one, one on hold, one in the fridge
 ├── quality.py, quality_routes.py  # slim-quality host side: QcSource over slim-data, the vertical audit (composed
 │                                  #   from every module, D-113), NCs (D-114), demo QC history and NC; /quality
 ├── invoices.py, demo_prices.py    # invoicing V5; /invoices; the accounting CSV (V5 writes formula cells as text, D-118)
@@ -140,6 +144,10 @@ scripts/seed_demo.py; tests/ (SQLite per test, or Postgres via TEST_DATABASE_URL
   staff; check-in (receipt + every chemical matched) is the only way to *received*.
 - Form UX: samples table + one grouped analysis panel for the ticked rows (the matrix layout was rejected).
 - TR numbers `TR00001`… from a gapless counter locked in the submit transaction.
+- Check-in logs the bottles of every sample in the same transaction (D-121); the screen requires them, the
+  machine contract (spec §12) does not (`POST /api/submissions/{tr}/check-in` takes `containers` but works
+  without; `/samples/log/{tr}` logs them later). A condition on a bottle can warn on the report for the
+  analyses it serves, or block prep; the lab's lists are `/samples/rules`.
 - Statuses: submitted → received → in progress → partial report → complete report → invoiced; cancelled.
   They follow the facts (D-99): report statuses only by issuing a report, invoiced only by sending the
   invoice; a cancel is refused once a report was issued or a result released. **Each time a module is

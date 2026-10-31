@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}{{ c.sample }} bottle {{ c.position }} — YourLab{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <h1>{{ c.sample }}: {{ c.title }}</h1>
+    <a href="{{ url_for('request_detail', tr_number=c.sample.rsplit('-', 1)[0]) }}">Back to request</a>
+  </div>
+  <dl class="detail-list">
+    <dt>Received</dt><dd>{{ c.received_on }} by {{ c.received_by }}</dd>
+    <dt>Kept until</dt><dd>{{ c.retention_due }}{% if c.overdue(today) %} <span class="badge badge--rush">overdue</span>{% endif %}</dd>
+    <dt>Where</dt><dd>{% if c.current_location %}{{ rules.location(c.current_location).label if rules.location(c.current_location) else c.current_location }}{% else %}—{% endif %}</dd>
+    <dt>Serves</dt><dd>{{ c.current_analyses|sort|join(", ") }}</dd>
+    <dt>Condition</dt><dd>{% for x in c.current_conditions %}{{ x.label }}{% if x.effect.name == "WARN" %} (the report warns){% elif x.effect.name == "BLOCK" %} (blocks prep){% endif %}{% if not loop.last %}, {% endif %}{% else %}Arrived intact{% endfor %}</dd>
+    <dt>State</dt><dd>
+      {% if not c.active %}{{ "Disposed of" if c.outcome.name == "DISPOSED" else "Returned to the customer" }}
+      {% elif c.held %}On hold: {{ c.hold_reason }}{% else %}In the lab{% endif %}</dd>
+    <dt>Label</dt><dd><code>{{ label.code }}</code> · bottle {{ label.bottle }} ·
+      <a href="{{ url_for('samples_labels', tr_number=c.sample.rsplit('-', 1)[0]) }}">print the request's labels</a></dd>
+  </dl>
+  {% if c.note %}<p>Note at receipt: {{ c.note }}</p>{% endif %}
+
+  <section aria-labelledby="history-heading">
+    <h2 id="history-heading">History</h2>
+    <table class="table">
+      <thead><tr><th scope="col">When</th><th scope="col">What</th><th scope="col">Who</th><th scope="col">Why</th></tr></thead>
+      <tbody>
+        <tr><td>{{ c.received_at.strftime("%Y-%m-%d %H:%M") }}</td>
+          <td>Received: {{ c.count }} × {{ c.type_label }}, {{ rules.location(c.location).label if rules.location(c.location) else c.location }}{% if c.conditions %} ({{ c.conditions|map(attribute="label")|join(", ") }}){% endif %}</td>
+          <td>{{ c.received_by }}</td><td></td></tr>
+        {% for e in c.events %}
+          <tr><td>{{ e.at.strftime("%Y-%m-%d %H:%M") }}</td>
+            <td>
+              {% if e.kind == EventKind.MOVED %}Moved to {{ rules.location(e.location).label if rules.location(e.location) else e.location }}
+              {% elif e.kind == EventKind.CONDITION %}Condition now: {{ e.conditions|map(attribute="label")|join(", ") or "intact" }}
+              {% elif e.kind == EventKind.CORRECTED %}Corrected{% if e.count %}: {{ e.count }} bottles{% endif %}{% if e.type_label %}: {{ e.type_label }}{% endif %}{% if e.analyses is not none %}: serves {{ e.analyses|sort|join(", ") }}{% endif %}
+              {% elif e.kind == EventKind.HOLD %}Put on hold
+              {% elif e.kind == EventKind.RELEASE %}Hold lifted
+              {% elif e.kind == EventKind.DISPOSED %}Disposed of ({{ e.method }})
+              {% else %}Returned to the customer{% endif %}</td>
+            <td>{{ e.by }}</td><td>{{ e.reason or "" }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  {% if c.active %}
+    {% macro act(name, label, danger=false) %}
+      <form method="post" action="{{ url_for('samples_action', container_id=c.id, action=name) }}" class="action-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+        <strong>{{ label }}</strong>
+        {{ caller() }}
+        <button type="submit" class="btn{% if danger %} btn--danger{% endif %}">{{ label }}</button>
+      </form>
+    {% endmacro %}
+    <section aria-labelledby="actions-heading">
+      <h2 id="actions-heading">What happened to it</h2>
+      {% call act("move", "Move") %}
+        <label>To <select name="location">{% for l in rules.locations %}<option value="{{ l.code }}"{% if l.code == c.current_location %} disabled{% endif %}>{{ l.label }}</option>{% endfor %}</select></label>
+        <label>Why <input name="reason" maxlength="500" size="24" placeholder="optional"></label>
+      {% endcall %}
+      {% call act("condition", "Note condition") %}
+        {% for cond in rules.conditions %}
+          <label class="check"><input type="checkbox" name="cond_{{ cond.code }}" value="1"{% if cond.code in c.current_conditions|map(attribute="code") %} checked{% endif %}> {{ cond.label }}</label>
+        {% endfor %}
+        <label>Why <input name="reason" maxlength="500" size="24" required placeholder="what changed"></label>
+      {% endcall %}
+      {% call act("correct", "Correct kind or count") %}
+        <label>Kind <select name="container_type"><option value="">(unchanged)</option>{% for t in rules.container_types %}<option value="{{ t.code }}">{{ t.label }}</option>{% endfor %}</select></label>
+        <label>Count <input type="number" name="count" min="1" max="999" class="narrow" placeholder="{{ c.current_count }}"></label>
+        <label>Why <input name="reason" maxlength="500" size="24" required placeholder="what was wrong"></label>
+      {% endcall %}
+      {% if c.held %}
+        {% call act("release", "Lift hold") %}<label>Why <input name="reason" maxlength="500" size="24" required></label>{% endcall %}
+      {% else %}
+        {% call act("hold", "Hold") %}<label>For <input name="reason" maxlength="500" size="28" required placeholder="e.g. complaint, open nonconformity"></label>{% endcall %}
+        {% call act("dispose", "Dispose", true) %}
+          <label>How <select name="method">{% for m in rules.disposal_methods %}<option>{{ m }}</option>{% endfor %}</select></label>
+          <label>Why <input name="reason" maxlength="500" size="24"{% if today < c.retention_due %} required placeholder="kept until {{ c.retention_due }}"{% else %} placeholder="optional"{% endif %}></label>
+        {% endcall %}
+        {% call act("return", "Return to customer") %}<label>Note <input name="reason" maxlength="500" size="24" placeholder="optional"></label>{% endcall %}
+      {% endif %}
+    </section>
+  {% endif %}
+{% endblock %}

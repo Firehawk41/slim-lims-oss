@@ -26,11 +26,14 @@ from slim_prep.domain.actor import Actor as PrepActor
 from slim_prep.domain.actor import IdentitySource
 from slim_prep.domain.actor import Role as PrepRole
 from slim_prep.domain.ports import SampleInfo, SampleState
+from slim_prep.domain.prep import PrepBatch
+from slim_prep.domain.problems import PrepRefused, Problem
 from slim_prep.persistence import books
 from slim_prep.persistence import migrate as prep_migrate
 from slim_prep.persistence._rows import NotFound
 from slim_prep.persistence.rules import PublishedRules, current_rules, publish_rules
 from slim_prep.service.handoff import send_correction, send_to_results, sent_version
+from slim_samples.service import custody
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session, selectinload
 
@@ -164,10 +167,24 @@ class TrSamples:
         return out
 
 
+def refuse_blocked(session: Session, batch: PrepBatch) -> None:
+    """A bottle that serves this analysis carries a blocking condition (e.g. unsafe to handle) and is
+    still in the lab: no prep batch takes the sample until the lab acts (slim-samples S-04). The host
+    composes the two modules; slim-prep is not told about bottles."""
+    problems = [
+        Problem(where=sample, message=f"{flag.text} blocks {batch.analysis} until the lab acts")
+        for sample in dict.fromkeys(s.sample for s in batch.samples)
+        for flag in custody.blocked_for(session, sample).get(batch.analysis, ())
+    ]
+    if problems:
+        raise PrepRefused(problems)
+
+
 def send(session: Session, code: str, user: User, reference: ReferenceData, specs) -> dict:
     """Sends the batch to slim-data (first time) or its correction (after), then re-evaluates the batch
     there if it has readings. Raises slim-prep's PrepRefused / NotFound, or LookupError."""
     batch = books.get_batch(session, code).item
+    refuse_blocked(session, batch)
     analysis = next((a for a in reference.catalog_analyses() if a.code == batch.analysis), None)
     if analysis is None or batch.analysis not in PREP_ANALYSES:
         raise LookupError(f"analysis {batch.analysis!r} can't take prep batches here")

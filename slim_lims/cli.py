@@ -30,6 +30,7 @@ from slim_lims.prep import migrate_slim_prep
 from slim_lims.quality import migrate_slim_quality
 from slim_lims.repositories import TRSubmissionRepository
 from slim_lims.results import migrate_slim_data
+from slim_lims.samples import migrate_slim_samples
 from slim_lims.security import hash_password
 
 
@@ -111,11 +112,12 @@ def _migrate() -> int:
         print(f"{backfilled} requests given their current state as version 1.")
     migrate_slim_data(engine)
     migrate_slim_prep(engine)
+    migrate_slim_samples(engine)
     migrate_slim_quality(engine)
     migrate_invoicing(engine)
     audited = install_audit_log(engine)
     print(
-        "slim-lims, slim-data, slim-prep and invoicing migrations applied."
+        "slim-lims, slim-data, slim-prep, slim-samples and invoicing migrations applied."
         + (
             f" Audit log on {len(audited)} tables."
             if audited
@@ -131,12 +133,15 @@ def _verify() -> int:
     from slim_data.service.verify import verify
     from slim_prep.service.verify import verify as verify_prep
     from slim_quality.service.verify import verify as verify_quality
+    from slim_samples.service import custody
 
     engine = make_engine(load_settings().database_url)
     with make_session_factory(engine)() as session:
         report = verify(session, chain_check(engine))
         prep = verify_prep(session)
         quality = verify_quality(session)
+        bottles = custody.verify(session)
+        bottle_count = len(custody.all_containers(session))
     print(
         f"Replayed {report.versions} result versions: "
         + ("all match." if not report.mismatches else f"{len(report.mismatches)} don't match:")
@@ -162,7 +167,12 @@ def _verify() -> int:
     )
     for problem in quality.problems:
         print(f"  {problem}")
-    return 0 if report.ok and prep.ok and quality.ok else 1
+    print(
+        f"Samples: {bottle_count} bottles: " + ("all hold." if not bottles else f"{len(bottles)} problems:")
+    )
+    for problem in bottles:
+        print(f"  {problem.where}: {problem.message}")
+    return 0 if report.ok and prep.ok and quality.ok and not bottles else 1
 
 
 def _empty_public(confirmed: bool, if_needed: bool = False) -> int:

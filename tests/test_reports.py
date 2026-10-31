@@ -19,6 +19,7 @@ from slim_data.persistence import migrate  # noqa: E402
 from slim_data.persistence.results import issues_for_tr  # noqa: E402
 from slim_data.service.views import ReportLineView, ReportView, report_view  # noqa: E402
 from slim_invoicing.persistence import migrate as invoicing_migrate  # noqa: E402
+from slim_samples.persistence import migrate as samples_migrate  # noqa: E402
 
 from slim_lims import reports  # noqa: E402
 from slim_lims.catalog import sync_analysis_catalog  # noqa: E402
@@ -48,6 +49,7 @@ def issued(tmp_path_factory):
     with engine.begin() as connection:
         migrate.upgrade(connection)
         invoicing_migrate.upgrade(connection)
+        samples_migrate.upgrade(connection)  # the report reads the bottles' conditions
     with make_session_factory(engine)() as session:
         sync_analysis_catalog(engine, session)
         session.commit()

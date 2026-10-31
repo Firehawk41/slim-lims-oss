@@ -22,6 +22,7 @@ from slim_lims.domain import (
 from slim_lims.reference import ReferenceData
 from slim_lims.repositories import TRSubmissionRepository
 from slim_lims.results import cancel_blocker
+from slim_lims.samples import check_in_with_bottles
 from slim_lims.schemas import CheckInIn, ChemicalMatchIn, StatusChangeIn, SubmissionIn
 from slim_lims.scope import ScopeError
 from slim_lims.security import csrf_protect
@@ -93,8 +94,18 @@ def change_status(tr_number: str, data: StatusChangeIn, user: RequireUser, servi
 
 
 @router.post("/{tr_number}/check-in", summary="Check in: accept a submitted request into the LIMS (staff)")
-def check_in_submission(tr_number: str, data: CheckInIn, user: RequireUser, service: Service, db: DB):
-    submission = service.check_in(tr_number, data, user)
+def check_in_submission(
+    tr_number: str,
+    data: CheckInIn,
+    user: RequireUser,
+    service: Service,
+    db: DB,
+    reference: Annotated[ReferenceData, Depends(get_reference)],
+):
+    if data.containers:  # the bottles are part of the same transaction (S-10)
+        submission = check_in_with_bottles(db, service, reference, tr_number, data, data.containers, user)
+    else:
+        submission = service.check_in(tr_number, data, user)
     db.commit()
     return _dump(submission)
 

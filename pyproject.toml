@@ -27,6 +27,8 @@ dependencies = [
     "slim-data @ git+https://github.com/Firehawk41/slim-data-oss@89c98aba78901ef8f01de686d2e42d308f004d67",
     # The prep book (slim-prep P6). Co-developing: pip install -e ../slim-prep-oss
     "slim-prep @ git+https://github.com/Firehawk41/slim-prep-oss@68979e828cba23fc26daf3132ce3c67fbdaa94fc",
+    # The sample module (slim-samples S-01). Co-developing: pip install -e ../slim-samples-oss
+    "slim-samples @ git+https://github.com/Firehawk41/slim-samples-oss@fc1be70ce8dbaa1f70c8d31185f760c3557dc5e7",
     # The quality module (slim-data D-109). Co-developing: pip install -e ../slim-quality-oss
     "slim-quality @ git+https://github.com/Firehawk41/slim-quality-oss@abf9ed5a0923d80aa1ae6ec1bcd94c5099770eb2",
     # slim-domain: its hash-chained audit log over the shared database (slim-data D-77), and the bridge.
@@ -58,6 +60,7 @@ select = ["E", "F", "W", "I", "B", "UP"]
 # These import test_demo_scenarios' fixtures, which their tests then take as arguments.
 "tests/test_board.py" = ["F811"]
 "tests/test_invoicing.py" = ["F811"]
+"tests/test_samples.py" = ["F811"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

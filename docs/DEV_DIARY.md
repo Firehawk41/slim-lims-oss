@@ -127,6 +127,21 @@ Tally and themes are updated now and then at the bottom.
 | C→J? | Raised, not built: pin module versions (R1); a slim-data handoff API for slim-prep (R2); V5 fixing its CSV (R3); payments as append-only rows (R4). | For Jamie. |
 | C✓ | Jamie: "1-4 please". R1–R4 built as recommended: D-116 (handoff API), D-117 (the host pins every module to a commit; libraries name each other unversioned), D-118 (V5's CSV safe at its source), D-119 (payments append-only rows; invoices append-only too). | Guards: `test_pins.py`, slim-prep's architecture test, V5's export test, `test_r4_…`. |
 
+## 2026-10-31: slim-samples (roadmap phase 4, first half)
+
+| Kind | What | Notes |
+|---|---|---|
+| J | "R1–R4 are merged." Parked, to log with this batch: **learning exercises (rebuild-it-small)** and **a quiz section that gauges where I'm up to.** | Parked, not scheduled. Not built; raise again when Jamie wants them. |
+| C✓ | Phase 4 starts with `slim-samples`; the signatory step and report delivery (email, PDF) are the next batch. | Design turn first; Jamie: "we're good to start." |
+| C→J | Claude's design: a "leaking" bottle blocks prep. Jamie: **leaking only warns on the report that the analysis may be compromised, for the analyses of that bottle** (sometimes several bottles for one sample: PFA, HDPE, glass). Lab-customisable; his default is a warning. | S-02, S-04. Claude's blocking default was wrong; "block" stays as a lab-set effect (e.g. unsafe to handle). Condition belongs to the bottle, so analyses are linked to bottles. |
+| J | Retention: asked whether it was a "built-in timer" and a way to mark disposed or returned. | Claude: a due date, not a timer; a person records disposal or return (S-09). Jamie: "both sounds good." Claude added a hold flag for open complaints. |
+| J | Storage: a **customizable, defined list** of locations. | S-03; so are kinds, conditions, disposal methods, retention. |
+| J | "There should be a section in login to specify how many and what kind of bottle were received." | Check-in's bottles section (S-02, S-10); rows of kind, count, location, condition, analyses served. |
+| C✓ | Not in this batch: the customer stating on the request form how many bottles they send. | Jamie: "not necessary." Parked (S-11). |
+| F | The machine contract (spec §12) can't require bottles: the private slim-lims posts check-in without them. | S-10: the screen requires them; the API accepts them; `/samples/log/{tr}` logs them afterwards. |
+| F | Claude couldn't create the new GitHub repo from the session; Jamie created `slim-samples-oss`. | Process note. |
+| F | `tests/test_quality.py::test_q2_the_pages_show_the_labs_time` failed in Claude's sandbox (also on untouched code) but passes in CI. | Likely the sandbox's own timezone (the test builds the seed's `now` with `astimezone()`); not investigated. A test that depends on the machine's zone is worth fixing. |
+
 ## Themes so far
 - **Domain facts are Jamie's, and they overrule Claude's defaults:** DF < 1, MDL averaging, standards as
   recipes, spike placement. Claude's "cautious" engineering defaults were wrong more than once where

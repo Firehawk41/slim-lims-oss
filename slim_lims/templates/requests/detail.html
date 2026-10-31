@@ -12,6 +12,7 @@
       {% else %}
       {% if current_user.is_staff and s.status not in (TRStatus.SUBMITTED, TRStatus.CANCELLED) %}
         <a href="{{ url_for('results_report', tr_number=s.tr_number) }}">Results report</a> ·
+        <a href="{{ url_for('samples_labels', tr_number=s.tr_number) }}">Bottle labels</a> ·
       {% endif %}
       {% if s.status in (TRStatus.PARTIAL_REPORT, TRStatus.COMPLETE_REPORT, TRStatus.INVOICED) %}
         <a href="{{ url_for('issued_reports', tr_number=s.tr_number) }}">Issued reports</a> ·
@@ -51,6 +52,15 @@
   {% for d in samples %}{% set smp = d.sample %}
     <section class="sample-card">
       <h3>{{ smp.position }}. {{ smp.sample_name }}</h3>
+      {% if bottles is defined and bottles is not none and not viewing %}
+        <p class="bottles">
+          {% for c in bottles.get(smp.position, []) %}
+            <a href="{{ url_for('samples_container', container_id=c.id) }}">{{ c.current_count }} × {{ c.current_type[1] }}</a>{% if c.current_conditions %} <span class="badge badge--rush">{{ c.current_conditions|map(attribute="label")|join(", ") }}</span>{% endif %}{% if not c.active %} <span class="muted">({{ "disposed" if c.outcome.name == "DISPOSED" else "returned" }})</span>{% elif c.held %} <span class="badge badge--submitted">on hold</span>{% endif %}{% if not loop.last %} · {% endif %}
+          {% else %}
+            <span class="muted">No bottles logged.</span> <a href="{{ url_for('samples_log', tr_number=s.tr_number) }}">Log them</a>
+          {% endfor %}
+        </p>
+      {% endif %}
       <dl class="kv">
         {% if smp.wafer_size %}
           <dt>Wafer</dt><dd>{{ smp.wafer_size.label }}, results in {{ smp.reporting_unit.label }}</dd>

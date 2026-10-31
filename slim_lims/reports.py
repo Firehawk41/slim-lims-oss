@@ -45,7 +45,23 @@ def _title(submission: TRSubmission, view: ReportView) -> str:
     return f"Results report {submission.tr_number}{amended}"
 
 
-def _notes(view: ReportView, reference: ReferenceData) -> str:
+def _conditions(session: Session, reference: ReferenceData, tr_number: str):
+    """What was wrong with the bottles that served each analysis (slim-samples S-04). Imported here:
+    the samples module reads the results module, which issues these reports."""
+    from slim_lims.samples import condition_notes
+
+    if session is None:  # the renderers are also called without a database (their unit tests)
+        return {}
+    return condition_notes(session, reference, tr_number)
+
+
+def _notes(
+    view: ReportView,
+    reference: ReferenceData,
+    conditions: dict[tuple[int, int], tuple[str, ...]] | None = None,
+) -> str:
+    """The Notes section: what the lines carry, then what was wrong with the bottles that served an
+    analysis on receipt (slim-samples S-04): the lab says so on the report."""
     rows = []
     for line in view.lines:
         texts = [*line.notes, *(_FLAG_TEXT.get(f, f) for f in line.shown_flags)]
@@ -60,6 +76,17 @@ def _notes(view: ReportView, reference: ReferenceData) -> str:
             name = analysis.name if analysis else line.analyte.analysis_id
             what = f"Sample {line.sample.position}, {name} {line.analyte.code}"
             rows.append(f"<li>{escape(what)}: {escape('; '.join(texts))}</li>")
+    reported = {(line.sample.position, line.analyte.analysis_id) for line in view.lines}
+    for (position, analysis_id), texts in sorted((conditions or {}).items()):
+        if (position, analysis_id) not in reported:
+            continue
+        analysis = reference.analysis(analysis_id)
+        name = analysis.name if analysis else analysis_id
+        what = f"Sample {position}, {name}"
+        rows.append(
+            f"<li>{escape(what)}: condition on receipt, {escape('; '.join(texts))}. "
+            "The result for this analysis may be compromised.</li>"
+        )
     return (
         f'<section class="slim-report__notes"><h2>Notes</h2><ul>{"".join(rows)}</ul></section>'
         if rows
@@ -147,7 +174,7 @@ def engine_renderer(
         )
     return (
         render_html(sheets, by_sample, title=_title(submission, view))
-        + _notes(view, reference)
+        + _notes(view, reference, _conditions(session, reference, submission.tr_number))
         + _key(view, _template_columns(sheets))
     )
 
@@ -178,7 +205,7 @@ def plain_renderer(
         f'<table class="slim-report__table"><thead><tr>{head}</tr></thead><tbody>'
         + "".join(row(line) for line in view.lines)
         + "</tbody></table></div>"
-        + _notes(view, reference)
+        + _notes(view, reference, _conditions(session, reference, submission.tr_number))
         + _key(view, {"MDL"})
     )
 
