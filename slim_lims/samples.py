@@ -241,6 +241,14 @@ def check_in_with_bottles(
     return submission
 
 
+def date_received(db: Session, tr_number: str, fallback: date) -> date:
+    """The day the request was received: retention runs from then, whenever the bottles get logged."""
+    return (
+        db.scalar(select(TRSubmissionRow.date_received).where(TRSubmissionRow.tr_number == tr_number))
+        or fallback
+    )
+
+
 def unlogged_positions(db: Session, lookup: TrSampleLookup, tr_number: str) -> set[int]:
     """Positions of the request's samples that have no bottle logged yet."""
     infos = lookup.for_tr(tr_number)

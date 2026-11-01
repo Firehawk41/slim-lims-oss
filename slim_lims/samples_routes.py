@@ -28,6 +28,7 @@ from slim_samples.domain.rules import SamplesRules
 from slim_samples.persistence._rows import NotAllowed, NotFound
 from slim_samples.persistence.rules import publish_rules
 from slim_samples.service import custody
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from slim_lims.api import get_reference
@@ -39,6 +40,7 @@ from slim_lims.samples import (
     BOTTLE_ROWS,
     TrSampleLookup,
     bottle_field,
+    date_received,
     parse_bottles,
     receive_bottles,
     rules,
@@ -84,6 +86,9 @@ def _guard(db: Session, action):
     except (ValidationError, ValueError) as error:
         db.rollback()
         raise Failed(422, [str(error).splitlines()[0]]) from None
+    except IntegrityError:  # two people logged the same bottles at once: the second loses
+        db.rollback()
+        raise Failed(409, ["someone else just recorded that; reload and look again"]) from None
     db.commit()
     return body
 
@@ -305,7 +310,15 @@ def samples_log_form(
     def run():
         missing = unlogged_positions(db, lookup, tr_number)
         by_position = parse_bottles(form, [s for s in lookup.for_tr(tr_number)], published)
-        return receive_bottles(db, lookup, tr_number, by_position, user, clock.today(), only=missing)
+        return receive_bottles(
+            db,
+            lookup,
+            tr_number,
+            by_position,
+            user,
+            date_received(db, tr_number, clock.today()),
+            only=missing,
+        )
 
     try:
         made = _guard(db, run)
