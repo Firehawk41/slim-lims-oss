@@ -140,7 +140,9 @@ Tally and themes are updated now and then at the bottom.
 | C✓ | Not in this batch: the customer stating on the request form how many bottles they send. | Jamie: "not necessary." Parked (S-11). |
 | F | The machine contract (spec §12) can't require bottles: the private slim-lims posts check-in without them. | S-10: the screen requires them; the API accepts them; `/samples/log/{tr}` logs them afterwards. |
 | F | Claude couldn't create the new GitHub repo from the session; Jamie created `slim-samples-oss`. | Process note. |
-| F | `tests/test_quality.py::test_q2_the_pages_show_the_labs_time` failed in Claude's sandbox (also on untouched code) but passes in CI. | Likely the sandbox's own timezone (the test builds the seed's `now` with `astimezone()`); not investigated. A test that depends on the machine's zone is worth fixing. |
+| F | `test_q2_the_pages_show_the_labs_time` failed in Claude's sandbox. Cause found (Jamie asked): the fixture built the seed's `now` with `astimezone()` (the *machine's* zone), so the seeded run times moved with the machine; it passed in CI (UTC) and failed wherever the zone isn't UTC, including Jamie's own Chicago machine. | Fixed: `astimezone(UTC)`; passes in UTC, Chicago and Sydney. My earlier guess in this entry (the 1 Nov clock change) was wrong. |
+| F | Review of slim-samples after merge (Jamie: "double check the module"): bottles logged *after* check-in took their retention date from the day they were logged, not the day the request was received. | Fixed; guard test `test_r3_…`. Also guarded: a refused bottle list undoes the check-in over the API (r1), a customer sees no bottle data (r2), a lab-typed condition label is escaped on the report (r4), a double-submitted log is a 409 not a 500. |
+| F | Known and left: two people disposing of the same bottle at the same instant record two events; `cli verify` reports the second ("an event after it was finished"). | Detectable, not prevented; a unique "one final event" constraint is the fix if it ever matters. |
 
 ## Themes so far
 - **Domain facts are Jamie's, and they overrule Claude's defaults:** DF < 1, MDL averaging, standards as

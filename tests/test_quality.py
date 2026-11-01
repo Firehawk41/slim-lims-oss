@@ -49,7 +49,7 @@ def seeded(db, reference):
     publish_demo_rules(db, reference)
     sync_personas(db)
     db.commit()
-    runs = seed_quality_history(db, reference, lambda *_: {}, NOW.astimezone(), days=30)
+    runs = seed_quality_history(db, reference, lambda *_: {}, NOW.astimezone(UTC), days=30)
     db.commit()
     return runs
 

@@ -296,3 +296,57 @@ def test_a_blocking_condition_refuses_prep_while_the_bottle_is_in_the_lab(db):
 
 def test_the_seed_actor_is_quality():
     assert Role.QUALITY in SEED_SAMPLES_ACTOR.roles
+
+
+# ---------------------------------------------------------------- review guards (2026-10-31)
+
+
+def test_r1_a_refused_api_check_in_leaves_the_request_submitted(client, staff_user, customer_user, db):
+    """The bottles and the check-in are one transaction: refusing the bottles undoes the receipt too."""
+    login_api(client, "jane@acme.example")
+    client.post("/api/submissions", json=payload())
+    client.post("/logout", data={"csrf_token": client.headers.pop("X-CSRF-Token")})
+    login_api(client, "staff@lab.example")
+    body = {"date_received": "2026-10-07", "chemicals": {"1": 2, "2": 3}}
+    row = {"container_type": "glass", "location": "shelf-a"}
+    refused = client.post("/api/submissions/TR00001/check-in", json={**body, "containers": {"1": [row]}})
+    assert refused.status_code == 422
+    assert client.get("/api/submissions/TR00001").json()["status"] == 1  # still submitted
+    assert client.post(
+        "/api/submissions/TR00001/check-in", json={**body, "containers": {"1": [row], "2": [row]}}
+    )
+
+
+def test_r2_a_customer_sees_no_bottles_on_their_request(submitted, db):
+    received(submitted, b1_0_cond_leaking="1")
+    submitted.post("/logout", data={"csrf_token": csrf_from(submitted.get("/requests/TR00001").text)})
+    login(submitted, "jane@acme.example")
+    page = submitted.get("/requests/TR00001").text
+    assert "TR00001" in page and "Leaking" not in page and "bottle" not in page.lower()
+
+
+def test_r3_bottles_logged_later_keep_the_date_the_request_was_received(
+    client, staff_user, customer_user, db
+):
+    """Retention runs from receipt, not from the day someone got round to logging the bottles."""
+    login_api(client, "jane@acme.example")
+    client.post("/api/submissions", json=payload())
+    client.post("/logout", data={"csrf_token": client.headers.pop("X-CSRF-Token")})
+    login_api(client, "staff@lab.example")
+    week_ago = (lab_today() - timedelta(days=7)).isoformat()
+    client.post(
+        "/api/submissions/TR00001/check-in", json={"date_received": week_ago, "chemicals": {"1": 2, "2": 3}}
+    )
+    page = client.get("/samples/log/TR00001").text
+    client.post(
+        "/samples/log/TR00001", data={"csrf_token": csrf_from(page), "b1_0_type": "hdpe", "b2_0_type": "hdpe"}
+    )
+    first = custody.all_containers(db)[0]
+    assert first.received_on.isoformat() == week_ago
+    assert first.retention_due == lab_today() - timedelta(days=7) + timedelta(days=90)
+
+
+def test_r4_a_condition_label_typed_by_the_lab_is_escaped_in_the_report(reference):
+    view = SimpleNamespace(lines=[line(1, 5)])
+    html = reports._notes(view, reference, {(1, 5): ('<img src=x onerror=alert(1)> "Leaking"',)})
+    assert "<img" not in html and "&lt;img" in html
