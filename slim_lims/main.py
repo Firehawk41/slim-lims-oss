@@ -21,6 +21,7 @@ from slim_lims.labs import Labs
 from slim_lims.labtime import LabClock
 from slim_lims.prep_routes import api_router as prep_api_router
 from slim_lims.prep_routes import router as prep_router
+from slim_lims.quality_records_routes import router as quality_records_router
 from slim_lims.quality_routes import router as quality_router
 from slim_lims.reference import ReferenceData
 from slim_lims.reference_cache import ReferenceCache
@@ -44,7 +45,7 @@ def _labs(settings: Settings) -> Labs:
     labs = Labs(
         settings.database_url,
         seed=lambda url: seed_demo(url, oss_dir=oss_dir, lab_timezone=settings.lab_timezone),
-        upgrade=upgrade_lab,
+        upgrade=lambda url: upgrade_lab(url, settings.lab_timezone),
     )
     labs.check()
     labs.start()
@@ -115,6 +116,7 @@ def create_app(
     app.include_router(samples_router)
     app.include_router(samples_api_router)
     app.include_router(quality_router)
+    app.include_router(quality_records_router)
     register_error_handlers(app)
 
     @app.exception_handler(LoginRequired)

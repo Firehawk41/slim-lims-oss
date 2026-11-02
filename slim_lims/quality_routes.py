@@ -30,7 +30,8 @@ from slim_data.persistence.results import get_issue
 from slim_data.service.audit import issues_between
 from slim_quality.domain.audits import AuditOutcome
 from slim_quality.domain.changes import NotAllowed
-from slim_quality.domain.enums import EventKind, LimitMethod, Measure, Severity
+from slim_quality.domain.enums import Effect, EventKind, LimitMethod, Measure, Severity
+from slim_quality.domain.equipment import EquipmentKind, EquipmentPolicy
 from slim_quality.domain.limits import Limits
 from slim_quality.domain.nonconformity import (
     EntryKind,
@@ -41,6 +42,7 @@ from slim_quality.domain.nonconformity import (
     NcState,
 )
 from slim_quality.domain.profile import MeasurePolicy, Profile, ToolSetting, differences
+from slim_quality.domain.pt import PtPolicy
 from slim_quality.domain.series import SeriesKey
 from slim_quality.monitors.registry import TOOLS
 from slim_quality.monitors.runner import ProfileError
@@ -61,6 +63,7 @@ from slim_lims.quality import (
     result_ref,
     touched,
 )
+from slim_lims.quality_records_routes import tiles
 from slim_lims.security import csrf_protect
 from slim_lims.web import flash, render
 
@@ -145,6 +148,7 @@ def quality_home(
             "profile": q.current_profile(db),
             "open_changes": store.list_changes(db, open_only=True),
             "last_review": reviews[0] if reviews else None,
+            "tiles": tiles(db, clock.today()),
         },
     )
 
@@ -310,6 +314,8 @@ def _profile_context(db: Session, profile: Profile) -> dict[str, Any]:
         "policies": {m: profile.policy(m) for m in Measure},
         "methods": [LimitMethod.HISTORY, LimitMethod.ROBUST],
         "severities": list(Severity),
+        "equipment_kinds": list(EquipmentKind),
+        "effects": list(Effect),
     }
 
 
@@ -326,9 +332,15 @@ def profile_from_form(
     pol_points: list[str],
     pol_low: list[str],
     pol_high: list[str],
+    base: Profile | None = None,
+    equipment: dict[str, Any] | None = None,
+    pt_cutoffs: tuple[str, str] = ("", ""),
 ) -> Profile:
     """The profile page's form as a Profile. Lists come in the page's order (every text input and
-    select is always sent), so keys and values pair up; checkboxes send only what is ticked."""
+    select is always sent), so keys and values pair up; checkboxes send only what is ticked. What the form
+    doesn't edit is kept from `base` (the profile in force): a fixed, standardised measure's limits (D-129),
+    and the equipment and PT settings when their fields aren't sent."""
+    base = base or Profile()
     settings = []
     for key, tool in TOOLS.items():
         params: dict[str, Any] = {}
@@ -360,7 +372,29 @@ def profile_from_form(
             window_low=_number(low, "Window low"),
             window_high=_number(high, "Window high"),
         )
-    return Profile(tools=tuple(settings), measures=policies)
+    for m, policy in base.measures.items():
+        if policy.fixed is not None and m not in policies:
+            policies[m] = policy
+    found = equipment or {}
+    kinds = found.get("kinds") or []
+    equipment_policy = base.equipment
+    if kinds:
+        equipment_policy = EquipmentPolicy(
+            overdue={
+                EquipmentKind(int(k)): Effect(int(e))
+                for k, e in zip(kinds, found.get("effects", []), strict=False)
+            },
+            unregistered=Effect(int(found.get("unregistered") or base.equipment.unregistered)),
+            due_within_days=int(found.get("due_days") or base.equipment.due_within_days),
+        )
+    questionable, unsatisfactory = pt_cutoffs
+    pt_policy = base.pt
+    if questionable.strip() or unsatisfactory.strip():
+        pt_policy = PtPolicy(
+            questionable=_number(questionable, "PT questionable") or base.pt.questionable,
+            unsatisfactory=_number(unsatisfactory, "PT unsatisfactory") or base.pt.unsatisfactory,
+        )
+    return Profile(tools=tuple(settings), measures=policies, equipment=equipment_policy, pt=pt_policy)
 
 
 @router.get("/quality/profile", name="quality_profile", response_class=HTMLResponse)
@@ -391,6 +425,12 @@ def quality_profile_post(
     pol_points: Annotated[list[str], Form()] = [],  # noqa: B006
     pol_low: Annotated[list[str], Form()] = [],  # noqa: B006
     pol_high: Annotated[list[str], Form()] = [],  # noqa: B006
+    eq_kind: Annotated[list[str], Form()] = [],  # noqa: B006
+    eq_effect: Annotated[list[str], Form()] = [],  # noqa: B006
+    eq_unregistered: Annotated[str, Form()] = "",
+    eq_due_days: Annotated[str, Form(max_length=4)] = "",
+    pt_questionable: Annotated[str, Form(max_length=10)] = "",
+    pt_unsatisfactory: Annotated[str, Form(max_length=10)] = "",
 ):
     actor = _actor(db, user)
     try:
@@ -407,6 +447,14 @@ def quality_profile_post(
             pol_points,
             pol_low,
             pol_high,
+            base=q.current_profile(db),
+            equipment={
+                "kinds": eq_kind,
+                "effects": eq_effect,
+                "unregistered": eq_unregistered,
+                "due_days": eq_due_days,
+            },
+            pt_cutoffs=(pt_questionable, pt_unsatisfactory),
         )
         if action == "propose":
             if not reason.strip():

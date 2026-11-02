@@ -51,14 +51,30 @@
     <table class="table">
       <thead><tr><th>Measure</th><th>Provisional limits from</th><th>First points</th><th>Window low</th><th>Window high</th></tr></thead>
       <tbody>{% for m in measures %}{% set p = policies[m] %}
+        {% if p.fixed %}<tr><td>{{ m.label }}</td><td colspan="4" class="muted">fixed at {{ p.center }} ± {{ p.sd }} SD: a standardised measure (D-129)</td></tr>{% else %}
         <tr><td>{{ m.label }}<input type="hidden" name="pol_measure" value="{{ m.value }}"></td>
           <td><select name="pol_method">{% for meth in methods %}<option value="{{ meth.value }}"{% if meth == p.method %} selected{% endif %}>{{ "mean ± SD" if meth.name == "HISTORY" else "median ± MAD" }}</option>{% endfor %}</select></td>
           <td><input type="number" name="pol_points" min="3" max="500" value="{{ p.baseline_points }}"></td>
           <td><input type="text" name="pol_low" size="7" value="{{ p.window_low if p.window_low is not none else '' }}"></td>
-          <td><input type="text" name="pol_high" size="7" value="{{ p.window_high if p.window_high is not none else '' }}"></td></tr>
+          <td><input type="text" name="pol_high" size="7" value="{{ p.window_high if p.window_high is not none else '' }}"></td></tr>{% endif %}
       {% endfor %}</tbody>
     </table>
     <p class="hint">Recoveries are fractions (0.75 = 75 %); the internal standard and RSD are in %.</p>
+
+    <h2>Equipment and proficiency testing</h2>
+    <table class="table">
+      <thead><tr><th>Overdue equipment, where used</th><th>Effect</th></tr></thead>
+      <tbody>{% for kind in equipment_kinds %}
+        <tr><td>{{ kind.label }}<input type="hidden" name="eq_kind" value="{{ kind.value }}"></td>
+          <td><select name="eq_effect">{% for e in effects %}<option value="{{ e.value }}"{% if profile.equipment.effect(kind) == e %} selected{% endif %}>{{ e.label }}</option>{% endfor %}</select></td></tr>
+      {% endfor %}
+        <tr><td>A name not in the register</td><td><select name="eq_unregistered">{% for e in effects %}<option value="{{ e.value }}"{% if profile.equipment.unregistered == e %} selected{% endif %}>{{ e.label }}</option>{% endfor %}</select></td></tr>
+      </tbody>
+    </table>
+    <label>"Due soon" within (days) <input type="number" name="eq_due_days" min="0" max="365" value="{{ profile.equipment.due_within_days }}"></label>
+    <label>PT questionable above |z| <input type="text" name="pt_questionable" size="5" value="{{ profile.pt.questionable }}"></label>
+    <label>PT unsatisfactory from |z| <input type="text" name="pt_unsatisfactory" size="5" value="{{ profile.pt.unsatisfactory }}"></label>
+    <p class="hint">Out of service always blocks. Effects: recorded (on the register only), warn (shown where used), block (refused).</p>
     <label>Why (for a proposal) <input type="text" name="reason" maxlength="1000" value="{{ reason or '' }}"></label>
     <div class="choice-row">
       <button type="submit" name="action" value="backtest" class="btn btn--secondary">Backtest</button>

@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}{{ round.scheme }} {{ round.round_code }} — PT — YourLab{% endblock %}
+{% block extra_head %}<link href="{{ url_for('static', path='css/quality.css') }}" rel="stylesheet" />{% endblock %}
+{% block content %}
+  <h1>{{ round.scheme }} {{ round.round_code }}</h1>
+  {% include "quality/_nav.html" %}
+  <dl class="kv-inline">
+    <div><dt>Sample</dt><dd>{% if round.tr_number != "HISTORY" %}<a href="{{ url_for('request_detail', tr_number=round.tr_number) }}">{{ round.sample }}</a>{% else %}before the demo{% endif %}</dd></div>
+    <div><dt>Analytes</dt><dd>{{ round.analytes|join(", ") }}</dd></div>
+    <div><dt>Results due</dt><dd>{{ round.due }}{% if round.overdue(today) %} (overdue){% endif %}</dd></div>
+    <div><dt>State</dt><dd><strong>{{ round.state.label }}</strong></dd></div>
+  </dl>
+
+  {% if round.submission %}
+  <section class="form-section">
+    <h2>Submitted</h2>
+    <p class="muted">By {{ round.submission.by.display }}, {{ round.submission.at.astimezone(zone).strftime("%Y-%m-%d %H:%M") }}: kept as sent, whatever happens to the results later.</p>
+    <ul>{% for v in round.submission.values %}<li>{{ v.analyte }}: {{ v.value }} {{ v.unit }} <span class="muted">({{ v.result_ref }})</span></li>{% endfor %}</ul>
+  </section>
+  {% elif ready %}
+  <section class="form-section">
+    <h2>Submit the lab's results</h2>
+    <ul>{% for v in ready %}<li>{{ v.analyte }}: {{ v.value }} {{ v.unit }}</li>{% endfor %}</ul>
+    <form method="post" action="{{ url_for('quality_pt_submit', round_id=round.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+      <button type="submit" class="btn btn--primary">Record as submitted</button></form>
+  </section>
+  {% else %}<p class="muted">Waiting for the lab: {{ waiting }}.</p>{% endif %}
+
+  {% if scores %}
+  <section class="form-section">
+    <h2>Scores</h2>
+    <table class="table"><thead><tr><th>Analyte</th><th>Lab</th><th>Assigned (σ<sub>pt</sub>)</th><th>z</th><th>Class</th><th></th></tr></thead>
+      <tbody>{% for s in scores %}
+        <tr><td>{{ s.analyte }}</td><td>{{ s.lab.value }} {{ s.lab.unit }}</td><td>{{ s.assigned.assigned }} ({{ s.assigned.sigma }})</td>
+          <td>{{ s.shown }}{% if s.provider_differs %} <span class="sev sev--WARN">provider says {{ s.assigned.provider_z }}</span>{% endif %}</td>
+          <td><span class="sev sev--{{ {1: 'none', 2: 'WARN', 3: 'ACTION'}[s.klass.value] }}">{{ s.klass.label }}</span></td>
+          <td>{% if s.klass.name == "UNSATISFACTORY" %}<form method="post" action="{{ url_for('quality_pt_nc', round_id=round.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}"><input type="hidden" name="analyte" value="{{ s.analyte }}">
+            <button type="submit" class="btn btn--secondary">Raise an NC</button></form>{% endif %}</td></tr>
+      {% endfor %}</tbody></table>
+  </section>
+  {% elif round.submission %}
+  <section class="form-section">
+    <h2>The provider's report</h2>
+    <form method="post" action="{{ url_for('quality_pt_scores', round_id=round.id) }}" class="stack-form wide-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+      <label>Report date <input type="date" name="report_date" value="{{ today }}" required></label>
+      <table class="table"><thead><tr><th>Analyte</th><th>Assigned value X</th><th>σ<sub>pt</sub></th><th>Provider's z (if given)</th></tr></thead>
+        <tbody>{% for a in round.analytes %}<tr><td>{{ a }}<input type="hidden" name="analyte" value="{{ a }}"></td>
+          <td><input type="text" name="assigned" required inputmode="decimal"></td><td><input type="text" name="sigma" required inputmode="decimal"></td>
+          <td><input type="text" name="provider_z" inputmode="decimal"></td></tr>{% endfor %}</tbody></table>
+      <button type="submit" class="btn btn--primary">Score</button>
+    </form>
+  </section>
+  {% endif %}
+{% endblock %}

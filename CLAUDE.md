@@ -51,7 +51,8 @@ shared database; `cli migrate` and the seed run them all.
 **Open:** deeper report-engine wiring (spec §13; changes other repos, needs the go-ahead); ecosystem
 docker-compose for the VPS (**deferred, do not start**); the landing page (`/about`) is live with
 placeholders; Jamie writes its words in `templates/about/_copy.html`. slim-quality part 1 is in (phase 3), and
-part 2 has begun (vertical audit, nonconformities); phase 4 is done (slim-samples; signed reports, their PDF, the
+part 2 is under way (vertical audit, nonconformities; batch 5a: equipment, reference lots, PT, complaints,
+D-125…D-130); next in it: 5b, then 5c (`docs/ROADMAP.md`); phase 4 is done (slim-samples; signed reports, their PDF, the
 outbox). Next: the rest of phase 5 or phase 6 (`docs/ROADMAP.md`). Parked: an SMTP transport (D-124).
 
 ## How to run
@@ -105,6 +106,10 @@ slim_lims/
 ├── demo_samples.py                # the demo's bottles: a leaking one, one on hold, one in the fridge
 ├── quality.py, quality_routes.py  # slim-quality host side: QcSource over slim-data, the vertical audit (composed
 │                                  #   from every module, D-113), NCs (D-114), demo QC history and NC; /quality
+├── quality_records.py, quality_records_routes.py  # 5a where modules meet: RegisterStocks (slim-prep's lots,
+│                                  #   P-28), equipment gates on prep and import (D-126), a balance's impact,
+│                                  #   PT values from released results, involved_in (D-130); /quality/equipment,
+│                                  #   /materials, /pt, /complaints; the customer's /requests/{tr}/complaints
 ├── invoices.py, demo_prices.py    # invoicing V5; /invoices; the accounting CSV (V5 writes formula cells as text, D-118)
 ├── reports.py       # issued reports: engine_renderer / plain_renderer, report_files; signing (D-122), the PDF (D-123)
 ├── delivery.py      # sending an issued report: report_deliveries, the outbox (/outbox; not transmitted, D-124)
@@ -157,6 +162,10 @@ scripts/seed_demo.py; tests/ (SQLite per test, or Postgres via TEST_DATABASE_URL
   wired, re-check which statuses are still set by hand.**
 - Payment: PO number or credit card (the lab calls; no card data stored). RUSH = outside business hours.
 - Every change to a TR is kept whole in `tr_versions` (D-104); a payment is a row added, never an edit (D-119).
+- Equipment and lots (D-125…D-127): a prep batch or standard is refused when its balance or pipette is out of
+  service or overdue (the profile says per kind; instruments warn); an import is refused when its instrument is
+  out of service. Standards take their lot from slim-quality's register. A complaint's outcome is approved by a
+  quality manager with no hand in the request (D-130).
 - Reports: "Sign and issue" needs the `signatory` capability (supervisors by default) and a name; the signatory may
   be the releaser (four-eyes stands at release). Its PDF is made at issue (WeasyPrint; needs Pango). Sending
   records a delivery in the outbox, never transmitted on the demo; it changes no status (D-122…D-124).

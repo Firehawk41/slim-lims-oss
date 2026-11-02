@@ -44,6 +44,7 @@ from slim_prep.persistence.rules import get_rules
 from slim_prep.service.books import move_to_rules, next_batch_code, record_batch, record_standard
 from slim_prep.service.handoff import sent_version
 from slim_prep.service.run_list import run_list_for
+from slim_quality.persistence import store as quality_store
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -53,6 +54,7 @@ from slim_lims.db import get_db
 from slim_lims.labtime import LabClock, lab_clock
 from slim_lims.models import ROLE_STAFF, User
 from slim_lims.prep import PREP_ANALYSES, TrSamples, prep_actor_for, refuse_blocked, rules, send
+from slim_lims.quality_records import RegisterStocks, refuse_equipment, standard_equipment
 from slim_lims.reference import ReferenceData
 from slim_lims.security import csrf_protect
 from slim_lims.web import flash, render
@@ -148,6 +150,13 @@ def _standard_json(r) -> dict[str, Any]:
     }
 
 
+def _usable_stocks(db: Session, today: date) -> list:
+    """The registered lots a standard can be made from today (P-28): not withdrawn, not expired."""
+    stocks = RegisterStocks(db)
+    found = [stocks.stock(lot.name, lot.lot, today) for lot in quality_store.list_lots(db)]
+    return [s for s in found if not isinstance(s, str) and s.expires >= today]
+
+
 def _home(db: Session, reference: ReferenceData, today: date, form=None, problems=None) -> dict[str, Any]:
     current = rules(db)
     return {
@@ -165,7 +174,7 @@ def _home(db: Session, reference: ReferenceData, today: date, form=None, problem
             for r in books.list_batches(db)
         ],  # fmt: skip
         "standards": [_standard_json(r) for r in books.list_standards(db)],
-        "stocks": [r.item for r in books.list_stocks(db)],
+        "stocks": _usable_stocks(db, today),
         "analyses": [(a.code, a.name) for a in reference.catalog_analyses() if a.code in PREP_ANALYSES],
         "today": today.isoformat(),
         "form": form or {},
@@ -487,9 +496,12 @@ def prep_save_batch(
 ):
     expected = _expected(values)
 
+    warnings: list[str] = []
+
     def save():
         batch = _batch_from_grid(values, db, user, clock)
         refuse_blocked(db, batch)
+        warnings.extend(refuse_equipment(db, batch))  # the equipment register (D-126)
         reason = values.get("reason") or None
         rules_id = None if expected else rules(db).id  # a correction keeps its own (P-24)
         samples = TrSamples(db, reference)
@@ -532,6 +544,8 @@ def prep_save_batch(
         return render(request, "prep/new_batch.html", context, refused.status)
     what = f"corrected (version {recorded.version})" if expected else "recorded"
     flash(request, f"Prep batch {recorded.item.code} {what}.", "success")
+    for warning in warnings:
+        flash(request, f"Equipment register: {warning}.", "warning")
     return RedirectResponse(request.url_for("prep_batch", code=recorded.item.code), status_code=303)
 
 
@@ -602,7 +616,9 @@ def prep_make_standard(
 ):
     form = {"step": step, "source": source, "prepared": prepared}
     try:
-        _guard(db, lambda: _make_standard(db, user, step, source, prepared, tuple(pipettes or ())))
+        _, warnings = _guard(
+            db, lambda: _make_standard(db, user, step, source, prepared, tuple(pipettes or ()))
+        )
     except Refused as refused:
         return render(
             request,
@@ -611,6 +627,8 @@ def prep_make_standard(
             refused.status,
         )
     flash(request, "Standard recorded.", "success")
+    for warning in warnings:
+        flash(request, f"Equipment register: {warning}.", "warning")
     return RedirectResponse(request.url_for("prep_home"), status_code=303)
 
 
@@ -623,7 +641,12 @@ def _make_standard(db: Session, user, step: str, source: str, prepared: str, pip
     except ValueError:
         raise ValueError("choose a recipe step, a source and the prep date") from None
     found = StandardRef(name=name, prepared=date.fromisoformat(key)) if kind == "standard" else (name, key)
-    return record_standard(db, rules(db).id, recipe, step_name, found, day, prep_actor_for(user), pipettes)
+    warnings = standard_equipment(db, pipettes, day)  # the equipment register (D-126)
+    recorded = record_standard(
+        db, rules(db).id, recipe, step_name, found, day, prep_actor_for(user), pipettes,
+        stocks=RegisterStocks(db),  # the stock's lot from the reference-material register (P-28)
+    )  # fmt: skip
+    return recorded, warnings
 
 
 # ---------------------------------------------------------------- JSON API
@@ -678,6 +701,7 @@ def api_save_batch(data: BatchIn, user: RequireStaff, db: DB, clock: Clock, refe
     def save():
         batch = _in_lab_time(data.batch, clock)
         refuse_blocked(db, batch)
+        refuse_equipment(db, batch)  # the equipment register (D-126): blocks raise
         rules_id = None if data.expected_version else rules(db).id  # a correction keeps its own (P-24)
         record_batch(
             db, batch, rules_id, prep_actor_for(user), TrSamples(db, reference), clock.now(),
@@ -722,6 +746,7 @@ def api_make_standard(data: StandardIn, user: RequireStaff, db: DB):
         source = data.standard if data.standard is not None else data.stock
         if source is None:
             raise ValueError("give a stock (name, lot) or a standard")
+        standard_equipment(db, data.pipettes, data.prepared)  # blocks raise (D-126)
         recorded = record_standard(
             db,
             rules(db).id,
@@ -731,6 +756,7 @@ def api_make_standard(data: StandardIn, user: RequireStaff, db: DB):
             data.prepared,
             prep_actor_for(user),
             data.pipettes,
+            stocks=RegisterStocks(db),  # P-28
         )
         return _standard_json(recorded)
 

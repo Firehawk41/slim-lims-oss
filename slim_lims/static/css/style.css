@@ -324,6 +324,11 @@ input[type="radio"] {
   background: #FBEAEA;
 }
 
+.flash--warning {
+  border-color: #B9770E;
+  background: #FDF2E0;
+}
+
 .form-error {
   border: 1px solid #C0392B;
   background: #FBEAEA;

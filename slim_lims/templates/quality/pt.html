@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Proficiency testing — Quality — YourLab{% endblock %}
+{% block extra_head %}<link href="{{ url_for('static', path='css/quality.css') }}" rel="stylesheet" />{% endblock %}
+{% macro klass(k) %}{% if k %}<span class="sev sev--{{ {1: 'none', 2: 'WARN', 3: 'ACTION'}[k.value] }}">{{ k.label }}</span>{% else %}—{% endif %}{% endmacro %}
+{% block content %}
+  <h1>Proficiency testing</h1>
+  {% include "quality/_nav.html" %}
+  <p class="hint">ISO 17025 §7.7.2. A PT sample comes in as an ordinary request and goes through the lab like any other.
+    The lab's results are submitted from what was released; z = (x − X) / σ<sub>pt</sub>, judged unrounded:
+    |z| ≤ {{ policy.questionable }} satisfactory, up to {{ policy.unsatisfactory }} questionable, from {{ policy.unsatisfactory }} unsatisfactory.</p>
+  <table class="table"><thead><tr><th>Round</th><th>Sample</th><th>Analytes</th><th>Due</th><th>State</th><th>Worst</th></tr></thead>
+    <tbody>{% for r, worst in rows %}
+      <tr><td><a href="{{ url_for('quality_pt_round', round_id=r.id) }}">{{ r.scheme }} {{ r.round_code }}</a></td>
+        <td>{% if r.tr_number != "HISTORY" %}<a href="{{ url_for('request_detail', tr_number=r.tr_number) }}">{{ r.sample }}</a>{% else %}<span class="muted">before the demo</span>{% endif %}</td>
+        <td>{{ r.analytes|join(", ") }}</td><td>{{ r.due }}{% if r.overdue(today) %} <span class="sev sev--ACTION">overdue</span>{% endif %}</td>
+        <td>{{ r.state.label }}</td><td>{{ klass(worst) }}</td></tr>
+    {% else %}<tr><td colspan="6" class="muted">No round yet.</td></tr>{% endfor %}</tbody></table>
+
+  <h2>z-score trends</h2>
+  <p class="hint">Each scheme × analyte is a series on fixed limits (0 ± 1): the same tools as QC judge it, so Westgard
+    1-3s is a z beyond 3 and 2-2s two questionable rounds in a row.</p>
+  <ul>{% for c in charts %}<li><a href="{{ url_for('quality_series') }}?id={{ c.series.key.slug|urlencode }}">{{ c.series.key.label }}</a>:
+    {{ c.series.points|length }} rounds{% if c.flags %}, {{ c.flags|length }} flag{{ "s" if c.flags|length != 1 }}{% endif %}</li>
+    {% else %}<li class="muted">None scored yet.</li>{% endfor %}</ul>
+
+  <section class="form-section">
+    <h2>Register a round</h2>
+    <form method="post" action="{{ url_for('quality_pt_register') }}" class="stack-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+      <label>Scheme <input type="text" name="scheme" maxlength="100" required></label>
+      <label>Round <input type="text" name="round_code" maxlength="50" required></label>
+      <label>Sample <input type="text" name="sample" maxlength="30" required placeholder="TR00042-01"></label>
+      <label>Analytes <input type="text" name="analytes" maxlength="500" required placeholder="Cu, Zn"></label>
+      <label>Results due <input type="date" name="due" required></label>
+      <button type="submit" class="btn btn--primary">Register</button>
+    </form>
+  </section>
+{% endblock %}

@@ -80,8 +80,12 @@ class PortalDemoHost:
             raise LookupError(f"SLIM customer {name!r} not found (seed the OSS demo data first)")
         return customer
 
-    def new_tr(self, scenario: str, samples: int, spec: bool, analysis_id: int) -> str:
-        customer = self._customer(SPEC_CUSTOMER if spec else CUSTOMER)
+    def new_tr(
+        self, scenario: str, samples: int, spec: bool, analysis_id: int, customer: str | None = None
+    ) -> str:
+        """A TR submitted and checked in by the supervisor persona; `customer` (a demo customer's name)
+        for one that isn't a scenario's, such as the PT provider's round (D-128)."""
+        customer = self._customer(customer or (SPEC_CUSTOMER if spec else CUSTOMER))
         name = ACID if analysis_id == self._assay_id else CHEMICAL
         chemical = self.reference.chemical_by_name(name)
         if chemical is None:

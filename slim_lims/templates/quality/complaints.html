@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Complaints — Quality — YourLab{% endblock %}
+{% block extra_head %}<link href="{{ url_for('static', path='css/quality.css') }}" rel="stylesheet" />{% endblock %}
+{% macro row(c) %}<tr><td><a href="{{ url_for('quality_complaint', complaint_id=c.id) }}">{{ c.number }}</a></td>
+  <td><a href="{{ url_for('request_detail', tr_number=c.tr_number) }}">{{ c.tr_number }}</a>{% if c.issue_id %}, report {{ c.issue_id }}{% endif %}</td>
+  <td>{{ c.text|truncate(80) }}</td><td>{{ c.state.label }}</td>
+  <td>{{ c.raised_by.display }}{% if c.by_staff %} (logged by staff){% endif %}, {{ c.raised_at.astimezone(zone).date() }}</td></tr>{% endmacro %}
+{% block content %}
+  <h1>Complaints</h1>
+  {% include "quality/_nav.html" %}
+  <p class="hint">ISO 17025 §7.9. A customer raises one from their request; staff log one taken by phone from the request's
+    complaints page. Acknowledge it, investigate, and have the outcome approved by a quality manager who had no hand in the
+    request's lab work; the customer sees the entries meant for them.</p>
+  <h2>Open</h2>
+  <table class="table"><thead><tr><th>#</th><th>About</th><th>Complaint</th><th>State</th><th>Raised</th></tr></thead>
+    <tbody>{% for c in open %}{{ row(c) }}{% else %}<tr><td colspan="5" class="muted">None open.</td></tr>{% endfor %}</tbody></table>
+  <h2>Closed</h2>
+  <table class="table"><thead><tr><th>#</th><th>About</th><th>Complaint</th><th>State</th><th>Raised</th></tr></thead>
+    <tbody>{% for c in closed %}{{ row(c) }}{% else %}<tr><td colspan="5" class="muted">None yet.</td></tr>{% endfor %}</tbody></table>
+{% endblock %}
