@@ -51,7 +51,8 @@ shared database; `cli migrate` and the seed run them all.
 **Open:** deeper report-engine wiring (spec §13; changes other repos, needs the go-ahead); ecosystem
 docker-compose for the VPS (**deferred, do not start**); the landing page (`/about`) is live with
 placeholders; Jamie writes its words in `templates/about/_copy.html`. slim-quality part 1 is in (phase 3), and
-part 2 has begun (vertical audit, nonconformities); phase 4's first half is in (slim-samples: bottles at check-in, `/samples`, condition warnings on the report, the prep gate); its second half (report signatory, email/PDF delivery) or the rest of phase 5 next (`docs/ROADMAP.md`).
+part 2 has begun (vertical audit, nonconformities); phase 4 is done (slim-samples; signed reports, their PDF, the
+outbox). Next: the rest of phase 5 or phase 6 (`docs/ROADMAP.md`). Parked: an SMTP transport (D-124).
 
 ## How to run
 
@@ -60,7 +61,7 @@ python -m venv .venv && . .venv/bin/activate
 pip install -e ".[dev]" -e ../slim-domain-oss[postgres] -e ../slim-report-engine-oss
 cp .env.example .env                     # DATABASE_URL defaults to sqlite:///slim_lims.db
 python scripts/seed_demo.py              # every migration + OSS demo data + rules + personas + scenarios
-PORTAL_PASSWORD='at-least-12-chars' python -m slim_lims.cli create-staff --email you@lab.example --initials JM --lab-role supervisor
+PORTAL_PASSWORD='at-least-12-chars' python -m slim_lims.cli create-staff --email you@lab.example --initials JM --lab-role supervisor --name 'Jo Example'
 uvicorn --factory slim_lims.main:create_app --reload   # http://127.0.0.1:8000, API docs at /api/docs
 python -m slim_lims.cli verify           # replay every result, recheck the prep book, audit chain (Postgres)
 pytest -q -p no:warnings                 # TEST_DATABASE_URL=postgresql+psycopg2://... for Postgres
@@ -83,11 +84,12 @@ slim_lims/
 ├── db.py            # Base (app tables only), make_engine (the only way to connect), get_db (the visitor's lab)
 ├── oss_guard.py     # OSS-only guard (called by make_engine)
 ├── domain/          # spec §3–4: enums, tr (TRSubmission, ...), workflow (transitions); pure
-├── models.py        # User, TR tables, tr_versions (D-104), invoices + payments (D-119; all three append-only), user_capabilities, report_files
+├── models.py        # User (full_name, job_title: how they sign), TR tables, tr_versions (D-104), invoices + payments (D-119),
+│                    #   report_pdfs, report_deliveries (all five append-only), user_capabilities, report_files
 ├── repositories.py  # TRSubmissionRepository: the only TR writer; gapless numbers; versions / as_of (D-104)
 ├── scope.py         # Scope.for_user: whose TRs a listing shows; fails closed (D-103)
 ├── services.py      # SubmissionService: submit, check-in, status (facts only, D-99), history
-├── capabilities.py  # manage users: supervisors by default, grantable per person (D-100)
+├── capabilities.py  # manage users, signatory (D-122): supervisors by default, grantable per person (D-100)
 ├── security.py      # bcrypt, CSRF, LoginThrottle (D-101), headers + body-size middleware
 ├── labtime.py       # LabClock: the lab's now / today (D-101)
 ├── labs.py          # a lab per visitor: Labs (claim, spares, sweep), with_schema (D-102)
@@ -104,7 +106,8 @@ slim_lims/
 ├── quality.py, quality_routes.py  # slim-quality host side: QcSource over slim-data, the vertical audit (composed
 │                                  #   from every module, D-113), NCs (D-114), demo QC history and NC; /quality
 ├── invoices.py, demo_prices.py    # invoicing V5; /invoices; the accounting CSV (V5 writes formula cells as text, D-118)
-├── reports.py       # issued reports: engine_renderer / plain_renderer, report_files
+├── reports.py       # issued reports: engine_renderer / plain_renderer, report_files; signing (D-122), the PDF (D-123)
+├── delivery.py      # sending an issued report: report_deliveries, the outbox (/outbox; not transmitted, D-124)
 ├── board.py         # the lab board (spec §13)
 ├── about.py         # the landing page's facts (/about; its words: templates/about/_copy.html, Jamie's)
 ├── personas.py, demo_scenarios.py, demo_prep.py  # demo personas (quality ones hold a capability) and scenarios
@@ -154,3 +157,6 @@ scripts/seed_demo.py; tests/ (SQLite per test, or Postgres via TEST_DATABASE_URL
   wired, re-check which statuses are still set by hand.**
 - Payment: PO number or credit card (the lab calls; no card data stored). RUSH = outside business hours.
 - Every change to a TR is kept whole in `tr_versions` (D-104); a payment is a row added, never an edit (D-119).
+- Reports: "Sign and issue" needs the `signatory` capability (supervisors by default) and a name; the signatory may
+  be the releaser (four-eyes stands at release). Its PDF is made at issue (WeasyPrint; needs Pango). Sending
+  records a delivery in the outbox, never transmitted on the demo; it changes no status (D-122…D-124).

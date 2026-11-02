@@ -16,7 +16,8 @@
       <h2 id="issue-{{ r.id }}">Report {{ r.id }}{% if r.amends %} (amends report {{ r.amends }}){% endif %}
         {% if loop.first %}<span class="badge badge--complete_report">latest</span>{% else %}<span class="badge badge--submitted">superseded</span>{% endif %}</h2>
       <p class="muted">Issued {{ r.at.strftime("%Y-%m-%d %H:%M UTC") if r.at else "" }}
-        {% if r.verified %}· verified: matches what was issued{% else %}<strong>· does not match the recorded hash</strong>{% endif %}</p>
+        {% if r.verified %}· verified: matches what was issued{% else %}<strong>· does not match the recorded hash</strong>{% endif %}
+        {% if r.pdf %}· <a href="{{ url_for('report_pdf', tr_number=s.tr_number, issue_id=r.id) }}">Download PDF</a>{% endif %}</p>
       {% if r.html %}
         <div class="report-paper">{{ r.html|safe }}</div>
       {% else %}

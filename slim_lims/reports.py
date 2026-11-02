@@ -8,11 +8,17 @@ template's own Results / Recovery / MDL or QL columns. `plain_renderer` is a tab
 for hosts without SLIM's report tables (the tests). Both are deterministic, and both get the same
 notes block: the standard qualifiers (D-11), the spec exceedances the report must show with the half
 delta where it bears on them (slim-data D-80), and a key that explains MDL, QL and half delta.
+
+A report is signed when it is issued (D-122): the signatory's block (slim-report-engine's template)
+goes last. Issuing also makes the PDF (D-123), once, from the stored HTML; a delivery (D-124) attaches
+that PDF to a message kept in the outbox.
 """
 
+from datetime import date
 from decimal import Decimal
 from hashlib import sha256
 from html import escape
+from pathlib import Path
 from typing import Protocol
 
 from slim_data.domain.enums import Qualifier
@@ -22,7 +28,7 @@ from sqlalchemy.orm import Session
 
 from slim_lims.bridge import to_slim_v1
 from slim_lims.domain import TRSubmission
-from slim_lims.models import ReportFileRow
+from slim_lims.models import LAB_ROLES, ReportFileRow, ReportPdfRow, User
 from slim_lims.reference import ReferenceData
 
 
@@ -221,3 +227,82 @@ def store(session: Session, tr_number: str, html: str) -> str:
 
 def stored(session: Session, digest: str) -> str | None:
     return session.scalar(select(ReportFileRow.html).where(ReportFileRow.sha256 == digest))
+
+
+# ---------------------------------------------------------------- signing (D-122)
+
+SIGNATURE_MARK = '<footer class="slim-report__signature">'
+
+
+class NotASignatory(Exception):
+    """The person issuing may not sign reports, or their name isn't set."""
+
+
+def signature_for(user: User, on: date):
+    """The block printed under a report `user` signs on `on`. Raises NotASignatory without a name."""
+    from slim_report_engine.reporting.html_report import Signature
+
+    name = (user.full_name or "").strip()
+    if not name:
+        raise NotASignatory(
+            f"{user.email} has no name to sign with: a user manager sets it on the Users page."
+        )
+    title = (user.job_title or "").strip() or LAB_ROLES.get(user.lab_role, "")
+    return Signature(name=name, title=title, date=on.isoformat())
+
+
+def sign(html: str, signature) -> str:
+    from slim_report_engine.reporting.html_report import render_signature
+
+    return html + render_signature(signature)
+
+
+def unsigned(html: str) -> str:
+    """The report without its signature block: what decides whether anything changed."""
+    return html.split(SIGNATURE_MARK, 1)[0]
+
+
+# ---------------------------------------------------------------- PDF (D-123)
+
+_CSS = Path(__file__).resolve().parent / "static" / "css" / "report.css"
+_PAGE_CSS = """
+@page { size: A4; margin: 18mm 15mm 20mm;
+  @bottom-left { content: string(report-id); font: 8pt Arial, sans-serif; color: #555; }
+  @bottom-right { content: "Page " counter(page) " of " counter(pages);
+    font: 8pt Arial, sans-serif; color: #555; }
+}
+.slim-report__title { string-set: report-id content(); }
+.slim-report__tabs { display: none; }
+body { margin: 0; font-family: Calibri, Arial, "DejaVu Sans", sans-serif; font-size: 9pt; }
+"""
+
+
+def pdf_bytes(html: str, title: str) -> bytes:
+    """The report as an A4 PDF: the page's own stylesheet, each page saying which report it belongs to
+    and "Page n of m" (ISO 17025 §7.8.2.1). Deterministic for the same HTML."""
+    from weasyprint import CSS, HTML
+
+    document = (
+        f"<!doctype html><html><head><meta charset=utf-8><title>{escape(title)}</title></head>"
+        f"<body>{html}</body></html>"
+    )
+    return HTML(string=document).write_pdf(stylesheets=[CSS(filename=str(_CSS)), CSS(string=_PAGE_CSS)])
+
+
+def store_pdf(session: Session, tr_number: str, html_sha256: str) -> str:
+    """Makes and keeps the PDF of a stored report (once per report file); returns the PDF's sha256."""
+    existing = session.scalar(select(ReportPdfRow.sha256).where(ReportPdfRow.html_sha256 == html_sha256))
+    if existing is not None:
+        return existing
+    html = stored(session, html_sha256)
+    if html is None:
+        raise ValueError(f"no stored report {html_sha256}")
+    pdf = pdf_bytes(html, f"Results report {tr_number}")
+    digest = sha256(pdf).hexdigest()
+    session.add(ReportPdfRow(tr_number=tr_number, html_sha256=html_sha256, sha256=digest, pdf=pdf))
+    session.flush()
+    return digest
+
+
+def pdf_for(session: Session, html_sha256: str) -> ReportPdfRow | None:
+    return session.scalar(select(ReportPdfRow).where(ReportPdfRow.html_sha256 == html_sha256))

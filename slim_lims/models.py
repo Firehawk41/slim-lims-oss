@@ -12,6 +12,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Integer,
+    LargeBinary,
     String,
     Text,
     Time,
@@ -59,6 +60,10 @@ class User(Base):
     # Staff ID in result files (the `analyst` column), so unique among staff (D-70).
     initials: Mapped[str | None] = mapped_column(String(10), unique=True)
     lab_role: Mapped[int | None] = mapped_column(Integer)  # staff only: LAB_ROLES
+    # As printed under a signed report (D-122): "Sue Example", "Laboratory Supervisor". Signing needs
+    # the name; the title falls back to the lab role.
+    full_name: Mapped[str | None] = mapped_column(String(100))
+    job_title: Mapped[str | None] = mapped_column(String(100))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     # A demo persona (personas.py): chosen, not logged in; never signs in through /login.
     is_persona: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
@@ -320,11 +325,56 @@ class TRInvoicePaymentRow(Base):
     recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
 
 
+# ---------------------------------------------------------------- report PDFs and deliveries (D-123, D-124)
+
+
+class ReportPdfRow(Base):
+    """An issued report as PDF (D-123): made once, at issue, from the stored HTML (`html_sha256`), and
+    kept with its own sha256. What a delivery attaches and a customer downloads. Append-only."""
+
+    __tablename__ = "report_pdfs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tr_number: Mapped[str] = mapped_column(String(20), index=True)
+    html_sha256: Mapped[str] = mapped_column(String(64), unique=True)
+    sha256: Mapped[str] = mapped_column(String(64), unique=True)
+    pdf: Mapped[bytes] = mapped_column(LargeBinary)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+
+
+class ReportDeliveryRow(Base):
+    """One sending of an issued report to the customer (D-124): to whom, the message, the PDF it
+    attached (by hash), who sent it and when, and what the transport did with it ("outbox": stored,
+    not transmitted, the demo's only transport). Append-only: a re-send is another row."""
+
+    __tablename__ = "report_deliveries"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tr_number: Mapped[str] = mapped_column(String(20), index=True)
+    issue_id: Mapped[int] = mapped_column(
+        Integer, index=True
+    )  # slim-data's report issue; no FK (module rule 1)
+    to_addresses: Mapped[list] = mapped_column(JSON)
+    cc_addresses: Mapped[list] = mapped_column(JSON)
+    subject: Mapped[str] = mapped_column(String(200))
+    body: Mapped[str] = mapped_column(Text)
+    pdf_sha256: Mapped[str] = mapped_column(String(64))
+    sent_by: Mapped[str] = mapped_column(String(254))  # the sender's email
+    transport: Mapped[str] = mapped_column(String(20))
+    sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+
+
 def _append_only_after_create(target, connection, **_kw) -> None:
     append_only(connection, target.name)
 
 
-for _table in (TRVersionRow.__table__, TRInvoiceRow.__table__, TRInvoicePaymentRow.__table__):
+for _table in (
+    TRVersionRow.__table__,
+    TRInvoiceRow.__table__,
+    TRInvoicePaymentRow.__table__,
+    ReportPdfRow.__table__,
+    ReportDeliveryRow.__table__,
+):
     event.listen(_table, "after_create", _append_only_after_create)
 
 

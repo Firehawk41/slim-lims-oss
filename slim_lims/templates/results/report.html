@@ -48,22 +48,38 @@
     <h2 id="issue-heading">Issues</h2>
     {% if r.issues %}
       <table class="table">
-        <thead><tr><th scope="col">Issue</th><th scope="col">Results</th><th scope="col">By</th><th scope="col">At</th><th scope="col">sha256</th></tr></thead>
+        <thead><tr><th scope="col">Issue</th><th scope="col">Results</th><th scope="col">Signed by</th><th scope="col">At</th><th scope="col">sha256</th><th scope="col">PDF</th><th scope="col">Sent</th></tr></thead>
         <tbody>
           {% for i in r.issues %}
-            <tr><td>{{ i.id }}{% if i.amends %} (amends {{ i.amends }}){% endif %}</td><td>{{ i.lines }}</td>
-              <td>{{ i.by }}</td><td>{{ (i.at or "")[:16].replace("T", " ") }}</td><td><code>{{ i.sha256[:12] }}…</code></td></tr>
+            <tr><td>{{ i.id }}{% if i.amends %} (amends {{ i.amends }}){% endif %}{% if not i.latest %} <span class="muted">superseded</span>{% endif %}</td><td>{{ i.lines }}</td>
+              <td>{{ i.by }}</td><td>{{ (i.at or "")[:16].replace("T", " ") }}</td><td><code>{{ i.sha256[:12] }}…</code></td>
+              <td>{% if i.pdf %}<a href="{{ url_for('report_pdf', tr_number=r.tr_number, issue_id=i.id) }}">PDF</a>{% else %}—{% endif %}</td>
+              <td>
+                {% for d in i.sent %}<div>{{ d.at[:16].replace("T", " ") }} by {{ d.by }} <span class="muted">(outbox, not transmitted)</span></div>{% endfor %}
+                {% if i.latest and i.pdf %}
+                  <form method="post" action="{{ url_for('results_send', tr_number=r.tr_number, issue_id=i.id) }}" class="nav-form">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+                    <button type="submit" class="btn btn--secondary btn--small">{{ "Send again" if i.sent else "Send to customer" }}</button>
+                  </form>
+                {% endif %}
+              </td></tr>
           {% endfor %}
         </tbody>
       </table>
+      <p class="hint">Sending goes to {{ r.results_to|join(", ") }}{% if r.results_cc %}, cc {{ r.results_cc|join(", ") }}{% endif %}, with the PDF attached.
+        This demo keeps it in the <a href="{{ url_for('outbox') }}">outbox</a>; nothing is transmitted.</p>
     {% else %}
       <p class="muted">Not issued yet.</p>
     {% endif %}
     <form method="post" action="{{ url_for('results_issue', tr_number=r.tr_number) }}" class="action-form">
       <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
-      <button type="submit" class="btn btn--primary" {% if not r.lines %}disabled{% endif %}>Issue report</button>
-      <span class="hint">Records exactly what this page shows and moves the request to
-        {{ "complete" if r.complete else "partial" }} report.</span>
+      <button type="submit" class="btn btn--primary" {% if not r.lines or r.sign_problem %}disabled{% endif %}>Sign and issue</button>
+      {% if r.sign_problem %}
+        <span class="hint">{{ r.sign_problem }}</span>
+      {% else %}
+        <span class="hint">You sign it: your name goes under the report. Records exactly what this page shows and moves the request to
+          {{ "complete" if r.complete else "partial" }} report.</span>
+      {% endif %}
     </form>
   </section>
 {% endblock %}

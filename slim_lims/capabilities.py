@@ -17,14 +17,16 @@ from slim_lims.models import LAB_ROLE_SUPERVISOR, User, UserCapability
 MANAGE_USERS = "manage_users"
 QUALITY = "quality"
 QUALITY_MANAGER = "quality_manager"
+SIGNATORY = "signatory"
 CAPABILITIES = {
+    SIGNATORY: "Signatory: sign and issue reports (ISO 17025 §7.8; D-122)",
     MANAGE_USERS: "Manage users: add users, deactivate them, set lab roles",
     QUALITY: "Quality: see the QC charts and tools, record events and notes, propose changes",
     QUALITY_MANAGER: "Quality manager: also approve changes to the quality rules and sign QC reviews",
 }
-ROLE_DEFAULTS: dict[int, frozenset[str]] = {LAB_ROLE_SUPERVISOR: frozenset({MANAGE_USERS})}
+ROLE_DEFAULTS: dict[int, frozenset[str]] = {LAB_ROLE_SUPERVISOR: frozenset({MANAGE_USERS, SIGNATORY})}
 GRANTED_BY_USER_MANAGERS = frozenset({QUALITY, QUALITY_MANAGER})
-PERSONA_GRANTABLE = frozenset({QUALITY, QUALITY_MANAGER})
+PERSONA_GRANTABLE = frozenset({QUALITY, QUALITY_MANAGER, SIGNATORY})
 
 
 def granted(db: Session, user: User) -> frozenset[str]:

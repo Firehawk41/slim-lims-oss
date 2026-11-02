@@ -20,6 +20,7 @@ rebuilds it exactly. The TR moves to partial or complete report in the same tran
 
 import json
 from collections.abc import Mapping
+from datetime import date
 from enum import StrEnum
 from functools import cache
 from hashlib import sha256
@@ -46,7 +47,7 @@ from slim_data.service.workflow import EvaluationReceipt, evaluate_batch
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
-from slim_lims import reports
+from slim_lims import capabilities, reports
 from slim_lims import slim_tables as t
 from slim_lims.domain import TRStatus
 from slim_lims.models import ROLE_STAFF, TRSampleRow, TRSubmissionRow, User
@@ -385,6 +386,7 @@ def issued_documents(session: Session, tr_number: str) -> list[dict]:
             "at": issue.created_at,
             "html": None,
             "document": None,
+            "pdf": reports.pdf_for(session, issue.file_sha256) is not None,
         }
         html = reports.stored(session, issue.file_sha256)
         if html is not None:
@@ -405,25 +407,33 @@ def report_complete(view: ReportView, submission) -> bool:
 
 
 def issue_report(
-    session: Session, service, tr_number: str, user: User, renderer, reference: ReferenceData
+    session: Session, service, tr_number: str, user: User, renderer, reference: ReferenceData, today: date
 ) -> dict:
-    """Renders the report as it stands now (every released result, latest versions), stores the file
-    and records the issue by its sha256 (D-73, slim-data D-79), then moves the TR to partial or
-    complete report (D-71). A report carrying a corrected result amends the latest issue. Raises
-    NothingToIssue, or slim-data's WorkflowError."""
+    """Signs and issues the report as it stands now (every released result, latest versions): only a
+    signatory may (D-122), and their block goes under the report, dated `today` (the lab's). Stores
+    the file and records the issue by its sha256 (D-73, slim-data D-79), makes its PDF (D-123), then
+    moves the TR to partial or complete report (D-71). A report carrying a corrected result amends the
+    latest issue. Raises reports.NotASignatory, NothingToIssue, or slim-data's WorkflowError."""
     submission = service.get(tr_number, user)  # 404s an unknown TR
+    if not capabilities.can(session, user, capabilities.SIGNATORY):
+        raise reports.NotASignatory("Only a signatory may sign and issue a report.")
+    signature = reports.signature_for(user, today)
     view = report_view(session, tr_number)
     if not view.lines:
         raise NothingToIssue(f"{tr_number} has no released results to report")
-    digest = reports.store(session, tr_number, renderer(session, submission, view, reference))
+    body = renderer(session, submission, view, reference)
     previous = issues_for_tr(session, tr_number)
-    if previous and previous[-1].file_sha256 == digest:
-        raise NothingToIssue(f"nothing has changed since report issue {previous[-1].id}")
+    if previous:  # the same report signed again (another day, another signatory) is no new issue
+        last = reports.stored(session, previous[-1].file_sha256)
+        if last is not None and reports.unsigned(last) == body:
+            raise NothingToIssue(f"nothing has changed since report issue {previous[-1].id}")
+    digest = reports.store(session, tr_number, reports.sign(body, signature))
     amends = previous[-1].id if previous and any(line.amended for line in view.lines) else None
     lines = tuple(
         ReportLine(sample=line.sample, analyte=line.analyte, version=line.version) for line in view.lines
     )
     issued = wf.record_issue(session, tr_number, lines, digest, actor_for(user), amends)
+    pdf_sha256 = reports.store_pdf(session, tr_number, digest)
 
     target = TRStatus.COMPLETE_REPORT if report_complete(view, submission) else TRStatus.PARTIAL_REPORT
     moved = None
@@ -436,6 +446,8 @@ def issue_report(
         "amended": issued.amended,
         "amends": amends,
         "sha256": digest,
+        "pdf_sha256": pdf_sha256,
+        "signed_by": signature.name,
         "lines": len(lines),
         "status": int(moved) if moved else None,
     }

@@ -2,8 +2,9 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# git: slim-data is installed from its GitHub repo (pyproject.toml).
-RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
+# git: slim-data is installed from its GitHub repo (pyproject.toml). Pango and a font: the report PDF (D-123).
+RUN apt-get update && apt-get install -y --no-install-recommends git libpango-1.0-0 libpangoft2-1.0-0 \
+    fonts-dejavu-core && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml ./
 COPY slim_lims ./slim_lims

@@ -88,6 +88,7 @@ def staff_user(db):
         role=ROLE_STAFF,
         initials="JM",
         lab_role=LAB_ROLE_SUPERVISOR,
+        full_name="Jamie Example",  # a supervisor signs reports (D-122)
     )
     db.add(user)
     db.commit()
