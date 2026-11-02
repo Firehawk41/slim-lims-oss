@@ -35,7 +35,7 @@ from slim_lims.domain import (
 from slim_lims.invoices import mark_paid, mark_sent
 from slim_lims.models import User
 from slim_lims.reference import ReferenceData
-from slim_lims.reports import engine_renderer, store
+from slim_lims.reports import engine_renderer, sign, signature_for, store, store_pdf
 from slim_lims.repositories import TRSubmissionRepository
 from slim_lims.results import (
     StaffDirectory,
@@ -135,14 +135,15 @@ class PortalDemoHost:
         return self.repo.record_transition(submission, received).tr_number
 
     def report_sha256(self, session: Session, tr_number: str, lines) -> str:
-        # What "Issue report" would record (slim-data D-79): the rendered report, stored; the
-        # scenarios report every released result.
+        # What "Sign and issue" would record (slim-data D-79, D-122): the rendered report, signed by
+        # the reviewer the scenarios issue as (a signatory in the demo), stored, and its PDF made
+        # (D-123); the scenarios report every released result.
         submission = self.repo.get_by_tr_number(tr_number)
-        return store(
-            session,
-            tr_number,
-            self.renderer(session, submission, report_view(session, tr_number), self.reference),
-        )
+        body = self.renderer(session, submission, report_view(session, tr_number), self.reference)
+        signed = sign(body, signature_for(self.users["reviewer"], self.today))
+        digest = store(session, tr_number, signed)
+        store_pdf(session, tr_number, digest)
+        return digest
 
 
 def seed_scenarios(

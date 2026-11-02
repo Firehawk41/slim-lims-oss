@@ -11,8 +11,9 @@ from slim_data.persistence.rulesets import current_policy, ruleset_for
 from sqlalchemy import select
 
 from slim_lims import slim_tables as t
+from slim_lims.capabilities import SIGNATORY
 from slim_lims.domain import RequestType, TRStatus, transition
-from slim_lims.models import LAB_ROLE_ANALYST, LAB_ROLE_REVIEWER, ROLE_STAFF, User
+from slim_lims.models import LAB_ROLE_ANALYST, LAB_ROLE_REVIEWER, ROLE_STAFF, User, UserCapability
 from slim_lims.reference import AnalysisRef, ChemicalRef, CustomerRef, ElementRef, StaticReferenceData
 from slim_lims.reports import plain_renderer
 from slim_lims.repositories import TRSubmissionRepository
@@ -78,8 +79,9 @@ def app(engine, reference):
 
 @pytest.fixture
 def lab(app, db, reference, staff_user):
-    """Demo rules published; JM supervisor (staff_user), RV reviewer, AN analyst; TR00001 received (2 samples
-    on 10 Elements), TR00002 only submitted, TR00003 received on 26 Elements (no ruleset)."""
+    """Demo rules published; JM supervisor (staff_user), RV reviewer and signatory (D-122), AN analyst;
+    TR00001 received (2 samples on 10 Elements), TR00002 only submitted, TR00003 received on 26 Elements
+    (no ruleset)."""
     publish_demo_rules(db, reference)
     for initials, lab_role in (("AN", LAB_ROLE_ANALYST), ("RV", LAB_ROLE_REVIEWER)):
         db.add(
@@ -89,8 +91,13 @@ def lab(app, db, reference, staff_user):
                 role=ROLE_STAFF,
                 initials=initials,
                 lab_role=lab_role,
+                full_name=f"{initials} Example",
+                job_title="Senior Chemist" if initials == "RV" else None,
             )
         )
+    db.flush()
+    rv = db.scalars(select(User).where(User.initials == "RV")).one()
+    db.add(UserCapability(user_id=rv.id, capability=SIGNATORY, granted_by=staff_user.id))
     repo = TRSubmissionRepository(db)
     for analysis, receive in ((TEN, True), (TEN, False), (THIRTY_SIX, True)):
         tr = repo.add(

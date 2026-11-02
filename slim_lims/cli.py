@@ -42,7 +42,14 @@ def _password() -> str:
 
 
 def _create_user(
-    email: str, role: str, *, initials: str | None, customer_id: int | None, lab_role: int | None = None
+    email: str,
+    role: str,
+    *,
+    initials: str | None,
+    customer_id: int | None,
+    lab_role: int | None = None,
+    full_name: str | None = None,
+    job_title: str | None = None,
 ) -> None:
     settings = load_settings()
     session_factory = make_session_factory(make_engine(settings.database_url))
@@ -60,6 +67,8 @@ def _create_user(
                 initials=initials,
                 customer_id=customer_id,
                 lab_role=lab_role,
+                full_name=full_name,
+                job_title=job_title,
             )
         )
         db.commit()
@@ -209,6 +218,8 @@ def main(argv: list[str] | None = None) -> int:
     staff.add_argument("--email", required=True)
     staff.add_argument("--initials", required=True)
     staff.add_argument("--lab-role", choices=[r.lower() for r in LAB_ROLES.values()], default="analyst")
+    staff.add_argument("--name", help="printed under the reports they sign (D-122)")
+    staff.add_argument("--title", help="their position, e.g. 'Laboratory Supervisor'")
 
     customer = sub.add_parser("create-customer-user", help="Create a user for an existing SLIM customer")
     customer.add_argument("--email", required=True)
@@ -241,6 +252,8 @@ def main(argv: list[str] | None = None) -> int:
             initials=args.initials.strip().upper(),
             customer_id=None,
             lab_role=lab_role,
+            full_name=(args.name or "").strip() or None,
+            job_title=(args.title or "").strip() or None,
         )
     else:
         _create_user(args.email, ROLE_CUSTOMER, initials=None, customer_id=args.customer_id)

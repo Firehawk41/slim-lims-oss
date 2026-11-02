@@ -3,19 +3,21 @@ the submission form itself is JavaScript (static/js/request_form.js) posting to 
 
 import uuid
 from datetime import date
+from hashlib import sha256
 from typing import Annotated
 
 import slim_invoicing
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse, Response
 from pydantic import ValidationError
+from slim_data.persistence.results import issues_for_tr
 from slim_samples.domain.problems import Refused as BottlesRefused
 from slim_samples.service import custody
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from slim_lims import about as about_page
-from slim_lims import board, capabilities, invoices
+from slim_lims import board, capabilities, invoices, reports
 from slim_lims.api import Service, get_reference
 from slim_lims.auth import CurrentUser, RequireStaff, RequireUser
 from slim_lims.db import get_db
@@ -172,6 +174,34 @@ def issued_reports(
             "s": submission,
             "reports": issued_documents(db, tr_number),
             "reference": reference,
+        },
+    )
+
+
+@router.get("/requests/{tr_number}/reports/{issue_id}.pdf", name="report_pdf")
+def report_pdf(request: Request, tr_number: str, issue_id: int, user: RequireUser, service: Service, db: DB):
+    """An issued report as the PDF made when it was issued (D-123), checked against its recorded hash.
+    Customers get their own; anyone else's is a 404."""
+    try:
+        service.get(tr_number, user)
+    except NotFound:
+        return render(
+            request, "error.html", {"status": 404, "message": f"Testing Request {tr_number} not found."}, 404
+        )
+    issue = next((i for i in issues_for_tr(db, tr_number) if i.id == issue_id), None)
+    row = reports.pdf_for(db, issue.file_sha256) if issue is not None else None
+    if row is None:
+        message = f"No PDF for report issue {issue_id} of {tr_number}."
+        return render(request, "error.html", {"status": 404, "message": message}, 404)
+    if sha256(row.pdf).hexdigest() != row.sha256:
+        message = "The stored PDF does not match the hash recorded when it was made."
+        return render(request, "error.html", {"status": 500, "message": message}, 500)
+    return Response(
+        row.pdf,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{tr_number}-report-{issue_id}.pdf"',
+            "X-Content-Type-Options": "nosniff",
         },
     )
 
@@ -577,6 +607,8 @@ def create_user(
     initials: Annotated[str, Form()] = "",
     customer_id: Annotated[str, Form()] = "",
     lab_role: Annotated[str, Form()] = "",
+    full_name: Annotated[str, Form(max_length=100)] = "",
+    job_title: Annotated[str, Form(max_length=100)] = "",
 ):
     email = email.strip().lower()
     initials = initials.strip().upper()
@@ -622,6 +654,8 @@ def create_user(
             initials=initials if role == ROLE_STAFF else None,
             lab_role=role_id if role == ROLE_STAFF else None,
             customer_id=cid if role == ROLE_CUSTOMER else None,
+            full_name=(full_name.strip() or None) if role == ROLE_STAFF else None,
+            job_title=(job_title.strip() or None) if role == ROLE_STAFF else None,
         )
     )
     db.commit()
@@ -677,6 +711,34 @@ def set_lab_role(
         target.lab_role = lab_role
         db.commit()
         flash(request, f"{target.email} is now {LAB_ROLES[lab_role].lower()}.")
+    return _back_to_users(request, db, user)
+
+
+@router.post("/admin/users/{user_id}/name", name="set_user_name")
+def set_user_name(
+    request: Request,
+    user_id: str,
+    user: RequireStaff,
+    db: DB,
+    full_name: Annotated[str, Form(max_length=100)] = "",
+    job_title: Annotated[str, Form(max_length=100)] = "",
+):
+    """The name and title printed under a report the person signs (D-122). Set by whoever manages
+    users, for anyone not above them; a persona's come from its row in data/demo_personas.csv."""
+    target = _target(db, user_id)
+    error = _user_admin(db, user)
+    if not error and (target is None or not target.is_staff or target.is_persona):
+        error = "Staff user not found."
+    elif not error and capabilities.outranks(target, user):
+        error = "Nobody acts on someone with a higher lab role."
+    if error:
+        flash(request, error, "error")
+    else:
+        target.full_name, target.job_title = full_name.strip() or None, job_title.strip() or None
+        db.commit()
+        flash(
+            request, f"{target.email} signs as {target.full_name or '(no name)'}, {target.job_title or '—'}."
+        )
     return _back_to_users(request, db, user)
 
 

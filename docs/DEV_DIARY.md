@@ -144,6 +144,18 @@ Tally and themes are updated now and then at the bottom.
 | F | Review of slim-samples after merge (Jamie: "double check the module"): bottles logged *after* check-in took their retention date from the day they were logged, not the day the request was received. | Fixed; guard test `test_r3_…`. Also guarded: a refused bottle list undoes the check-in over the API (r1), a customer sees no bottle data (r2), a lab-typed condition label is escaped on the report (r4), a double-submitted log is a 409 not a 500. |
 | F | Known and left: two people disposing of the same bottle at the same instant record two events; `cli verify` reports the second ("an event after it was finished"). | Detectable, not prevented; a unique "one final event" constraint is the fix if it ever matters. |
 
+## 2026-11-02: signed reports, PDF, outbox (roadmap phase 4, second half)
+
+| Kind | What | Notes |
+|---|---|---|
+| F | Jamie's opening message repeated the 2026-10-31 one (slim-samples next; park learning exercises and a quiz). Claude pointed out both were done and logged, then checked every branch when Jamie asked "didn't I already do that?" for the signatory and delivery work: nothing existed. | The parked items stay as logged on 2026-10-31. |
+| C→J | Claude proposed "signatory ≠ releaser" as a lab setting. Jamie: why, if four-eyes; **shouldn't the signatory be the releaser?** | Claude withdrew it: four-eyes already stands at release (D-18, D-62); signing covers the whole report. D-122. |
+| J | Asked how email delivery could be demoed: as what *would* be sent, sitting in an outbox? | Yes, as a delivery recorded and not transmitted, not "waiting to send". D-124. |
+| J | Go-ahead to change slim-report-engine's template (the signature block), over a host-appended block. | slim-report-engine-oss #3. |
+| C✓ | One act "Sign and issue"; the `signatory` capability; PDF made once at issue and kept by hash; the outbox as the only transport (SMTP parked). | D-122, D-123, D-124. |
+| C→C | Caught while building: signing puts the day into the file, so the old "nothing has changed" check (same hash) would have let the same report be issued again the next day. | Compares the unsigned bodies; guard test `test_s3_…`. |
+| C→C | The demo scenarios issue as Rob (reviewer), so Rob is a signatory in the demo too; otherwise the seeded reports would carry a signature by someone not allowed to sign. | `test_s7_…`. |
+
 ## Themes so far
 - **Domain facts are Jamie's, and they overrule Claude's defaults:** DF < 1, MDL averaging, standards as
   recipes, spike placement. Claude's "cautious" engineering defaults were wrong more than once where

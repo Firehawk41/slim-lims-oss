@@ -552,7 +552,9 @@ reported and what is waiting to be invoiced. `slim_lims/board.py`, `templates/bo
   row per analyte) filled with the released results under Results / Recovery / MDL (QL on ion
   panels): the MDL, not ±. It is stored (`report_files`) and the issue records its sha256, so the
   Reports page serves each issue byte for byte and re-checks the hash. Staff see "What the customer
-  will get" before issuing. HTML now; PDF later. `reports.py`: `engine_renderer` (the app),
+  will get" before issuing. A signatory signs it by issuing it (D-122): slim-report-engine's signature
+  block goes last. Its PDF is made at issue and kept by hash (D-123); "Send to customer" puts it in the
+  outbox, not transmitted (D-124). `reports.py`: `engine_renderer` (the app),
   `plain_renderer` (tests without SLIM's report tables).
   Half delta (½Δ, half the difference between the two cups; slim-data D-80) is printed only beside a
   spec limit it bears on: the result is outside it, or within ½Δ of it ("above the customer's

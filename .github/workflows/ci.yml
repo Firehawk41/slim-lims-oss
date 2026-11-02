@@ -41,7 +41,7 @@ jobs:
       # checkout where they look for it.
       - run: >-
           git clone https://github.com/Firehawk41/slim-report-engine-oss ../slim-report-engine-oss
-          && git -C ../slim-report-engine-oss checkout 12584cd6c3ef35ca2ff386fd204acf830e90e237
+          && git -C ../slim-report-engine-oss checkout d9546ea5fe051bd5a7ea117aa47ceef7c52ced21
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python }}
@@ -52,5 +52,5 @@ jobs:
       - run: >-
           pip install -e ".[dev]"
           "slim-domain @ git+https://github.com/Firehawk41/slim-domain-oss@7b97dada57eb27440a4d63be4263d84263c1647d"
-          "slim-report-engine @ git+https://github.com/Firehawk41/slim-report-engine-oss@12584cd6c3ef35ca2ff386fd204acf830e90e237"
+          "slim-report-engine @ git+https://github.com/Firehawk41/slim-report-engine-oss@d9546ea5fe051bd5a7ea117aa47ceef7c52ced21"
       - run: pytest -q

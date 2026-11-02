@@ -31,6 +31,8 @@ class Persona:
     initials: str | None
     customer_id: int | None
     capabilities: frozenset[str] = frozenset()
+    full_name: str | None = None
+    job_title: str | None = None
 
 
 def load_personas(path: Path = PERSONAS_CSV) -> list[Persona]:
@@ -44,6 +46,8 @@ def load_personas(path: Path = PERSONAS_CSV) -> list[Persona]:
                 initials=row["initials"].strip().upper() or None,
                 customer_id=int(row["customer_id"]) if row["customer_id"].strip() else None,
                 capabilities=frozenset(c for c in (row.get("capabilities") or "").split("|") if c.strip()),
+                full_name=(row.get("full_name") or "").strip() or None,
+                job_title=(row.get("job_title") or "").strip() or None,
             )
             for row in csv.DictReader(f)
         ]
@@ -64,6 +68,7 @@ def sync_personas(session: Session, personas: list[Persona] | None = None) -> in
         user.lab_role = p.lab_role if p.role == ROLE_STAFF else None
         user.initials = p.initials if p.role == ROLE_STAFF else None
         user.customer_id = None if p.role == ROLE_STAFF else p.customer_id
+        user.full_name, user.job_title = p.full_name, p.job_title
         session.flush()
         _sync_capabilities(session, user, p.capabilities if p.role == ROLE_STAFF else frozenset())
     session.flush()

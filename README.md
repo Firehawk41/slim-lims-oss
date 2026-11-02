@@ -13,8 +13,8 @@ fictional demo data.
 about a minute). **Roadmap:** [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 Customers log in and submit Testing Requests; lab staff receive the samples, run the results through
-slim-data's rules engine, review and release them, issue reports and track each request to invoice on
-one board. Submissions are stored as Testing Request domain objects in the shape defined in
+slim-data's rules engine, review and release them, sign and issue reports (with a PDF, sent through a
+demo outbox) and track each request to invoice on one board. Submissions are stored as Testing Request domain objects in the shape defined in
 [`docs/SLIM_DOMAIN_V2.md`](docs/SLIM_DOMAIN_V2.md), so the rest of the LIMS can consume them
 directly — no Excel in between.
 
@@ -80,7 +80,7 @@ cp .env.example .env
 # Fictional SLIM reference data from the OSS repos (checked out next to this one):
 pip install -e ../slim-domain-oss[postgres] -e ../slim-report-engine-oss
 python scripts/seed_demo.py
-PORTAL_PASSWORD='at-least-12-chars' python -m slim_lims.cli create-staff --email you@lab.example --initials JM --lab-role supervisor
+PORTAL_PASSWORD='at-least-12-chars' python -m slim_lims.cli create-staff --email you@lab.example --initials JM --lab-role supervisor --name 'Jo Example'
 uvicorn --factory slim_lims.main:create_app --reload
 ```
 

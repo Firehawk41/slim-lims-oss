@@ -41,9 +41,11 @@ from slim_data.service.imports import ImportPlan, ImportRefused, preview_import
 from slim_data.service.views import batch_view, batches, report_view
 from sqlalchemy.orm import Session
 
+from slim_lims import capabilities, delivery, reports
 from slim_lims.api import Service, get_reference
 from slim_lims.auth import RequireStaff
 from slim_lims.db import get_db
+from slim_lims.labtime import lab_clock
 from slim_lims.reference import ReferenceData
 from slim_lims.results import (
     READERS,
@@ -141,6 +143,12 @@ def _decide(db: Session, action) -> tuple[int, dict[str, Any]]:
     """Runs one decision; (200, body) and commits, or (status, reason) and rolls back."""
     try:
         body = action()
+    except reports.NotASignatory as error:  # D-122
+        db.rollback()
+        return 403, {"detail": str(error)}
+    except delivery.NotSendable as error:  # D-124
+        db.rollback()
+        return 409, {"detail": str(error)}
     except wf.BatchReviewRefused as error:
         db.rollback()
         return 409, {"detail": "Nothing was reviewed.", "problems": error.problems}
@@ -169,19 +177,36 @@ def _decide(db: Session, action) -> tuple[int, dict[str, Any]]:
     return 200, body
 
 
-def _report(db: Session, service, tr_number: str, user, renderer, reference) -> dict[str, Any]:
-    """The report as it stands now, rendered as "Issue report" would issue it, and every issue so
-    far (raises the app's NotFound)."""
+def _report(db: Session, service, tr_number: str, user, renderer, reference, today) -> dict[str, Any]:
+    """The report as it stands now, rendered and signed as "Sign and issue" would issue it by `user`
+    today (D-122), every issue so far with its deliveries (D-124) (raises the app's NotFound)."""
     submission = service.get(tr_number, user)
     view = report_view(db, tr_number)
     document = report_document(view)
     html = renderer(db, submission, view, reference) if view.lines else None
+    sign_problem = None
+    if not capabilities.can(db, user, capabilities.SIGNATORY):
+        sign_problem = "Only a signatory may sign and issue a report."
+    else:
+        try:
+            signature = reports.signature_for(user, today)
+        except reports.NotASignatory as error:
+            sign_problem = str(error)
+        else:
+            html = reports.sign(html, signature) if html else None
+    sent = {}
+    for d in delivery.deliveries(db, tr_number):
+        sent.setdefault(d.issue_id, []).append(d)
+    issues = issues_for_tr(db, tr_number)
     return {
         **document,
         "waiting": list(view.waiting),
         "complete": report_complete(view, submission),
         "sha256": sha256(html.encode()).hexdigest() if html else None,
         "html": html,
+        "sign_problem": sign_problem,
+        "results_to": [str(a) for a in submission.results_to],
+        "results_cc": [str(a) for a in submission.results_cc],
         "issues": [
             {
                 "id": i.id,
@@ -190,8 +215,14 @@ def _report(db: Session, service, tr_number: str, user, renderer, reference) -> 
                 "lines": len(i.lines),
                 "by": i.created_by.display,
                 "at": i.created_at.isoformat() if i.created_at else None,
+                "pdf": reports.pdf_for(db, i.file_sha256) is not None,
+                "latest": i is issues[-1],
+                "sent": [
+                    {"id": d.id, "at": d.sent_at.isoformat(), "by": d.sent_by, "transport": d.transport}
+                    for d in reversed(sent.get(i.id, []))
+                ],
             }
-            for i in issues_for_tr(db, tr_number)
+            for i in issues
         ],
     }
 
@@ -613,7 +644,15 @@ def results_report(
     request: Request, tr_number: str, user: RequireStaff, db: DB, service: Service, reference: Reference
 ):
     try:
-        report = _report(db, service, tr_number, user, request.app.state.report_renderer, reference)
+        report = _report(
+            db,
+            service,
+            tr_number,
+            user,
+            request.app.state.report_renderer,
+            reference,
+            lab_clock(request).today(),
+        )
     except TRNotFound:
         return render(
             request, "error.html", {"status": 404, "message": f"Testing Request {tr_number} not found."}, 404
@@ -626,11 +665,24 @@ def results_issue(
     request: Request, tr_number: str, user: RequireStaff, db: DB, service: Service, reference: Reference
 ):
     status, body = _decide(
-        db, lambda: issue_report(db, service, tr_number, user, request.app.state.report_renderer, reference)
+        db,
+        lambda: issue_report(
+            db,
+            service,
+            tr_number,
+            user,
+            request.app.state.report_renderer,
+            reference,
+            lab_clock(request).today(),
+        ),
     )
     if status == 200:
         amended = f" (amends issue {body['amends']})" if body["amended"] else ""
-        flash(request, f"Report issue {body['issue_id']} recorded{amended}: {body['lines']} result(s).")
+        flash(
+            request,
+            f"Report issue {body['issue_id']} signed by {body['signed_by']} and recorded{amended}: "
+            f"{body['lines']} result(s).",
+        )
     else:
         flash(request, str(body["detail"]), "error")
     return RedirectResponse(request.url_for("results_report", tr_number=tr_number).path, status_code=303)
@@ -641,7 +693,15 @@ def api_report(
     request: Request, tr_number: str, user: RequireStaff, db: DB, service: Service, reference: Reference
 ):
     try:
-        report = _report(db, service, tr_number, user, request.app.state.report_renderer, reference)
+        report = _report(
+            db,
+            service,
+            tr_number,
+            user,
+            request.app.state.report_renderer,
+            reference,
+            lab_clock(request).today(),
+        )
         report.pop("html")  # the API gives the facts; the page shows the rendered report
         return report
     except TRNotFound:
@@ -655,6 +715,62 @@ def api_issue(
     request: Request, tr_number: str, user: RequireStaff, db: DB, service: Service, reference: Reference
 ):
     status, body = _decide(
-        db, lambda: issue_report(db, service, tr_number, user, request.app.state.report_renderer, reference)
+        db,
+        lambda: issue_report(
+            db,
+            service,
+            tr_number,
+            user,
+            request.app.state.report_renderer,
+            reference,
+            lab_clock(request).today(),
+        ),
     )
     return JSONResponse(body, status_code=201 if status == 200 else status)
+
+
+def _send(db: Session, service, tr_number: str, issue_id: int, user) -> tuple[int, dict[str, Any]]:
+    def run():
+        row = delivery.send_report(db, service.get(tr_number, user), issue_id, user)
+        return {
+            "delivery_id": row.id,
+            "issue_id": row.issue_id,
+            "to": row.to_addresses,
+            "cc": row.cc_addresses,
+            "subject": row.subject,
+            "pdf_sha256": row.pdf_sha256,
+            "transport": row.transport,
+        }
+
+    return _decide(db, run)
+
+
+@router.post("/results/reports/{tr_number}/issues/{issue_id}/send", name="results_send")
+def results_send(
+    request: Request, tr_number: str, issue_id: int, user: RequireStaff, db: DB, service: Service
+):
+    """Sends an issued report to the customer: into the outbox, not transmitted (D-124)."""
+    status, body = _send(db, service, tr_number, issue_id, user)
+    if status == 200:
+        flash(
+            request,
+            f"Report issue {issue_id} is in the outbox for {', '.join(body['to'])} (not transmitted).",
+        )
+    else:
+        flash(request, str(body["detail"]), "error")
+    return RedirectResponse(request.url_for("results_report", tr_number=tr_number).path, status_code=303)
+
+
+@api_router.post(
+    "/reports/{tr_number}/issues/{issue_id}/send",
+    summary="Send an issued report to the customer (the outbox: stored, not transmitted)",
+)
+def api_send(tr_number: str, issue_id: int, user: RequireStaff, db: DB, service: Service):
+    status, body = _send(db, service, tr_number, issue_id, user)
+    return JSONResponse(body, status_code=201 if status == 200 else status)
+
+
+@router.get("/outbox", name="outbox")
+def outbox(request: Request, user: RequireStaff, db: DB):
+    """Every report sent, newest first, as the customer would have received it (D-124)."""
+    return render(request, "results/outbox.html", {"deliveries": delivery.deliveries(db)})
