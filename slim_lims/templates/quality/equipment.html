@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Equipment — Quality — YourLab{% endblock %}
+{% block extra_head %}<link href="{{ url_for('static', path='css/quality.css') }}" rel="stylesheet" />{% endblock %}
+{% block content %}
+  <h1>Equipment register</h1>
+  {% include "quality/_nav.html" %}
+  <p class="hint">ISO 17025 §6.4. Each item by the name the prep book and the instrument files use. Its state follows its
+    calibrations and checks and today's date. Where it is used: out of service always blocks; overdue
+    {% for kind, effect in policy.overdue.items() %}{{ kind.label|lower }}s {{ effect.label|lower }}{{ ", " if not loop.last }}{% endfor %};
+    a name not in the register: {{ policy.unregistered.label|lower }}. These settings are the quality profile's.</p>
+  <table class="table"><thead><tr><th>Item</th><th>Kind</th><th>State</th><th>Calibration due</th><th>Description</th></tr></thead>
+    <tbody>{% for item, state in rows %}
+      <tr><td><a href="{{ url_for('quality_equipment_item', item_id=item.id) }}">{{ item.name }}</a></td><td>{{ item.kind.label }}</td>
+        <td><span class="sev sev--{{ {1: 'none', 2: 'INFO', 3: 'WARN', 4: 'ACTION'}[state.value] }}">{{ state.label }}</span></td>
+        <td>{{ item.due_on() or ("not needed" if not item.calibration_required else "never calibrated") }}</td><td>{{ item.description }}</td></tr>
+    {% else %}<tr><td colspan="5" class="muted">Nothing registered yet.</td></tr>{% endfor %}</tbody></table>
+
+  <section class="form-section">
+    <h2>Register an item</h2>
+    <form method="post" action="{{ url_for('quality_equipment_register') }}" class="stack-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+      <label>Name <input type="text" name="name" maxlength="100" required placeholder="as the prep book or the instrument file names it"></label>
+      <label>Kind <select name="kind">{% for k in kinds %}<option value="{{ k.value }}">{{ k.label }}</option>{% endfor %}</select></label>
+      <label>Description <input type="text" name="description" maxlength="500"></label>
+      <label><input type="checkbox" name="calibration_required" value="1" checked> Needs calibration</label>
+      <button type="submit" class="btn btn--primary">Register</button>
+    </form>
+  </section>
+{% endblock %}

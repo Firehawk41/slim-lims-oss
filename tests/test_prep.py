@@ -9,11 +9,13 @@ from slim_data.domain.enums import ReadingRole
 from slim_data.domain.values import SampleRef
 from slim_data.persistence.observations import evaluation_input
 from slim_data.persistence.observations import get_batch as results_batch
+from slim_prep.demo import DEMO_RULES
 from slim_prep.persistence import migrate as prep_migrate
 from sqlalchemy import select
 
 from slim_lims.models import User
 from slim_lims.prep import publish_demo_prep
+from slim_lims.quality_records import DEMO_INSTRUMENTS, seed_demo_register
 from tests.conftest import csrf_from, login, login_api
 from tests.test_results import HEADER, lab, reference, upload  # noqa: F401 (fixtures)
 
@@ -45,6 +47,7 @@ def app(engine, reference):  # noqa: F811
 @pytest.fixture
 def prep(lab, reference):  # noqa: F811
     publish_demo_prep(lab, reference, TODAY)
+    seed_demo_register(lab, TODAY, DEMO_INSTRUMENTS, DEMO_RULES)  # the stock's lot is registered (P-28)
     lab.commit()
     return lab
 

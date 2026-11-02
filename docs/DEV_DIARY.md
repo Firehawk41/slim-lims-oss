@@ -156,6 +156,17 @@ Tally and themes are updated now and then at the bottom.
 | C→C | Caught while building: signing puts the day into the file, so the old "nothing has changed" check (same hash) would have let the same report be issued again the next day. | Compares the unsigned bodies; guard test `test_s3_…`. |
 | C→C | The demo scenarios issue as Rob (reviewer), so Rob is a signatory in the demo too; otherwise the seeded reports would carry a signature by someone not allowed to sign. | `test_s7_…`. |
 
+## 2026-11-02: slim-quality part 2, batch 5a (equipment, lots, PT, complaints)
+
+| Kind | What | Notes |
+|---|---|---|
+| C✓ | Split phase 5's remaining ten items into three batches (5a records the lab keeps, 5b what the data shows, 5c the management system); 5a first. | Jamie: "5a as recommended". |
+| C→C | The brief changed Claude's own discussion point: reading slim-prep's design (P-07, P-14) showed the registers were always meant to be slim-quality's, so lots come through a port instead of the host cross-checking typed ones. | D-127, P-28. |
+| C✓ | Equipment by the names the modules already record; the effect per kind in the profile (change-controlled), out of service always blocks; a failed balance's impact through the prep batches that used it. | D-125, D-126. |
+| C✓ | A PT sample is an ordinary TR; z-scores charted on fixed limits (0 ± 1) by the existing tools. | D-128, D-129. |
+| C✓ | Complaints: the outcome refused to anyone with a hand in the request, composed by the host (§7.9.6). | D-130. |
+| C→C | Caught while building: the profile form would have reset the PT z-score's fixed limits to a baseline on the next proposal; the form now keeps what it doesn't edit. Also `upgrade_lab` seeds the register in old labs, or their standards would be refused. | Guard tests in `tests/test_quality_records.py`. |
+
 ## Themes so far
 - **Domain facts are Jamie's, and they overrule Claude's defaults:** DF < 1, MDL averaging, standards as
   recipes, spike placement. Claude's "cautious" engineering defaults were wrong more than once where

@@ -46,6 +46,7 @@ from slim_lims.api import Service, get_reference
 from slim_lims.auth import RequireStaff
 from slim_lims.db import get_db
 from slim_lims.labtime import lab_clock
+from slim_lims.quality_records import instrument_problems, run_equipment
 from slim_lims.reference import ReferenceData
 from slim_lims.results import (
     READERS,
@@ -103,6 +104,17 @@ def _plan_json(plan: ImportPlan) -> dict[str, Any]:
     }
 
 
+def _with_equipment(request: Request, db: Session, plan: ImportPlan) -> dict[str, Any]:
+    """The preview with what the equipment register says about the run's instrument on its day (D-126)."""
+    body = _plan_json(plan)
+    body["equipment_blocks"], body["equipment"] = [], []
+    if plan.run is not None:
+        zone = lab_clock(request).zone
+        day = plan.run.analyzed_at.astimezone(zone).date()
+        body["equipment_blocks"], body["equipment"] = instrument_problems(db, plan.run.instrument, day)
+    return body
+
+
 def _import(request, db, reference, service, user, content: bytes, filename: str, reader=None):
     """(status, body): 201 with the receipt, or 422 with the reason; commits only on success."""
     lookup = _lookup(request, db, reference)
@@ -111,6 +123,10 @@ def _import(request, db, reference, service, user, content: bytes, filename: str
             db, content, filename, actor_for(user), lookup, StaffDirectory(db), reader
         )
         started = start_work(service, trs, user)
+        blocks, warnings = run_equipment(db, receipt.run_id, lab_clock(request).zone)  # D-126
+        if blocks:
+            db.rollback()
+            return 422, {"detail": f"The file was not imported: {'; '.join(blocks)} (equipment register)."}
     except ImportRefused as refused:
         db.rollback()
         return 422, {"detail": "The file was not imported.", "plan": _plan_json(refused.plan)}
@@ -136,6 +152,7 @@ def _import(request, db, reference, service, user, content: bytes, filename: str
             for code, e in evaluations.items()
         },
         "started": started,
+        "equipment": warnings,
     }
 
 
@@ -374,6 +391,8 @@ def results_upload(
                 f"Imported {filename}: {body['readings']} readings "
                 f"({body['skipped']} already imported); batches evaluated: {evaluated}.{started}",
             )
+            for warning in body["equipment"]:
+                flash(request, f"Equipment register: {warning}.", "warning")
             return RedirectResponse(request.url_for("results_home").path, status_code=303)
         context = _home(request, db, reference, form, error=body["detail"], plan=body.get("plan"))
         return render(request, "results/index.html", context, 422)
@@ -381,7 +400,11 @@ def results_upload(
         db, content, filename, actor_for(user), _lookup(request, db, reference), StaffDirectory(db), reader
     )
     db.rollback()  # a preview writes nothing
-    return render(request, "results/index.html", _home(request, db, reference, form, plan=_plan_json(plan)))
+    return render(
+        request,
+        "results/index.html",
+        _home(request, db, reference, form, plan=_with_equipment(request, db, plan)),
+    )
 
 
 @router.get("/results/batches/{code}", name="results_batch")
@@ -555,7 +578,7 @@ def api_import(
             reader,
         )
         db.rollback()
-        return _plan_json(plan)
+        return _with_equipment(request, db, plan)
     status, body = _import(request, db, reference, service, user, content, filename, reader)
     return JSONResponse(body, status_code=status)
 

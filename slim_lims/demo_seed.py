@@ -24,6 +24,7 @@ from zoneinfo import ZoneInfo
 
 from alembic import command
 from alembic.config import Config
+from slim_prep.demo import DEMO_RULES
 from sqlalchemy import func, inspect, select, text
 
 import slim_lims
@@ -40,7 +41,13 @@ from slim_lims.labtime import LabClock
 from slim_lims.oss_guard import assert_oss_database
 from slim_lims.personas import sync_personas
 from slim_lims.prep import migrate_slim_prep, publish_demo_prep
-from slim_lims.quality import migrate_slim_quality, seed_demo_nonconformity, seed_quality_history
+from slim_lims.quality import (
+    migrate_slim_quality,
+    seed_demo_nonconformity,
+    seed_quality_history,
+    seed_quality_records,
+)
+from slim_lims.quality_records import DEMO_INSTRUMENTS, seed_demo_register
 from slim_lims.reference_cache import load_reference
 from slim_lims.repositories import TRSubmissionRepository
 from slim_lims.results import SpecReader, migrate_slim_data, publish_demo_rules
@@ -60,6 +67,7 @@ class SeedReport:
     prepped: str | None = None
     bottles: int = 0
     qc_runs: int = 0
+    records: dict = field(default_factory=dict)
 
 
 def load_oss_demo(oss_dir: Path):
@@ -133,6 +141,7 @@ def seed_demo(
             publish_demo_prep(session, reference, clock.today())
             publish_demo_samples(session)
             report.personas = sync_personas(session)
+            seed_demo_register(session, clock.today(), DEMO_INSTRUMENTS, DEMO_RULES)  # D-125, D-127
             session.commit()
             if scenarios:
                 specs = SpecReader(slim_engine)
@@ -145,16 +154,20 @@ def seed_demo(
                 report.qc_runs = seed_quality_history(session, reference, specs, clock.now())
                 seed_demo_nonconformity(session, clock.now())
                 session.commit()
+                issued = report.scenarios.get("clean_pass")
+                report.records = seed_quality_records(session, reference, specs, clock.now(), issued)
+                session.commit()
     finally:
         portal_engine.dispose()
         slim_engine.dispose()
     return report
 
 
-def upgrade_lab(database_url: str) -> None:
+def upgrade_lab(database_url: str, lab_timezone: str = "America/Chicago") -> None:
     """Every migration (the app's and each module's) and the audit log, on a lab that already exists: what
-    a deploy adds reaches a visitor's lab (slim-data D-115). Nothing is seeded; running it twice changes
-    nothing."""
+    a deploy adds reaches a visitor's lab (slim-data D-115). Nothing is seeded but the equipment register
+    and reference lots when a lab has none (D-127: making a standard needs a registered lot); running it
+    twice changes nothing."""
     config = Config(str(Path(slim_lims.__file__).parent / "alembic.ini"))
     config.attributes["database_url"] = database_url
     command.upgrade(config, "head")
@@ -166,5 +179,10 @@ def upgrade_lab(database_url: str) -> None:
         migrate_slim_quality(engine)
         migrate_invoicing(engine)
         install_audit_log(engine)
+        with make_session_factory(engine)() as session:
+            seed_demo_register(
+                session, LabClock(ZoneInfo(lab_timezone)).today(), DEMO_INSTRUMENTS, DEMO_RULES
+            )
+            session.commit()
     finally:
         engine.dispose()

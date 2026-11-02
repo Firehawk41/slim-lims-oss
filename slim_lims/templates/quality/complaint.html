@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}{{ c.number }} — Complaints — YourLab{% endblock %}
+{% block extra_head %}<link href="{{ url_for('static', path='css/quality.css') }}" rel="stylesheet" />{% endblock %}
+{% macro form_open(kind) %}<form method="post" action="{{ url_for('quality_complaint_entry', complaint_id=c.id) }}" class="stack-form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}"><input type="hidden" name="kind" value="{{ kind.value }}">{% endmacro %}
+{% block content %}
+  <h1>{{ c.number }}: {{ c.tr_number }}</h1>
+  {% include "quality/_nav.html" %}
+  <dl class="kv-inline">
+    <div><dt>State</dt><dd><strong>{{ c.state.label }}</strong></dd></div>
+    <div><dt>Raised</dt><dd>{{ c.raised_by.display }}{% if c.by_staff %} (logged by staff){% endif %}, {{ c.raised_at.astimezone(zone).strftime("%Y-%m-%d %H:%M") }}</dd></div>
+    <div><dt>About</dt><dd><a href="{{ url_for('request_detail', tr_number=c.tr_number) }}">{{ c.tr_number }}</a>{% if c.issue_id %}, report issue {{ c.issue_id }}{% endif %}</dd></div>
+  </dl>
+  <blockquote>{{ c.text }}</blockquote>
+
+  <section class="form-section">
+    <h2>Record</h2>
+    <ol>{% for e in c.entries %}<li><strong>{{ e.kind.label }}</strong> by {{ e.by.display }}, {{ e.at.astimezone(zone).strftime("%Y-%m-%d %H:%M") }}
+      {% if e.valid is not none %}({{ "valid: about the lab's work" if e.valid else "not about the lab's work" }}){% endif %}
+      <span class="muted">{{ "to the customer" if e.to_customer else "internal" }}</span>: {{ e.note }}</li>
+    {% else %}<li class="muted">Nothing recorded yet.</li>{% endfor %}</ol>
+  </section>
+
+  {% if c.state.name != "CLOSED" %}
+  <section class="form-section">
+    {% if c.state.name == "RECEIVED" %}
+      <h2>Acknowledge (to the customer)</h2>
+      {{ form_open(kinds.ACKNOWLEDGED) }}<label>Note <textarea name="note" rows="2" maxlength="4000" required>Thank you: we have your complaint and will reply within five working days.</textarea></label>
+        <button type="submit" class="btn btn--primary">Acknowledge</button></form>
+    {% elif c.state.name in ("ACKNOWLEDGED", "INVESTIGATED") %}
+      <h2>Investigation (internal)</h2>
+      {{ form_open(kinds.INVESTIGATED) }}<label>Finding <textarea name="note" rows="3" maxlength="4000" required></textarea></label>
+        <label>Is it about the lab's work? <select name="valid"><option value="1">Yes: valid</option><option value="0">No (§7.9.3)</option></select></label>
+        <button type="submit" class="btn btn--primary">Record the investigation</button></form>
+    {% endif %}
+    {% if c.state.name == "INVESTIGATED" %}
+      <h2>Approve the outcome (to the customer)</h2>
+      <p class="hint">A quality manager with no hand in {{ c.tr_number }}'s lab work approves it (§7.9.6): nobody who entered,
+        reviewed or released its results, prepped its samples or signed its reports.</p>
+      {% if may_approve %}
+        {{ form_open(kinds.OUTCOME) }}<label>Outcome <textarea name="note" rows="3" maxlength="4000" required></textarea></label>
+          <button type="submit" class="btn btn--primary">Approve and send</button></form>
+      {% elif not actor.is_manager %}<p class="muted">A quality manager approves the outcome.</p>
+      {% else %}<p class="form-error">You had a hand in {{ c.tr_number }}'s lab work: another quality manager approves it.</p>{% endif %}
+    {% elif c.state.name == "OUTCOME_APPROVED" %}
+      <h2>Close</h2>
+      {{ form_open(kinds.CLOSED) }}<label>Note (to the customer) <textarea name="note" rows="2" maxlength="4000" required></textarea></label>
+        <button type="submit" class="btn btn--primary">Close</button></form>
+    {% endif %}
+    <h2>A progress note</h2>
+    {{ form_open(kinds.PROGRESS) }}<label>Note <textarea name="note" rows="2" maxlength="4000" required></textarea></label>
+      <label><input type="checkbox" name="to_customer" value="1" checked> Show it to the customer</label>
+      <button type="submit" class="btn btn--secondary">Add</button></form>
+    <form method="post" action="{{ url_for('quality_complaint_nc', complaint_id=c.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+      <button type="submit" class="btn btn--secondary">Raise a nonconformity from it</button></form>
+  </section>
+  {% endif %}
+{% endblock %}

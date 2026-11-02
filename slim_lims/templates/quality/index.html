@@ -8,6 +8,10 @@
     and when a forecast says a series will leave its acceptance window. Profile v{{ profile.version }}{% if profile.version == 0 %} (the starter profile){% endif %}.</p>
 
   <dl class="kv-inline">
+    <div><dt>Equipment</dt><dd><a href="{{ url_for('quality_equipment') }}">{{ tiles.equipment_bad }} overdue or out of service, {{ tiles.equipment_due }} due soon</a></dd></div>
+    <div><dt>Reference lots</dt><dd><a href="{{ url_for('quality_materials') }}">{{ tiles.lots_expiring }} expiring within 30 days</a></dd></div>
+    <div><dt>Proficiency testing</dt><dd><a href="{{ url_for('quality_pt') }}">{{ tiles.pt_open }} open, {{ tiles.pt_flagged }} questionable or worse</a></dd></div>
+    <div><dt>Complaints</dt><dd><a href="{{ url_for('quality_complaints') }}">{{ tiles.complaints_open }} open</a></dd></div>
     <div><dt>Open changes</dt><dd><a href="{{ url_for('quality_changes') }}">{{ open_changes|length }}</a></dd></div>
     <div><dt>Last QC review</dt><dd>{% if last_review %}{{ last_review.period_from }} to {{ last_review.period_to }}, by {{ last_review.by.display }}{% else %}none yet{% endif %} (<a href="{{ url_for('quality_reviews') }}">reviews</a>)</dd></div>
   </dl>

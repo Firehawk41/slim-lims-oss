@@ -30,6 +30,7 @@ from slim_quality.demo import history as demo
 from slim_quality.domain.actor import QualityActor
 from slim_quality.domain.enums import EventKind as QualityEventKind
 from slim_quality.domain.enums import QualityRole, Severity
+from slim_quality.domain.equipment import EquipmentKind
 from slim_quality.domain.nonconformity import NcSource
 from slim_quality.domain.qc import CalibrationRecord, QcRecord, to_series
 from slim_quality.persistence import migrate as quality_migrate
@@ -41,6 +42,7 @@ from sqlalchemy.orm import Session
 from slim_lims import capabilities, reports
 from slim_lims.audit import chain_check
 from slim_lims.models import User
+from slim_lims.quality_records import released_from_prep, seed_demo_records
 from slim_lims.reference import ReferenceData
 from slim_lims.repositories import TRSubmissionRepository
 from slim_lims.results import (
@@ -387,9 +389,15 @@ def impact_label(r) -> str:
 
 
 def touched(db: Session, nc) -> list:
-    """The released results the nonconformity's window may have touched (slim-data D-112)."""
+    """The released results the nonconformity's window may have touched (slim-data D-112). An NC from a
+    balance or pipette (D-126) touches what the prep batches that used it in the window made; anything
+    else named, what its instrument measured."""
     if nc.instrument is None or nc.window_from is None:
         return []
+    if nc.source == NcSource.EQUIPMENT:
+        item = next((i for i in store.list_equipment(db) if i.name == nc.instrument), None)
+        if item is not None and item.kind in (EquipmentKind.BALANCE, EquipmentKind.PIPETTE):
+            return released_from_prep(db, item.name, nc.window_from, nc.window_to)
     return released_in_window(db, nc.instrument, nc.analyte, nc.window_from, nc.window_to)
 
 
@@ -413,3 +421,19 @@ def seed_demo_nonconformity(db: Session, now: datetime) -> None:
         None,
         (now - timedelta(days=demo.WEAR_DAYS), now),
     )
+
+
+def seed_quality_records(session: Session, reference, specs, now: datetime, issued_tr: str | None) -> dict:
+    """The demo's PT rounds and complaints (D-128, D-130), by the quality personas; `issued_tr` is a TR of
+    customer A with a report (the complaints are about it). Once."""
+    from slim_lims.demo_scenarios import PortalDemoHost  # the scenarios' TR maker (imports the app's modules)
+
+    people = {
+        role: quality_actor(session, session.scalars(select(User).where(User.email == email)).first())
+        for role, email in QUALITY_PERSONAS.items()
+    }
+    if None in people.values():
+        return {}
+    people["customer"] = session.scalars(select(User).where(User.email == "customer@demo.example")).first()
+    host = PortalDemoHost(session, reference, specs, now.date())
+    return seed_demo_records(session, host, now.date(), people, issued_tr)

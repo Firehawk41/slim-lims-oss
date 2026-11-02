@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Complaints on {{ s.tr_number }} — YourLab{% endblock %}
+{% block content %}
+  <h1>Complaints on {{ s.tr_number }}</h1>
+  <p><a href="{{ url_for('request_detail', tr_number=s.tr_number) }}">Back to the request</a></p>
+  {% for c in complaints %}
+    <section class="form-section">
+      <h2>{{ c.number }}: {{ c.state.label }}</h2>
+      <p class="muted">Raised by {{ c.raised_by.display }}{% if c.by_staff %} (logged by the lab){% endif %}, {{ c.raised_at.astimezone(zone).date() }}{% if c.issue_id %}, about report issue {{ c.issue_id }}{% endif %}</p>
+      <blockquote>{{ c.text }}</blockquote>
+      <ol>{% for e in c.for_customer %}<li><strong>{{ e.kind.label }}</strong>, {{ e.at.astimezone(zone).date() }}: {{ e.note }}</li>
+        {% else %}<li class="muted">Not acknowledged yet.</li>{% endfor %}</ol>
+    </section>
+  {% else %}<p class="muted">No complaint on this request.</p>{% endfor %}
+
+  <section class="form-section">
+    <h2>{{ "Log a complaint taken by phone" if current_user and current_user.is_staff else "Raise a complaint" }}</h2>
+    <form method="post" action="{{ url_for('request_complaint_raise', tr_number=s.tr_number) }}" class="stack-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+      {% if issues %}<label>About a report <select name="issue_id"><option value="">— the request as a whole —</option>
+        {% for i in issues %}<option value="{{ i.id }}">Issue {{ i.id }}, {{ i.created_at.astimezone(zone).date() }}</option>{% endfor %}</select></label>{% endif %}
+      <label>What is wrong <textarea name="text" rows="4" maxlength="4000" required></textarea></label>
+      <button type="submit" class="btn btn--primary">Send</button>
+    </form>
+  </section>
+{% endblock %}

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}{{ item.name }} — Equipment — YourLab{% endblock %}
+{% block extra_head %}<link href="{{ url_for('static', path='css/quality.css') }}" rel="stylesheet" />{% endblock %}
+{% block content %}
+  <h1>{{ item.name }}</h1>
+  {% include "quality/_nav.html" %}
+  <dl class="kv-inline">
+    <div><dt>Kind</dt><dd>{{ item.kind.label }}</dd></div>
+    <div><dt>State today</dt><dd><strong>{{ state.label }}</strong></dd></div>
+    <div><dt>Calibration due</dt><dd>{{ item.due_on() or ("not needed" if not item.calibration_required else "never calibrated") }}</dd></div>
+    <div><dt>When overdue, where used</dt><dd>{{ effect.label }} (out of service: block)</dd></div>
+  </dl>
+  {% if item.description %}<p>{{ item.description }}</p>{% endif %}
+
+  <section class="form-section">
+    <h2>Record</h2>
+    <table class="table"><thead><tr><th>Day</th><th>What</th><th>Result</th><th>Detail</th><th>By</th><th></th></tr></thead>
+      <tbody>{% for e in item.entries %}
+        <tr><td>{{ e.on }}</td><td>{{ e.kind.label }}</td>
+          <td>{% if e.passed is not none %}<span class="sev sev--{{ 'none' if e.passed else 'ACTION' }}">{{ "passed" if e.passed else "failed" }}</span>{% endif %}</td>
+          <td>{% if e.provider %}{{ e.provider }}{% endif %}{% if e.certificate %}, certificate {{ e.certificate }}{% endif %}{% if e.next_due %}; next due {{ e.next_due }}{% endif %}{% if e.note %} {{ e.note }}{% endif %}</td>
+          <td>{{ e.by.display }}</td>
+          <td>{% if e.failed %}<form method="post" action="{{ url_for('quality_equipment_nc', item_id=item.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}"><input type="hidden" name="index" value="{{ loop.index0 }}">
+            <button type="submit" class="btn btn--secondary">Raise an NC</button></form>{% endif %}</td></tr>
+      {% else %}<tr><td colspan="6" class="muted">Nothing recorded yet.</td></tr>{% endfor %}</tbody></table>
+    {% if events %}<h3>Events on its charts</h3>
+      <ul>{% for ev in events %}<li>{{ ev.at.astimezone(zone).date() }}: {{ ev.kind.label }}, {{ ev.note }} ({{ ev.by.display }})</li>{% endfor %}</ul>{% endif %}
+  </section>
+
+  <section class="form-section">
+    <h2>Record a calibration or check</h2>
+    <form method="post" action="{{ url_for('quality_equipment_entry', item_id=item.id) }}" class="stack-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+      <label>What <select name="kind">{% if item.calibration_required %}<option value="{{ kinds.CALIBRATION.value }}">Calibration</option>{% endif %}<option value="{{ kinds.CHECK.value }}">Intermediate check</option></select></label>
+      <label>Day <input type="date" name="on" value="{{ today }}" required></label>
+      <label>Result <select name="passed"><option value="1">Passed</option><option value="0">Failed (takes it out of service)</option></select></label>
+      <label>By (calibration) <input type="text" name="provider" maxlength="200" placeholder="in house, or the calibration lab"></label>
+      <label>Certificate <input type="text" name="certificate" maxlength="100"></label>
+      <label>Next due (a passing calibration) <input type="date" name="next_due"></label>
+      <label>Note <textarea name="note" rows="2" maxlength="2000" placeholder="what failed, if it failed"></textarea></label>
+      <button type="submit" class="btn btn--primary">Record</button>
+    </form>
+  </section>
+  <section class="form-section">
+    <h2>{{ "Return to service" if state.name == "OUT_OF_SERVICE" else "Take out of service" }}, or a note</h2>
+    <form method="post" action="{{ url_for('quality_equipment_entry', item_id=item.id) }}" class="stack-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+      <label>What <select name="kind">
+        {% if state.name == "OUT_OF_SERVICE" %}<option value="{{ kinds.RETURNED.value }}">Returned to service</option>{% else %}<option value="{{ kinds.OUT_OF_SERVICE.value }}">Out of service</option>{% endif %}
+        <option value="{{ kinds.NOTE.value }}">Note</option></select></label>
+      <label>Day <input type="date" name="on" value="{{ today }}" required></label>
+      <label>Reason <textarea name="note" rows="2" maxlength="2000" required></textarea></label>
+      <button type="submit" class="btn btn--secondary">Record</button>
+    </form>
+  </section>
+{% endblock %}

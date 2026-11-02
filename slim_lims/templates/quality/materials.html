@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Reference materials — Quality — YourLab{% endblock %}
+{% block extra_head %}<link href="{{ url_for('static', path='css/quality.css') }}" rel="stylesheet" />{% endblock %}
+{% block content %}
+  <h1>Reference materials</h1>
+  {% include "quality/_nav.html" %}
+  <p class="hint">ISO 17025 §6.5. The purchased lots the lab makes its standards from, each with its certificate. The prep
+    book takes a stock's lot from here: a lot that isn't registered, is withdrawn or has expired can't make a standard.
+    A lot is usable through the earlier of its certificate's expiry and, once opened, its shelf life once opened.</p>
+  <table class="table"><thead><tr><th>Lot</th><th>Certified</th><th>Certificate</th><th>Usable through</th><th>Opened</th><th></th></tr></thead>
+    <tbody>{% for lot in lots %}{% set why = lot.unusable_on(today) %}
+      <tr><td>{{ lot.name }} lot <strong>{{ lot.lot }}</strong><br><span class="muted">{{ lot.supplier }}</span></td>
+        <td>{{ lot.value }}{% if lot.uncertainty %} ± {{ lot.uncertainty }}{% endif %} {{ lot.unit }}<br><span class="muted">{{ lot.elements|join(", ") }}</span></td>
+        <td>{{ lot.certificate }}{% if lot.traceability %}<br><span class="muted">{{ lot.traceability }}</span>{% endif %}</td>
+        <td>{% if why %}<span class="sev sev--ACTION">{{ why }}</span>{% elif lot.effective_expiry <= soon %}<span class="sev sev--WARN">{{ lot.effective_expiry }}</span>{% else %}{{ lot.effective_expiry }}{% endif %}</td>
+        <td>{{ lot.opened_on or "sealed" }}{% if lot.shelf_life_opened_days %}<br><span class="muted">{{ lot.shelf_life_opened_days }} days once opened</span>{% endif %}</td>
+        <td>{% if not lot.withdrawn_on %}<form method="post" action="{{ url_for('quality_lot_entry', lot_id=lot.id) }}" class="inline-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}"><input type="hidden" name="on" value="{{ today }}">
+          <select name="kind">{% if not lot.opened_on %}<option value="{{ kinds.OPENED.value }}">Opened today</option>{% endif %}<option value="{{ kinds.WITHDRAWN.value }}">Withdraw</option><option value="{{ kinds.NOTE.value }}">Note</option></select>
+          <input type="text" name="note" maxlength="2000" placeholder="reason (withdraw, note)">
+          <button type="submit" class="btn btn--secondary">Record</button></form>{% endif %}</td></tr>
+    {% else %}<tr><td colspan="6" class="muted">No lot registered yet.</td></tr>{% endfor %}</tbody></table>
+
+  <section class="form-section">
+    <h2>Register a lot</h2>
+    <form method="post" action="{{ url_for('quality_lot_register') }}" class="stack-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+      <label>Name <input type="text" name="name" maxlength="100" required placeholder="as the prep book's recipes name it"></label>
+      <label>Lot <input type="text" name="lot" maxlength="50" required></label>
+      <label>Supplier <input type="text" name="supplier" maxlength="200" required></label>
+      <label>Certificate number <input type="text" name="certificate" maxlength="100" required></label>
+      <label>Traceable to <input type="text" name="traceability" maxlength="500"></label>
+      <label>Certified value <input type="text" name="value" maxlength="30" required inputmode="decimal"></label>
+      <label>Unit <select name="unit"><option>ppm</option><option>ppb</option><option>ppt</option></select></label>
+      <label>Expanded uncertainty <input type="text" name="uncertainty" maxlength="30" inputmode="decimal"></label>
+      <label>Elements <input type="text" name="elements" maxlength="500" required placeholder="Cu, Fe, Ni"></label>
+      <label>Expires <input type="date" name="expires" required></label>
+      <label>Shelf life once opened (days) <input type="number" name="shelf_life_opened_days" min="1" max="3650"></label>
+      <button type="submit" class="btn btn--primary">Register</button>
+    </form>
+  </section>
+{% endblock %}

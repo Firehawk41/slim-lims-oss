@@ -50,6 +50,8 @@
       <dl class="kv">
         {% if plan.run %}
           <dt>Run</dt><dd>{{ plan.run.run_code }} on {{ plan.run.instrument }}, {{ plan.run.analyzed_at }}</dd>
+          {% for p in plan.equipment_blocks %}<dt>Equipment</dt><dd class="form-error">{{ p }}: the import will be refused</dd>{% endfor %}
+          {% for p in plan.equipment %}<dt>Equipment</dt><dd>{{ p }} (a warning; it will import)</dd>{% endfor %}
           <dt>Analyst</dt><dd>{{ plan.run.analyst }}</dd>
         {% endif %}
         <dt>New readings</dt><dd>{{ plan.readings }}{% if plan.skipped %} ({{ plan.skipped }} rows imported before){% endif %}</dd>

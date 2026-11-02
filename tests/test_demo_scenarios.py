@@ -33,7 +33,12 @@ TEN, THIRTY_SIX, ANIONS, ASSAY = 1, 3, 6, 17  # the OSS demo data's IDs
 @pytest.fixture
 def reference():
     return StaticReferenceData.of(
-        customers=[CustomerRef(1, "A", "1 A Street"), CustomerRef(2, "B", "2 B Street")],
+        # Z: the PT provider (D-128)
+        customers=[
+            CustomerRef(1, "A", "1 A Street"),
+            CustomerRef(2, "B", "2 B Street"),
+            CustomerRef(26, "Z", "26 Z"),
+        ],
         chemicals=[ChemicalRef(2, "IPA"), ChemicalRef(3, "HNO3")],
         elements=[ElementRef(i, s, s) for i, s in ELEMENTS.items()],
         analyses=[
