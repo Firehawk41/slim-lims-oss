@@ -32,7 +32,7 @@ dependencies = [
     # The sample module (slim-samples S-01). Co-developing: pip install -e ../slim-samples-oss
     "slim-samples @ git+https://github.com/Firehawk41/slim-samples-oss@fc1be70ce8dbaa1f70c8d31185f760c3557dc5e7",
     # The quality module (slim-data D-109). Co-developing: pip install -e ../slim-quality-oss
-    "slim-quality @ git+https://github.com/Firehawk41/slim-quality-oss@5e859c03158a3e16ada5535cc66f655af9d4963a",
+    "slim-quality @ git+https://github.com/Firehawk41/slim-quality-oss@430fdefefc93497912330e303a6a84c5138b12f6",
     # slim-domain: its hash-chained audit log over the shared database (slim-data D-77), and the bridge.
     "slim-domain @ git+https://github.com/Firehawk41/slim-domain-oss@7b97dada57eb27440a4d63be4263d84263c1647d",
     # Invoicing V5 (slim-data D-83): a subfolder of the invoicing repo. Co-developing: pip install -e ../SLIM-Invoicing-Program/V5-LIMS-Module

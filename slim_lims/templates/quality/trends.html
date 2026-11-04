@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Trends — Quality — YourLab{% endblock %}
+{% block extra_head %}<link href="{{ url_for('static', path='css/quality.css') }}" rel="stylesheet" />{% endblock %}
+{% macro row(t) %}<tr><td>{{ t.label }}</td><td>{{ t.requests }}</td><td>{{ t.samples }}</td>
+  <td>{% if t.on_time_percent is not none %}{{ t.on_time_percent }} %{% else %}—{% endif %}</td>
+  <td>{{ t.on_time }}</td><td>{{ t.late }}</td><td>{{ t.open }}</td><td>{% if t.open_late %}<span class="sev sev--ACTION">{{ t.open_late }}</span>{% else %}0{% endif %}</td>
+  <td>{{ t.mean_days if t.mean_days is not none else "—" }}</td><td>{{ t.worst_late or "—" }}</td></tr>{% endmacro %}
+{% macro table(rows) %}<table class="table"><thead><tr><th></th><th>Requests</th><th>Samples</th><th>On time</th><th>On time</th><th>Late</th><th>Open</th><th>Open, late</th><th>Mean days</th><th>Worst late</th></tr></thead>
+  <tbody>{% for t in rows %}{{ row(t) }}{% else %}<tr><td colspan="10" class="muted">None.</td></tr>{% endfor %}</tbody></table>{% endmacro %}
+{% block content %}
+  <h1>Turnaround and customers</h1>
+  {% include "quality/_nav.html" %}
+  <p class="hint">ISO 17025 §8.9's inputs. A request is on time when its complete report was issued on or before its service date:
+    working days Mon–Fri from receipt, the slowest sample's processing time. A crude clock: no holidays, a hold doesn't stop it,
+    a rush counts from receipt. Days are working days.</p>
+  <form method="get" action="{{ url_for('quality_trends') }}" class="inline-form">
+    <label>Received since <input type="date" name="since" value="{{ since or '' }}"></label> <button type="submit" class="btn btn--secondary">Show</button>
+  </form>
+
+  <h2>Overall</h2>{{ table([report.overall]) }}
+  {% if report.open_late %}
+  <h2>Open and late</h2>
+  <ul>{% for r in report.open_late %}<li><a href="{{ url_for('request_detail', tr_number=r.tr_number) }}">{{ r.tr_number }}</a> ({{ r.customer }}):
+    due {{ r.due }}, {{ r.days_late(report.today) }} working day{{ "s" if r.days_late(report.today) != 1 }} late</li>{% endfor %}</ul>
+  {% endif %}
+  <h2>By month of receipt</h2>{{ table(report.by_month) }}
+  <h2>By customer</h2>{{ table(report.by_customer) }}
+  <h2>By analysis</h2>{{ table(report.by_analysis) }}
+
+  <h2>Customer trends</h2>
+  <table class="table"><thead><tr><th>Customer</th><th>Requests (samples) per month</th><th>Last month vs before</th><th>On time</th><th>Complaints (open)</th></tr></thead>
+    <tbody>{% for c in customers %}
+      <tr><td>{{ c.customer }}</td><td>{% for m, n, s in c.months %}{{ m }}: {{ n }} ({{ s }}){{ ", " if not loop.last }}{% else %}—{% endfor %}</td>
+        <td>{% if c.change is none %}—{% elif c.change > 0 %}+{{ c.change }}{% else %}{{ c.change }}{% endif %}</td>
+        <td>{% if c.on_time_percent is not none %}{{ c.on_time_percent }} %{% else %}—{% endif %}</td>
+        <td>{{ c.complaints }}{% if c.open_complaints %} ({{ c.open_complaints }} open){% endif %}</td></tr>
+    {% else %}<tr><td colspan="5" class="muted">No request received yet.</td></tr>{% endfor %}</tbody></table>
+{% endblock %}

@@ -167,6 +167,17 @@ Tally and themes are updated now and then at the bottom.
 | C✓ | Complaints: the outcome refused to anyone with a hand in the request, composed by the host (§7.9.6). | D-130. |
 | C→C | Caught while building: the profile form would have reset the PT z-score's fixed limits to a baseline on the next proposal; the form now keeps what it doesn't edit. Also `upgrade_lab` seeds the register in old labs, or their standards would be refused. | Guard tests in `tests/test_quality_records.py`. |
 
+## 2026-11-04: slim-quality part 2, batch 5b (uncertainty, competence, trends)
+
+| Kind | What | Notes |
+|---|---|---|
+| J | Asked for the big picture first: why should a lab care about each item? | Each answers an assessor's question from records SLIM already keeps; Claude ranked them competence, uncertainty, turnaround. |
+| C✓ | Uncertainty the Nordtest way from check-standard recoveries plus CRM/PT bias; signed by a quality manager; not on the report (the ± stays ½Δ). | Jamie: "go, all three with your recommendations". D-131. |
+| C✓ | An authorisation register in slim-quality; acts found after the fact, not blocked. | D-132. |
+| C✓ | Turnaround against the app's own service date (Mon–Fri, no holidays, holds don't pause); customer trends with complaints. | D-133. |
+| C→C | Caught while building: an authorisation recorded after the act it covers would have hidden the gap; it is a finding of its own ("backdated"). Days compare in the lab's zone, or an evening's grant reads as tomorrow. | Guard tests in slim-quality `tests/domain/test_phase5b.py`. |
+| C→C | The demo plants a gap that teaches: Rob holds the app's signatory capability but nobody recorded his authorisation to sign, so his reports show up. | `test_the_demo_register_is_seeded_once_and_finds_robs_signatures`. |
+
 ## Themes so far
 - **Domain facts are Jamie's, and they overrule Claude's defaults:** DF < 1, MDL averaging, standards as
   recipes, spike placement. Claude's "cautious" engineering defaults were wrong more than once where
