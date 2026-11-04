@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Competence — Quality — YourLab{% endblock %}
+{% block extra_head %}<link href="{{ url_for('static', path='css/quality.css') }}" rel="stylesheet" />{% endblock %}
+{% block content %}
+  <h1>Competence</h1>
+  {% include "quality/_nav.html" %}
+  <p class="hint">ISO 17025 §6.2.5–6.2.6. Who is authorised for what, and every act recorded in the modules (prep, readings entered,
+    review, release, a signed report) checked against the register as it stood on that day. Found after the fact; nothing is blocked.</p>
+
+  <h2>Acts outside an authorisation</h2>
+  <table class="table"><thead><tr><th>Day</th><th>Who</th><th>Act</th><th>On</th><th>Why</th><th></th></tr></thead>
+    <tbody>{% for f in findings %}
+      <tr><td>{{ f.act.on }}</td><td>{{ f.act.person.display }}</td><td>{{ f.act.act.label }}</td>
+        <td>{% if f.act.tr_number %}<a href="{{ url_for('request_detail', tr_number=f.act.tr_number) }}">{{ f.act.label }}</a>{% else %}{{ f.act.label }}{% endif %}</td>
+        <td>{% if f.backdated %}<span class="sev sev--WARN">backdated</span> {% else %}<span class="sev sev--ACTION">outside</span> {% endif %}{{ f.reason }}</td>
+        <td><form method="post" action="{{ url_for('quality_competence_nc') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+          <input type="hidden" name="ref" value="{{ f.act.ref }}"><button type="submit" class="btn btn--secondary">Raise an NC</button></form></td></tr>
+    {% else %}<tr><td colspan="6" class="muted">Every recorded act was authorised.</td></tr>{% endfor %}</tbody></table>
+
+  <h2>The register</h2>
+  <table class="table"><thead><tr><th>Who</th><th>Act</th><th>Method</th><th>Valid</th><th>Evidence</th><th>Granted</th><th></th></tr></thead>
+    <tbody>{% for a in register %}
+      <tr><td>{{ a.person.display }}</td><td>{{ a.act.label }}</td><td>{{ a.method_label }}</td>
+        <td>{{ a.valid_from }} to {{ a.last_day or "open" }}{% if a.withdrawn_on %} <span class="sev sev--WARN">withdrawn {{ a.withdrawn_on }}</span>{% endif %}</td>
+        <td>{{ a.evidence }}{% for e in a.entries if e.kind.name == "NOTE" %}<br><span class="muted">{{ e.on }}: {{ e.note }}</span>{% endfor %}</td>
+        <td>{{ a.granted_by.display }}, {{ a.granted_at.date() }}</td>
+        <td>{% if actor.is_manager and not a.withdrawn_on %}<form method="post" action="{{ url_for('quality_competence_entry', authorisation_id=a.id) }}" class="inline-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}"><input type="hidden" name="kind" value="1">
+          <input type="text" name="note" maxlength="2000" required placeholder="Why withdrawn">
+          <button type="submit" class="btn btn--secondary">Withdraw</button></form>{% endif %}</td></tr>
+    {% else %}<tr><td colspan="7" class="muted">Nobody is authorised yet.</td></tr>{% endfor %}</tbody></table>
+
+  {% if actor.is_manager %}
+  <section class="form-section">
+    <h2>Authorise</h2>
+    <form method="post" action="{{ url_for('quality_competence_grant') }}" class="stack-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+      <label>Who <select name="person_id" required>{% for p in people %}<option value="{{ p.id }}">{{ p.display }}</option>{% endfor %}</select></label>
+      <label>Act <select name="act" required>{% for a in acts %}<option value="{{ a.value }}">{{ a.label }}</option>{% endfor %}</select></label>
+      <label>Method <select name="method"><option value="">Every method</option>{% for m in methods %}<option value="{{ m }}">{{ m }}</option>{% endfor %}</select></label>
+      <label>From <input type="date" name="valid_from" value="{{ today }}" required></label>
+      <label>Until (optional) <input type="date" name="valid_until"></label>
+      <label>Evidence <input type="text" name="evidence" maxlength="2000" required placeholder="Training record, a witnessed run"></label>
+      <button type="submit" class="btn btn--primary">Authorise</button>
+    </form>
+    <p class="hint">Signing a report has no method: only an authorisation for every method covers it.</p>
+  </section>
+  {% else %}<p class="muted">A quality manager keeps the register.</p>{% endif %}
+{% endblock %}

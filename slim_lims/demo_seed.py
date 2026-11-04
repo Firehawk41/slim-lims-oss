@@ -47,6 +47,7 @@ from slim_lims.quality import (
     seed_quality_history,
     seed_quality_records,
 )
+from slim_lims.quality_insights import seed_demo_authorisations
 from slim_lims.quality_records import DEMO_INSTRUMENTS, seed_demo_register
 from slim_lims.reference_cache import load_reference
 from slim_lims.repositories import TRSubmissionRepository
@@ -142,6 +143,7 @@ def seed_demo(
             publish_demo_samples(session)
             report.personas = sync_personas(session)
             seed_demo_register(session, clock.today(), DEMO_INSTRUMENTS, DEMO_RULES)  # D-125, D-127
+            seed_demo_authorisations(session, clock.today())  # D-132: before anyone acts
             session.commit()
             if scenarios:
                 specs = SpecReader(slim_engine)
@@ -180,9 +182,9 @@ def upgrade_lab(database_url: str, lab_timezone: str = "America/Chicago") -> Non
         migrate_invoicing(engine)
         install_audit_log(engine)
         with make_session_factory(engine)() as session:
-            seed_demo_register(
-                session, LabClock(ZoneInfo(lab_timezone)).today(), DEMO_INSTRUMENTS, DEMO_RULES
-            )
+            today = LabClock(ZoneInfo(lab_timezone)).today()
+            seed_demo_register(session, today, DEMO_INSTRUMENTS, DEMO_RULES)
+            seed_demo_authorisations(session, today)  # D-132: a lab from before the register gets it
             session.commit()
     finally:
         engine.dispose()

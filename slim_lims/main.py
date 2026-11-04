@@ -21,6 +21,7 @@ from slim_lims.labs import Labs
 from slim_lims.labtime import LabClock
 from slim_lims.prep_routes import api_router as prep_api_router
 from slim_lims.prep_routes import router as prep_router
+from slim_lims.quality_insights_routes import router as quality_insights_router
 from slim_lims.quality_records_routes import router as quality_records_router
 from slim_lims.quality_routes import router as quality_router
 from slim_lims.reference import ReferenceData
@@ -117,6 +118,7 @@ def create_app(
     app.include_router(samples_api_router)
     app.include_router(quality_router)
     app.include_router(quality_records_router)
+    app.include_router(quality_insights_router)
     register_error_handlers(app)
 
     @app.exception_handler(LoginRequired)

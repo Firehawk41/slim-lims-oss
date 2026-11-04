@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Uncertainty — Quality — YourLab{% endblock %}
+{% block extra_head %}<link href="{{ url_for('static', path='css/quality.css') }}" rel="stylesheet" />{% endblock %}
+{% block content %}
+  <h1>Measurement uncertainty</h1>
+  {% include "quality/_nav.html" %}
+  <p class="hint">ISO 17025 §7.6, Nordtest TR 537, from the lab's own QC. Precision u<sub>Rw</sub> is the spread of a check standard's
+    recoveries day to day; bias is the RMS of the CRM recoveries' and PT results' relative bias, with the reference values' own
+    uncertainty u(Cref). U = k × √(u<sub>Rw</sub>² + u<sub>bias</sub>²), k = {{ policy.k }}. Relative, as % of the value.
+    Not on the report: the report's ± is still the two cups' half-difference.</p>
+
+  <h2>Signed estimates</h2>
+  <table class="table"><thead><tr><th>Instrument · analyte</th><th>U (k)</th><th>u<sub>Rw</sub></th><th>u<sub>bias</sub></th><th>Points</th><th>Window</th><th>Signed</th></tr></thead>
+    <tbody>{% for e in current %}
+      <tr><td>{{ e.key.label }}</td><td><strong>{{ e.shown }} %</strong> ({{ e.k }})</td><td>{{ pct(e.u_rw) }} %</td><td>{{ pct(e.u_bias) }} %</td>
+        <td>{{ e.n_precision }} checks, {{ e.bias_points|length }} CRM/PT</td><td>{{ e.window_from.date() }} to {{ e.window_to.date() }}</td>
+        <td>{{ e.signed_by.display }}, {{ e.signed_at.date() }}</td></tr>
+    {% else %}<tr><td colspan="7" class="muted">None signed yet.</td></tr>{% endfor %}</tbody></table>
+
+  <section class="form-section">
+    <h2>Work one out</h2>
+    <form method="get" action="{{ url_for('quality_uncertainty') }}" class="stack-form">
+      <label>Check standard series <select name="series" required>
+        {% for s in candidates %}<option value="{{ s.key.slug }}"{% if s.key.slug == form.series %} selected{% endif %}>{{ s.key.label }}</option>{% endfor %}
+      </select></label>
+      <label>From <input type="date" name="start" value="{{ form.start }}" required></label>
+      <label>To <input type="date" name="end" value="{{ form.end }}" required></label>
+      <label>u(Cref), % <input type="text" name="u_cref" value="{{ form.u_cref }}" inputmode="decimal" required></label>
+      <label>Where u(Cref) comes from <input type="text" name="basis" value="{{ form.basis }}" maxlength="2000" placeholder="CRM certificate; PT report"></label>
+      <button type="submit" class="btn btn--secondary">Work it out</button>
+    </form>
+    <p class="hint">At least {{ policy.min_precision_points }} check points and {{ policy.min_bias_points }} CRM or PT results in the window (the profile's).</p>
+  </section>
+
+  {% if refused %}<p class="flash flash--error">{{ refused }}</p>{% endif %}
+  {% if draft %}
+  <section class="form-section">
+    <h2>{{ draft.key.label }}: U = {{ draft.shown }} %</h2>
+    <dl class="kv-inline">
+      <div><dt>u<sub>Rw</sub></dt><dd>{{ pct(draft.u_rw) }} % from {{ draft.n_precision }} points of {{ draft.precision_label }}</dd></div>
+      <div><dt>RMS bias</dt><dd>{{ pct(draft.rms_bias) }} % from {{ draft.bias_points|length }} results</dd></div>
+      <div><dt>u(Cref)</dt><dd>{{ pct(draft.u_cref) }} %</dd></div>
+      <div><dt>u<sub>bias</sub></dt><dd>{{ pct(draft.u_bias) }} %</dd></div>
+      <div><dt>u<sub>c</sub></dt><dd>{{ pct(draft.u_c) }} %</dd></div>
+      <div><dt>U (k = {{ draft.k }})</dt><dd><strong>{{ draft.shown }} %</strong></dd></div>
+    </dl>
+    <table class="table"><thead><tr><th>Bias from</th><th>When</th><th>Relative bias</th></tr></thead>
+      <tbody>{% for b in draft.bias_points %}<tr><td>{{ b.source|upper }} {{ b.label }}</td><td>{{ b.at.date() }}</td><td>{{ pct(b.bias) }} %</td></tr>{% endfor %}</tbody></table>
+    {% if actor.is_manager %}
+    <form method="post" action="{{ url_for('quality_uncertainty_sign') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+      {% for k in ("series", "start", "end", "u_cref", "basis") %}<input type="hidden" name="{{ k }}" value="{{ form[k] }}">{% endfor %}
+      <button type="submit" class="btn btn--primary">Sign this estimate</button>
+      <span class="muted">Worked out again from the records when signed.{% if not form.basis %} Say where u(Cref) comes from first.{% endif %}</span>
+    </form>
+    {% else %}<p class="muted">A quality manager signs it.</p>{% endif %}
+  </section>
+  {% endif %}
+{% endblock %}
