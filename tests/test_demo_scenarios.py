@@ -152,7 +152,8 @@ def test_every_scenario_replays_and_cli_verify_says_so(engine, seeded, monkeypat
     out = capsys.readouterr().out
     assert "result versions: all match." in out
     assert (
-        "Quality: 0 profile versions, 0 limit sets, 0 nonconformities: all hold." in out
+        "Quality: 0 profile versions, 0 limit sets, 0 nonconformities, 0 risks, 0 internal audits: all hold."
+        in out
     )  # review 2026-10-30b Q7
     if engine.dialect.name == "sqlite":
         assert install_audit_log(engine) == [] and chain_check(engine) is None
