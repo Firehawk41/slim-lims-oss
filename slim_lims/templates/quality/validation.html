@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Software validation — Quality — YourLab{% endblock %}
+{% block extra_head %}<link href="{{ url_for('static', path='css/quality.css') }}" rel="stylesheet" />{% endblock %}
+{% block content %}
+  <h1>Software validation</h1>
+  {% include "quality/_nav.html" %}
+  <p class="hint">ISO 17025 §7.11.2. What the lab runs, as installed now: each module's commit (pinned, D-117), the database's
+    migrations, slim-data's engine steps and slim-quality's tools (each a fixed version), and every module's <code>verify</code>, run
+    now (it only reads). Each commit links to its CI results (the tests on SQLite and Postgres, and the coverage gate); they are not
+    re-run here. A signature covers exactly these versions: when a module moves, the pack is signed again.
+    <a href="{{ url_for('quality_validation_json') }}">Download the pack (JSON)</a>.</p>
+
+  <p>{% if rag is none %}<span class="rag rag--RED">never signed</span>
+    {% elif rag.name == "GREEN" %}<span class="rag rag--GREEN">signed</span> for these versions by {{ signature.signed_by.display }}, {{ signature.signed_at.astimezone(zone).date() }}: {{ signature.note }}
+    {% else %}<span class="rag rag--AMBER">stale</span>: last signed {{ signature.signed_at.astimezone(zone).date() }} for other versions{% endif %}</p>
+
+  <h2>Modules</h2>
+  <table class="table"><thead><tr><th>Module</th><th>Installed</th><th>CI</th></tr></thead>
+    <tbody>{% for m in pack.modules %}<tr><td><a href="{{ m.repository }}">{{ m.module }}</a></td>
+      <td>{% if m.commit %}<code>{{ m.commit[:12] }}</code>{% else %}{{ m.version }}{% endif %}</td>
+      <td>{% if m.ci %}<a href="{{ m.ci }}">checks for this commit</a>{% else %}<span class="muted">no commit: not a pinned install</span>{% endif %}</td></tr>{% endfor %}</tbody></table>
+
+  <h2>verify, run now</h2>
+  <table class="table"><tbody>{% for name, v in pack.verify.items() %}<tr><td>{{ name }}</td>
+    <td>{% if v.ok %}<span class="sev sev--none">holds</span>{% else %}<span class="sev sev--ACTION">problems</span>{% endif %}</td><td>{{ v.detail }}</td></tr>{% endfor %}</tbody></table>
+
+  <h2>Migrations</h2>
+  <table class="table"><tbody>{% for table, rev in pack.migrations.items() %}<tr><td><code>{{ table }}</code></td><td>{{ rev or "—" }}</td></tr>{% endfor %}</tbody></table>
+
+  <h2>Versioned steps and tools</h2>
+  <p><strong>slim-data steps:</strong> {{ pack.steps|join(", ") }}</p>
+  <p><strong>slim-quality tools:</strong> {{ pack.quality_tools|join(", ") }}</p>
+
+  {% if actor.is_manager %}
+  <section class="form-section">
+    <h2>Sign the pack</h2>
+    <form method="post" action="{{ url_for('quality_validation_sign') }}" class="stack-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+      <label>What you checked <textarea name="note" rows="2" maxlength="2000" required placeholder="CI green on every commit; verify holds; release notes read"></textarea></label>
+      <button type="submit" class="btn btn--primary">Sign for the installed versions</button>
+    </form>
+  </section>
+  {% else %}<p class="muted">A quality manager signs the pack.</p>{% endif %}
+
+  <h2>Signatures</h2>
+  <ul>{% for s in signatures %}<li>{{ s.signed_at.astimezone(zone).date() }}, {{ s.signed_by.display }}: {{ s.note }} <span class="muted">({{ s.versions|length }} modules)</span></li>
+  {% else %}<li class="muted">None yet.</li>{% endfor %}</ul>
+{% endblock %}

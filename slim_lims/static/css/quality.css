@@ -12,3 +12,9 @@
 .kv-inline { display: flex; flex-wrap: wrap; gap: .25rem 1.5rem; }
 .stack-form.wide-form { max-width: none; }
 .wide-form select { min-width: 11em; }
+/* readiness (D-136) */
+.rag { display: inline-block; padding: 0 .4em; border-radius: 3px; font-size: .85em; font-weight: 600; }
+.rag--RED { background: #fde2e7; color: #a61b37; }
+.rag--AMBER { background: #fff3cd; color: #7a5a00; }
+.rag--GREEN { background: #e8f5ec; color: #1e6b3a; }
+.evidence { margin: 0; padding-left: 1.1em; }

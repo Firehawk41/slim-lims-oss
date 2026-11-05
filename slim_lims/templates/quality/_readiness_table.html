@@ -1,0 +1,6 @@
+<table class="table"><thead><tr><th>Clause</th><th></th><th>Evidence</th></tr></thead>
+  <tbody>{% for r in readiness_rows %}
+    <tr><td><strong>{{ r.clause }}</strong> {{ r.title }}</td><td><span class="rag rag--{{ r.rag.name }}">{{ r.rag.label }}</span></td>
+      <td><ul class="evidence">{% for e in r.evidence %}<li><span class="rag rag--{{ e.rag.name }}">{{ e.rag.label }}</span>
+        {% if e.page and pages %}<a href="{{ url_for(pages[e.page]) }}">{{ e.text }}</a>{% else %}{{ e.text }}{% endif %}</li>{% endfor %}</ul></td></tr>
+  {% endfor %}</tbody></table>

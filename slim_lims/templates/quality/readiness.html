@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Readiness — Quality — YourLab{% endblock %}
+{% block extra_head %}<link href="{{ url_for('static', path='css/quality.css') }}" rel="stylesheet" />{% endblock %}
+{% block content %}
+  <h1>Readiness per clause</h1>
+  {% include "quality/_nav.html" %}
+  <p class="hint">ISO/IEC 17025, clause by clause, on {{ today }}: the evidence the records already hold, and a colour from the
+    profile's rules (each clause audited within {{ policy.audit_every_days }} days, NCs closed within {{ policy.nc_open_days }},
+    complaints within {{ policy.complaint_open_days }}, a PT round within {{ policy.pt_every_days }}, a management review within
+    {{ policy.review_every_days }}, {{ policy.on_time_target }} % of requests on time). A clause is the worst of its lines. Nothing here is stored:
+    the <a href="{{ url_for('quality_management_review') }}">management review</a> freezes it when signed.</p>
+  <p>{% for name, group in rows|groupby("rag.name")|sort(attribute="grouper", reverse=True) %}<span class="rag rag--{{ name }}">{{ group|length }} {{ name|lower }}</span> {% endfor %}</p>
+  {% set readiness_rows = rows %}{% include "quality/_readiness_table.html" %}
+{% endblock %}

@@ -3,6 +3,7 @@ name: CI
 on:
   push:
   pull_request:
+  workflow_dispatch:  # run by hand when GitHub drops a push event
 
 jobs:
   lint:

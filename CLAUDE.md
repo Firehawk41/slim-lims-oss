@@ -50,11 +50,11 @@ shared database; `cli migrate` and the seed run them all.
 
 **Open:** deeper report-engine wiring (spec §13; changes other repos, needs the go-ahead); ecosystem
 docker-compose for the VPS (**deferred, do not start**); the landing page (`/about`) is live with
-placeholders; Jamie writes its words in `templates/about/_copy.html`. slim-quality part 1 is in (phase 3), and
-part 2 is under way (vertical audit, nonconformities; batch 5a: equipment, reference lots, PT, complaints,
-D-125…D-130; batch 5b: uncertainty from QC, competence, turnaround and customer trends, D-131…D-133); next
-in it: 5c (`docs/ROADMAP.md`); phase 4 is done (slim-samples; signed reports, their PDF, the
-outbox). Next: the rest of phase 5 or phase 6 (`docs/ROADMAP.md`). Parked: an SMTP transport (D-124).
+placeholders; Jamie writes its words in `templates/about/_copy.html`. slim-quality parts 1 and 2 are in
+(phases 3 and 5: vertical audit, NCs; 5a equipment, lots, PT, complaints, D-125…D-130; 5b uncertainty,
+competence, trends, D-131…D-133; 5c risks, internal audits, readiness, management review, the §7.11 pack,
+D-134…D-137); phase 4 is done (slim-samples; signed reports, their PDF, the outbox). Next: phase 6
+(`docs/ROADMAP.md`); slim-quality part 3 stays parked. Parked: an SMTP transport (D-124).
 
 ## How to run
 
@@ -114,6 +114,10 @@ slim_lims/
 ├── quality_insights.py, quality_insights_routes.py  # 5b: TrDates (slim-quality's TurnaroundSource),
 │                                  #   lab_acts (every module's acts for the competence check, D-132), the
 │                                  #   demo register; /quality/uncertainty, /competence, /trends
+├── quality_system.py, quality_system_routes.py  # 5c: who acted in a clause (an auditor's independence,
+│                                  #   D-135), the §7.11 pack from what is installed (D-137), readiness's
+│                                  #   host inputs, the demo risks and audits; /quality/risks,
+│                                  #   /internal-audits, /readiness, /management-review, /validation
 ├── invoices.py, demo_prices.py    # invoicing V5; /invoices; the accounting CSV (V5 writes formula cells as text, D-118)
 ├── reports.py       # issued reports: engine_renderer / plain_renderer, report_files; signing (D-122), the PDF (D-123)
 ├── delivery.py      # sending an issued report: report_deliveries, the outbox (/outbox; not transmitted, D-124)
@@ -170,6 +174,9 @@ scripts/seed_demo.py; tests/ (SQLite per test, or Postgres via TEST_DATABASE_URL
   service or overdue (the profile says per kind; instruments warn); an import is refused when its instrument is
   out of service. Standards take their lot from slim-quality's register. A complaint's outcome is approved by a
   quality manager with no hand in the request (D-130).
+- Internal audits (D-135): nobody audits a clause they acted in over the past year (the host's acts) or kept
+  records of in slim-quality. A management review's pack and a validation signature are frozen when signed;
+  a pin bump makes the validation signature stale (D-136, D-137).
 - Competence (D-132): the app's capabilities decide who may act; slim-quality's authorisation register is the
   competence record, checked after the fact against every act (never blocks). Uncertainty (D-131) is signed
   in slim-quality and not on the report.

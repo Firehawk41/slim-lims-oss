@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Management review — Quality — YourLab{% endblock %}
+{% block extra_head %}<link href="{{ url_for('static', path='css/quality.css') }}" rel="stylesheet" />{% endblock %}
+{% block content %}
+  <h1>Management review</h1>
+  {% include "quality/_nav.html" %}
+  <p class="hint">ISO 17025 §8.9. The pack for a period: the readiness view and the inputs the records hold (§8.9.2 d, e, f, h, j, m,
+    n, o), worked out now. The others are yours to write. Signing freezes the pack as shown, with the review's outputs (§8.9.3):
+    it is worked out again from the records at signing, never taken from this form.</p>
+
+  <h2>Signed reviews</h2>
+  <table class="table"><thead><tr><th>#</th><th>Period</th><th>Signed</th><th>Outputs</th></tr></thead>
+    <tbody>{% for r in reviews %}<tr><td><a href="{{ url_for('quality_management_review_signed', review_id=r.id) }}">{{ r.number }}</a></td>
+      <td>{{ r.pack.period_from }} to {{ r.pack.period_to }}</td><td>{{ r.signed_by.display }}, {{ r.signed_at.astimezone(zone).date() }}</td><td>{{ r.outputs|length }}</td></tr>
+    {% else %}<tr><td colspan="4" class="muted">No review signed yet.</td></tr>{% endfor %}</tbody></table>
+
+  <form method="get" action="{{ url_for('quality_management_review') }}" class="choice-row">
+    <label>From <input type="date" name="start" value="{{ period[0] }}"></label>
+    <label>To <input type="date" name="end" value="{{ period[1] }}"></label>
+    <button type="submit" class="btn btn--secondary btn--small">Show the pack</button>
+  </form>
+
+  <h2>The pack, {{ pack.period_from }} to {{ pack.period_to }}</h2>
+  <h3>Inputs from the records</h3>
+  {% for s in pack.sections %}<h4>({{ s.letter }}) {{ s.title }}</h4><ul>{% for line in s.lines %}<li>{{ line }}</li>{% endfor %}</ul>{% endfor %}
+  <h3>Readiness</h3>
+  {% set readiness_rows = pack.readiness %}{% include "quality/_readiness_table.html" %}
+
+  {% if actor.is_manager %}
+  <section class="form-section">
+    <h2>Sign the review</h2>
+    <form method="post" action="{{ url_for('quality_management_review_sign') }}" class="stack-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+      <input type="hidden" name="start" value="{{ pack.period_from }}"><input type="hidden" name="end" value="{{ pack.period_to }}">
+      <label>Attendees <input type="text" name="attendees" maxlength="1000"></label>
+      {% for letter in written %}<label>({{ letter }}) {{ inputs[letter] }} <textarea name="input_{{ letter }}" rows="2" maxlength="2000"></textarea></label>{% endfor %}
+      <h3>Outputs (§8.9.3)</h3>
+      <p class="hint">At least one. Empty lines are left out; an owner and a due day show up in the next review's (d).</p>
+      <table class="table"><thead><tr><th>Kind</th><th>Decision or action</th><th>Owner</th><th>Due</th></tr></thead>
+        <tbody>{% for n in output_rows %}<tr>
+          <td><select name="output_kind">{% for o in outputs %}<option value="{{ o.value }}">{{ o.label }}</option>{% endfor %}</select></td>
+          <td><input type="text" name="output_text" maxlength="2000"></td>
+          <td><input type="text" name="output_owner" maxlength="100" size="10"></td>
+          <td><input type="date" name="output_due"></td></tr>{% endfor %}</tbody></table>
+      <button type="submit" class="btn btn--primary">Sign the review</button>
+    </form>
+  </section>
+  {% else %}<p class="muted">A quality manager signs the review.</p>{% endif %}
+{% endblock %}
