@@ -114,7 +114,7 @@ def _get(loader, what: str):
 
 
 def tiles(db: Session, today: date) -> dict:
-    """What the quality home shows at a glance (D-125…D-130)."""
+    """What the quality home shows at a glance (D-125…D-130, D-134, D-135)."""
     due_within = q.current_profile(db).equipment.due_within_days
     states = [item.state(today, due_within) for item in store.list_equipment(db)]
     soon = today + timedelta(days=30)
@@ -128,6 +128,10 @@ def tiles(db: Session, today: date) -> dict:
         "pt_open": sum(r.state != PtState.SCORED for r in rounds),
         "pt_flagged": sum((r.worst(policy) or PtClass.SATISFACTORY) > PtClass.SATISFACTORY for r in rounds),
         "complaints_open": sum(c.state != ComplaintState.CLOSED for c in store.list_complaints(db)),
+        "risks_flagged": sum(
+            bool(r.flags(today, q.current_profile(db).risk)) for r in store.list_risks(db) if not r.closed
+        ),
+        "audits_overdue": sum(a.overdue(today) for a in store.list_internal_audits(db)),
     }
 
 

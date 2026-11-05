@@ -171,7 +171,8 @@ def _verify() -> int:
         print(f"  {problem}")
     print(
         f"Quality: {quality.profiles} profile versions, {quality.limit_sets} limit sets, "
-        f"{quality.nonconformities} nonconformities: "
+        f"{quality.nonconformities} nonconformities, {quality.risks} risks, "
+        f"{quality.internal_audits} internal audits: "
         + ("all hold." if quality.ok else f"{len(quality.problems)} problems:")
     )
     for problem in quality.problems:

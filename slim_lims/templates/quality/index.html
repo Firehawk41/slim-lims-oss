@@ -12,6 +12,9 @@
     <div><dt>Reference lots</dt><dd><a href="{{ url_for('quality_materials') }}">{{ tiles.lots_expiring }} expiring within 30 days</a></dd></div>
     <div><dt>Proficiency testing</dt><dd><a href="{{ url_for('quality_pt') }}">{{ tiles.pt_open }} open, {{ tiles.pt_flagged }} questionable or worse</a></dd></div>
     <div><dt>Complaints</dt><dd><a href="{{ url_for('quality_complaints') }}">{{ tiles.complaints_open }} open</a></dd></div>
+    <div><dt>Risks</dt><dd><a href="{{ url_for('quality_risks') }}">{{ tiles.risks_flagged }} flagged</a></dd></div>
+    <div><dt>Internal audits</dt><dd><a href="{{ url_for('quality_internal_audits') }}">{{ tiles.audits_overdue }} overdue</a></dd></div>
+    <div><dt>ISO 17025</dt><dd><a href="{{ url_for('quality_readiness') }}">readiness per clause</a></dd></div>
     <div><dt>Open changes</dt><dd><a href="{{ url_for('quality_changes') }}">{{ open_changes|length }}</a></dd></div>
     <div><dt>Last QC review</dt><dd>{% if last_review %}{{ last_review.period_from }} to {{ last_review.period_to }}, by {{ last_review.by.display }}{% else %}none yet{% endif %} (<a href="{{ url_for('quality_reviews') }}">reviews</a>)</dd></div>
   </dl>

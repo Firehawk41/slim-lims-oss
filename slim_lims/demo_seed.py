@@ -49,6 +49,7 @@ from slim_lims.quality import (
 )
 from slim_lims.quality_insights import seed_demo_authorisations
 from slim_lims.quality_records import DEMO_INSTRUMENTS, seed_demo_register
+from slim_lims.quality_system import seed_demo_quality_system
 from slim_lims.reference_cache import load_reference
 from slim_lims.repositories import TRSubmissionRepository
 from slim_lims.results import SpecReader, migrate_slim_data, publish_demo_rules
@@ -144,6 +145,7 @@ def seed_demo(
             report.personas = sync_personas(session)
             seed_demo_register(session, clock.today(), DEMO_INSTRUMENTS, DEMO_RULES)  # D-125, D-127
             seed_demo_authorisations(session, clock.today())  # D-132: before anyone acts
+            seed_demo_quality_system(session, clock.today())  # D-134, D-135: before anyone acts
             session.commit()
             if scenarios:
                 specs = SpecReader(slim_engine)
@@ -168,8 +170,8 @@ def seed_demo(
 def upgrade_lab(database_url: str, lab_timezone: str = "America/Chicago") -> None:
     """Every migration (the app's and each module's) and the audit log, on a lab that already exists: what
     a deploy adds reaches a visitor's lab (slim-data D-115). Nothing is seeded but the equipment register
-    and reference lots when a lab has none (D-127: making a standard needs a registered lot); running it
-    twice changes nothing."""
+    and reference lots when a lab has none (D-127: making a standard needs a registered lot), and the
+    authorisations, risks and audit programme likewise; running it twice changes nothing."""
     config = Config(str(Path(slim_lims.__file__).parent / "alembic.ini"))
     config.attributes["database_url"] = database_url
     command.upgrade(config, "head")
@@ -185,6 +187,7 @@ def upgrade_lab(database_url: str, lab_timezone: str = "America/Chicago") -> Non
             today = LabClock(ZoneInfo(lab_timezone)).today()
             seed_demo_register(session, today, DEMO_INSTRUMENTS, DEMO_RULES)
             seed_demo_authorisations(session, today)  # D-132: a lab from before the register gets it
+            seed_demo_quality_system(session, today)  # D-134, D-135: likewise the risks and audits
             session.commit()
     finally:
         engine.dispose()

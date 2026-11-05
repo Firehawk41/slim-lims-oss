@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}{{ r.number }} — Management review — YourLab{% endblock %}
+{% block extra_head %}<link href="{{ url_for('static', path='css/quality.css') }}" rel="stylesheet" />{% endblock %}
+{% block content %}
+  <h1>{{ r.number }}: management review, {{ r.pack.period_from }} to {{ r.pack.period_to }}</h1>
+  {% include "quality/_nav.html" %}
+  <dl class="kv-inline">
+    <div><dt>Signed</dt><dd>{{ r.signed_by.display }}, {{ r.signed_at.astimezone(zone).strftime("%Y-%m-%d %H:%M") }}</dd></div>
+    {% if r.attendees %}<div><dt>Attendees</dt><dd>{{ r.attendees }}</dd></div>{% endif %}
+  </dl>
+  <p class="hint">As signed: the pack below is what was shown then, whatever the records say now.</p>
+  <h2>Outputs</h2>
+  <table class="table"><thead><tr><th>Kind</th><th>Decision or action</th><th>Owner</th><th>Due</th></tr></thead>
+    <tbody>{% for o in r.outputs %}<tr><td>{{ o.kind.label }}</td><td>{{ o.text }}</td><td>{{ o.owner or "—" }}</td><td>{{ o.due or "—" }}</td></tr>{% endfor %}</tbody></table>
+  <h2>Inputs</h2>
+  {% for letter, title, lines in r.sections() %}<h4>({{ letter }}) {{ title }}</h4>
+    {% if lines %}<ul>{% for line in lines %}<li>{{ line }}</li>{% endfor %}</ul>{% else %}<p class="muted">—</p>{% endif %}{% endfor %}
+  <h2>Readiness, as shown</h2>
+  {% set readiness_rows = r.pack.readiness %}{% set pages = none %}{% include "quality/_readiness_table.html" %}
+{% endblock %}

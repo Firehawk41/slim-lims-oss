@@ -11,6 +11,11 @@
   <a href="{{ url_for('quality_complaints') }}">Complaints</a> ·
   <a href="{{ url_for('quality_uncertainty') }}">Uncertainty</a> ·
   <a href="{{ url_for('quality_competence') }}">Competence</a> ·
-  <a href="{{ url_for('quality_trends') }}">Trends</a>
+  <a href="{{ url_for('quality_trends') }}">Trends</a> ·
+  <a href="{{ url_for('quality_risks') }}">Risks</a> ·
+  <a href="{{ url_for('quality_internal_audits') }}">Internal audits</a> ·
+  <a href="{{ url_for('quality_readiness') }}">Readiness</a> ·
+  <a href="{{ url_for('quality_management_review') }}">Management review</a> ·
+  <a href="{{ url_for('quality_validation') }}">Software validation</a>
   <span class="muted"> — you are a quality {{ "manager" if actor.is_manager else "user" }}</span>
 </p>

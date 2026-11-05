@@ -178,6 +178,17 @@ Tally and themes are updated now and then at the bottom.
 | C→C | Caught while building: an authorisation recorded after the act it covers would have hidden the gap; it is a finding of its own ("backdated"). Days compare in the lab's zone, or an evening's grant reads as tomorrow. | Guard tests in slim-quality `tests/domain/test_phase5b.py`. |
 | C→C | The demo plants a gap that teaches: Rob holds the app's signatory capability but nobody recorded his authorisation to sign, so his reports show up. | `test_the_demo_register_is_seeded_once_and_finds_robs_signatures`. |
 
+## 2026-11-05: slim-quality part 2, batch 5c (risks, internal audits, readiness, management review, §7.11)
+
+| Kind | What | Notes |
+|---|---|---|
+| J | "I don't understand what the first decision means or looks like." | Claude showed a demo risk register as a table (L × S, score, action, review date). Jamie: "Score's fine". D-134. |
+| C✓ | Internal audits as a yearly programme with an independent auditor and a per-clause checklist; vertical audits count toward their clauses. | D-135. |
+| C✓ | Readiness per clause (red / amber / green from profile rules); the management review pack frozen at signing, worked out again from the records, never from the form. | D-136. |
+| C✓ | The §7.11 pack built by the host from what is installed; a signature covers exactly those versions and goes stale on a pin bump. | D-137. |
+| C→C | Who is "involved" in a clause is split where the knowledge is: the host from the acts its modules recorded, slim-quality from who kept that clause's records in it (an NC keeper doesn't audit 7.10). | `test_whoever_kept_a_clauses_records_here_does_not_audit_it`. |
+| C→C | The design said the pack shows "verify's last run", but no run is recorded anywhere: the pack runs every module's `verify` when shown (read-only). | `test_the_validation_pack_lists_the_installed_modules_and_is_signed_for_them`. |
+
 ## Themes so far
 - **Domain facts are Jamie's, and they overrule Claude's defaults:** DF < 1, MDL averaging, standards as
   recipes, spike placement. Claude's "cautious" engineering defaults were wrong more than once where

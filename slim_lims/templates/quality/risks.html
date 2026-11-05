@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Risks — Quality — YourLab{% endblock %}
+{% block extra_head %}<link href="{{ url_for('static', path='css/quality.css') }}" rel="stylesheet" />{% endblock %}
+{% block content %}
+  <h1>Risks and opportunities</h1>
+  {% include "quality/_nav.html" %}
+  <p class="hint">ISO 17025 §8.5. A risk is scored likelihood × severity (1–5 each): from {{ policy.medium_from }} it is medium,
+    from {{ policy.high_from }} high (the profile's bands). A high risk needs an action planned since it was last scored; anything
+    past its review date is flagged.</p>
+
+  <table class="table"><thead><tr><th>#</th><th>Risk or opportunity</th><th>Source</th><th>Owner</th><th>L × S</th><th>Score</th><th>Actions open</th><th>Review by</th><th>Flags</th></tr></thead>
+    <tbody>{% for r, flags in rows %}{% set band = r.band(policy) %}
+      <tr><td><a href="{{ url_for('quality_risk', risk_id=r.id) }}">{{ r.number }}</a></td><td>{{ r.title }}{% if r.closed %} <span class="muted">(closed)</span>{% endif %}</td>
+        <td>{{ r.source.label }}</td><td>{{ r.owner }}</td>
+        <td>{% if r.scored %}{{ r.scored[0] }} × {{ r.scored[1] }}{% else %}<span class="muted">n/a</span>{% endif %}</td>
+        <td>{% if band %}<span class="rag rag--{{ ['GREEN', 'AMBER', 'RED'][band.value - 1] }}">{{ r.score }} · {{ band.label }}</span>{% else %}<span class="muted">opportunity</span>{% endif %}</td>
+        <td>{{ r.open_actions|length }}</td><td>{{ r.review_due }}</td>
+        <td>{% for f in flags %}<span class="sev sev--WARN">{{ f }}</span> {% endfor %}</td></tr>
+    {% else %}<tr><td colspan="9" class="muted">Nothing registered yet.</td></tr>{% endfor %}</tbody></table>
+  <p><a href="{{ url_for('quality_risks') }}{% if not show_closed %}?closed=1{% endif %}">{{ "Hide" if show_closed else "Show" }} closed ones</a></p>
+
+  <section class="form-section">
+    <h2>Register one</h2>
+    <form method="post" action="{{ url_for('quality_risk_raise') }}" class="stack-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+      <label>Kind <select name="kind">{% for k in kinds %}<option value="{{ k.value }}">{{ k.label }}</option>{% endfor %}</select></label>
+      <label>What could happen (or could go better) <input type="text" name="title" maxlength="200" required></label>
+      <label>More detail <textarea name="description" rows="2" maxlength="2000"></textarea></label>
+      <label>Source <select name="source">{% for s in sources %}<option value="{{ s.value }}">{{ s.label }}</option>{% endfor %}</select></label>
+      <label>Owner <input type="text" name="owner" maxlength="100" required></label>
+      <label>Likelihood (1–5, a risk only) <input type="number" name="likelihood" min="1" max="5"></label>
+      <label>Severity (1–5, a risk only) <input type="number" name="severity" min="1" max="5"></label>
+      <label>Review by <input type="date" name="review_by" value="{{ review_by }}" required></label>
+      <button type="submit" class="btn btn--primary">Register</button>
+    </form>
+  </section>
+{% endblock %}

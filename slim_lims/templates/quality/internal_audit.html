@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}{{ a.number }} — Internal audits — YourLab{% endblock %}
+{% block extra_head %}<link href="{{ url_for('static', path='css/quality.css') }}" rel="stylesheet" />{% endblock %}
+{% macro form_open(kind) %}<form method="post" action="{{ url_for('quality_internal_audit_entry', audit_id=a.id) }}" class="stack-form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}"><input type="hidden" name="kind" value="{{ kind.value }}">{% endmacro %}
+{% block content %}
+  <h1>{{ a.number }}: {{ a.label }}</h1>
+  {% include "quality/_nav.html" %}
+  <dl class="kv-inline">
+    <div><dt>Auditor</dt><dd>{{ a.auditor.display }}</dd></div>
+    <div><dt>Due</dt><dd>{{ a.due }}{% if a.due != a.planned_for %} (planned for {{ a.planned_for }}){% endif %}{% if a.overdue(today) %} <span class="sev sev--WARN">overdue</span>{% endif %}</dd></div>
+    <div><dt>State</dt><dd><strong>{{ a.state.label }}</strong>{% if a.done_on %} on {{ a.done_on }}{% endif %}</dd></div>
+    <div><dt>Planned</dt><dd>{{ a.planned_by.display }}, {{ a.planned_at.astimezone(zone).date() }}</dd></div>
+  </dl>
+
+  {% if a.conducted %}
+  <h2>Checklist</h2>
+  <blockquote>{{ a.conducted.note }}</blockquote>
+  <table class="table"><thead><tr><th>#</th><th>Clause</th><th>Checked</th><th>Outcome</th><th>Evidence</th><th></th></tr></thead>
+    <tbody>{% for line in a.conducted.lines %}
+      <tr><td>{{ loop.index }}</td><td>{{ line.clause }}</td><td>{{ line.checked }}</td>
+        <td>{% if line.outcome.name == "FINDING" %}<span class="sev sev--ACTION">finding</span>{% elif line.outcome.name == "OBSERVATION" %}<span class="sev sev--WARN">observation</span>{% else %}<span class="sev sev--none">conforming</span>{% endif %}</td>
+        <td>{{ line.evidence or "—" }}</td>
+        <td>{% if loop.index in without_nc %}<form method="post" action="{{ url_for('quality_internal_audit_nc', audit_id=a.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+          <input type="hidden" name="line_no" value="{{ loop.index }}"><button type="submit" class="btn btn--secondary btn--small">Raise an NC</button></form>
+          {% elif line.outcome.name == "FINDING" %}<span class="muted">NC raised</span>{% endif %}</td></tr>
+    {% endfor %}</tbody></table>
+  {% endif %}
+
+  <section class="form-section">
+    <h2>Record</h2>
+    <ol>{% for e in a.entries %}<li><strong>{{ e.kind.label }}</strong> by {{ e.by.display }}, {{ e.at.astimezone(zone).strftime("%Y-%m-%d %H:%M") }}{% if e.on %} ({{ e.on }}){% endif %}{% if e.note and e.kind.name != "CONDUCTED" %}: {{ e.note }}{% endif %}</li>
+    {% else %}<li class="muted">Nothing recorded since it was planned.</li>{% endfor %}</ol>
+  </section>
+
+  <section class="form-section">
+  {% if a.state.name == "PLANNED" %}
+    <h2>Record the audit</h2>
+    <p class="hint">One line per thing checked, within {{ a.clause }} (e.g. {{ a.clause }}.2). Empty lines are left out. An observation
+      or a finding gives its evidence. The auditor must still have had no hand in {{ a.clause }} over the past year.</p>
+    {{ form_open(kinds.CONDUCTED) }}
+      <label>Day <input type="date" name="on" value="{{ today }}" required></label>
+      <table class="table"><thead><tr><th>Clause</th><th>Checked</th><th>Outcome</th><th>Evidence</th></tr></thead>
+        <tbody>{% for n in rows %}<tr>
+          <td><input type="text" name="line_clause" maxlength="20" value="{{ a.clause }}" size="6"></td>
+          <td><input type="text" name="line_checked" maxlength="1000"></td>
+          <td><select name="line_outcome">{% for o in outcomes %}<option value="{{ o.value }}">{{ o.label }}</option>{% endfor %}</select></td>
+          <td><input type="text" name="line_evidence" maxlength="2000"></td></tr>{% endfor %}</tbody></table>
+      <label>Summary <textarea name="note" rows="2" maxlength="4000" required></textarea></label>
+      <button type="submit" class="btn btn--primary">Record the audit</button></form>
+    <h2>Move it</h2>
+    {{ form_open(kinds.RESCHEDULED) }}<label>New day <input type="date" name="on" required></label>
+      <label>Why (optional) <input type="text" name="note" maxlength="4000"></label>
+      <button type="submit" class="btn btn--secondary">Reschedule</button></form>
+    {% if actor.is_manager %}
+    <h2>Cancel</h2>
+    {{ form_open(kinds.CANCELLED) }}<label>Why <input type="text" name="note" maxlength="4000" required></label>
+      <button type="submit" class="btn btn--secondary">Cancel the audit</button></form>
+    {% endif %}
+  {% endif %}
+    <h2>A note</h2>
+    {{ form_open(kinds.NOTE) }}<label>Note <input type="text" name="note" maxlength="4000" required></label>
+      <button type="submit" class="btn btn--secondary">Add</button></form>
+  </section>
+{% endblock %}
