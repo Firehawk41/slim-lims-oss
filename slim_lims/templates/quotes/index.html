@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}Quotes — YourLab{% endblock %}
+{% block extra_head %}<link href="{{ url_for('static', path='css/quotes.css') }}" rel="stylesheet" />{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <h1>Quotes</h1>
+    {% if can_price %}<a class="btn btn--primary" href="{{ url_for('new_quote') }}">New quote</a>{% endif %}
+    {% if not current_user.is_staff %}<a class="btn btn--primary" href="{{ url_for('ask_quote') }}">Ask for a quote</a>{% endif %}
+  </div>
+
+  {% if current_user.is_staff %}
+    {% set open = requests|selectattr("state", "equalto", "open")|list %}
+    <p><a href="{{ url_for('quote_requests') }}">{{ open|length }} open quote request{{ "" if open|length == 1 else "s" }}</a>{% if open %}: customers waiting for a quote{% endif %}.</p>
+    {% if expiring %}
+      <section class="form-section" aria-labelledby="expiring-heading">
+        <h2 id="expiring-heading">Expiring within {{ warn_days }} days</h2>
+        <ul>{% for q, _ in expiring %}<li><a href="{{ url_for('quote_detail', quote_id=q.id) }}">{{ number(q.id) }}</a>
+          {% for c in q.customer_ids %}{{ reference.customer(c).name if reference.customer(c) else c }}{{ ", " if not loop.last }}{% endfor %}{% if q.is_default %}Default price list{% endif %}: expires {{ q.expire_date }}</li>{% endfor %}</ul>
+      </section>
+    {% endif %}
+  {% elif requests %}
+    <section class="form-section" aria-labelledby="mine-heading">
+      <h2 id="mine-heading">Your quote requests</h2>
+      <ul>
+        {% for r in requests %}
+          <li>{{ r.row.created_at.strftime("%Y-%m-%d") }}:
+            {% if r.state == "open" %}waiting for the lab
+            {% elif r.state == "answered" %}answered with <a href="{{ url_for('quote_detail', quote_id=r.event.quote_id) }}">{{ number(r.event.quote_id) }}</a>
+            {% else %}declined: {{ r.event.reason }}{% endif %}</li>
+        {% endfor %}
+      </ul>
+    </section>
+  {% endif %}
+
+  <table class="table">
+    <thead><tr><th scope="col">Quote</th><th scope="col">For</th><th scope="col">Valid</th><th scope="col">Lines</th><th scope="col">State</th></tr></thead>
+    <tbody>
+      {% for q, s in rows %}
+        <tr class="quote-row--{{ s }}">
+          <td><a href="{{ url_for('quote_detail', quote_id=q.id) }}">{{ number(q.id) }}</a></td>
+          <td>{% if q.is_default %}Default price list{% else %}{% for c in q.customer_ids %}{{ reference.customer(c).name if reference.customer(c) else c }}{{ ", " if not loop.last }}{% endfor %}{% endif %}</td>
+          <td>{{ q.effective_date }} to {{ q.expire_date }}</td>
+          <td>{{ q.line_items|length }}</td>
+          <td><span class="quote-state quote-state--{{ s }}">{{ labels[s] }}</span></td>
+        </tr>
+      {% else %}
+        <tr><td colspan="5" class="muted">No quotes yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="hint">A customer's own quote prices what it covers first; the default price list prices the rest. An expired
+    quote prices nothing; it stays here as a record.</p>
+{% endblock %}

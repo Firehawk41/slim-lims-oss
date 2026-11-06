@@ -38,6 +38,7 @@
       <dt>Request type</dt><dd>{{ s.request_type.label }}</dd>
       <dt>Contact</dt><dd>{{ s.customer_contact }}, {{ s.customer_phone }}</dd>
       <dt>Payment</dt><dd>{{ s.payment_method.label }}{% if s.po_number %} — {{ s.po_number }}{% endif %}</dd>
+      {% if quote_id %}<dt>Quote</dt><dd><a href="{{ url_for('quote_detail', quote_id=quote_id) }}">{{ "Q%05d"|format(quote_id) }}</a></dd>{% endif %}
       <dt>Results to</dt><dd>{{ s.results_to|join(", ") }}{% if s.results_cc %} <span class="muted">(cc {{ s.results_cc|join(", ") }})</span>{% endif %}</dd>
       <dt>Invoice to</dt><dd>{{ s.invoice_to|join(", ") }}{% if s.invoice_cc %} <span class="muted">(cc {{ s.invoice_cc|join(", ") }})</span>{% endif %}</dd>
       <dt>Submitted</dt><dd>{{ s.submitted_at.strftime("%Y-%m-%d %H:%M UTC") }} by {{ s.submitted_by.display }}</dd>

@@ -53,7 +53,8 @@ docker-compose for the VPS (**deferred, do not start**); the landing page (`/abo
 placeholders; Jamie writes its words in `templates/about/_copy.html`. slim-quality parts 1 and 2 are in
 (phases 3 and 5: vertical audit, NCs; 5a equipment, lots, PT, complaints, D-125…D-130; 5b uncertainty,
 competence, trends, D-131…D-133; 5c risks, internal audits, readiness, management review, the §7.11 pack,
-D-134…D-137); phase 4 is done (slim-samples; signed reports, their PDF, the outbox). Next: phase 6
+D-134…D-137); phase 4 is done (slim-samples; signed reports, their PDF, the outbox). Phase 6 has begun: quote
+screens are in (D-139; early withdrawal waits on V5); next in phase 6: reference-data upkeep, accounts
 (`docs/ROADMAP.md`); slim-quality part 3 stays parked. Parked: an SMTP transport (D-124).
 
 ## How to run
@@ -87,8 +88,9 @@ slim_lims/
 ├── oss_guard.py     # OSS-only guard (called by make_engine)
 ├── domain/          # spec §3–4: enums, tr (TRSubmission, ...), workflow (transitions); pure
 ├── models.py        # User (full_name, job_title: how they sign), TR tables, tr_versions (D-104), invoices + payments (D-119),
-│                    #   report_pdfs, report_deliveries, display_modes (all six append-only), user_capabilities,
-│                    #   report_files, lab_sections (+ lab_section_analyses), display_links
+│                    #   report_pdfs, report_deliveries, display_modes, quote_requests (+ events), quote_pdfs,
+│                    #   quote_deliveries, tr_quotes (all append-only), user_capabilities, report_files,
+│                    #   lab_sections (+ lab_section_analyses), display_links
 ├── repositories.py  # TRSubmissionRepository: the only TR writer; gapless numbers; versions / as_of (D-104)
 ├── scope.py         # Scope.for_user: whose TRs a listing shows; fails closed (D-103)
 ├── services.py      # SubmissionService: submit, check-in, status (facts only, D-99), history
@@ -120,6 +122,8 @@ slim_lims/
 │                                  #   host inputs, the demo risks and audits; /quality/risks,
 │                                  #   /internal-audits, /readiness, /management-review, /validation
 ├── invoices.py, demo_prices.py    # invoicing V5; /invoices; the accounting CSV (V5 writes formula cells as text, D-118)
+├── quotes.py, quotes_routes.py    # quote screens over V5's quotes (D-139): list by state, make / replace, the document
+│                                  #   and its PDF, sending (outbox), customers' requests; a TR's quote (tr_quotes)
 ├── reports.py       # issued reports: engine_renderer / plain_renderer, report_files; signing (D-122), the PDF (D-123)
 ├── delivery.py      # sending an issued report: report_deliveries, the outbox (/outbox; not transmitted, D-124)
 ├── board.py         # the lab board (spec §13)
@@ -187,6 +191,10 @@ scripts/seed_demo.py; tests/ (SQLite per test, or Postgres via TEST_DATABASE_URL
   the whole lab or a section (the lab's own; one per analysis; the *lab displays* capability sets them up).
   A screen opens a display link (secret, revocable, no login, reloads every minute). Screens show customer
   names only while the lab-wide switch says no visitors; never set, they hide them.
+- Quotes (D-139) are V5's, never edited; the host makes them (*pricing* capability), lists them by state,
+  sends their PDF to the outbox and answers customers' requests. A request may name the customer's own
+  quote in force (`tr_quotes`; the TR's JSON contract is unchanged); pricing still takes the cheapest valid
+  line. **Not built:** withdrawing a quote early (needs V5; a replaced quote stays in force to its expiry).
 - Reports: "Sign and issue" needs the `signatory` capability (supervisors by default) and a name; the signatory may
   be the releaser (four-eyes stands at release). Its PDF is made at issue (WeasyPrint; needs Pango). Sending
   records a delivery in the outbox, never transmitted on the demo; it changes no status (D-122…D-124).

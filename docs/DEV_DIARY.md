@@ -198,6 +198,15 @@ Tally and themes are updated now and then at the bottom.
 | C→J | Claude proposed screens that always hide customer names (visitors may see them). Jamie: also a named mode for when there are no visitors, or the screen is trivia, not useful. | Built as a lab-wide switch any staff member flips; never set means hidden. D-138. |
 | C→C | Claude proposed a script polling every minute; a `meta refresh` does the same with no script at all (nothing for the CSP to allow, nothing to break on a TV browser). | `test_staff_see_the_day_with_names_and_set_up_sections_and_screens`. |
 
+## 2026-11-06: quote screens (roadmap phase 6, first part)
+
+| Kind | What | Notes |
+|---|---|---|
+| F | Claude read invoicing V5 before proposing: it already holds quotes (customers, lines, prices per processing time, bulk, dates), never edits them and ignores an expired one when pricing. So the batch is screens, requests and sending, not a quotes module. | D-139. |
+| C✓ | Quotes stay in V5; Replace makes a new prefilled quote; no draft/accept states; customers ask and get an answer or a reason; expiring-soon list; a *pricing* capability; the PDF and the outbox as for reports. | D-139. |
+| C✓ | Early withdrawal as a row added in V5, honoured by pricing. | Agreed, **not built**: attaching the invoicing repo was refused in the session. A replaced quote stays in force to its expiry; the page says so. |
+| C→C | The request form's quote reference was to go on the TR; but the TR's JSON is a machine contract (spec §12). Kept beside it in `tr_quotes` instead. | `test_a_request_names_one_of_the_customers_quotes_in_force`. |
+
 ## Themes so far
 - **Domain facts are Jamie's, and they overrule Claude's defaults:** DF < 1, MDL averaging, standards as
   recipes, spike placement. Claude's "cautious" engineering defaults were wrong more than once where

@@ -1,0 +1,16 @@
+/* Quotes (D-139): the list's states and the quote as the customer receives it. */
+.quote-state { font-size: 0.8rem; vertical-align: middle; font-weight: 600; padding: 0.1em 0.5em; border-radius: 3px; border: 1px solid currentColor; }
+.quote-state--expiring { color: #D69E2E; }
+.quote-state--expired, .quote-state--not_yet { color: var(--color-text-muted); }
+.quote-state--in_force { color: #38A169; }
+.quote-row--expired td { color: var(--color-text-muted); }
+.quote-line select { min-width: 18rem; }
+.quote-prices input { width: 7rem; }
+.quote-doc { background: #fff; color: #1a202c; padding: 1.5rem; border-radius: 4px; margin: 1rem 0; }
+.quote-doc__head { display: flex; justify-content: space-between; gap: 1rem; border-bottom: 2px solid #1a202c; margin-bottom: 1rem; }
+.quote-doc__lab { font-weight: 700; }
+.quote-doc__id { text-align: right; }
+.quote-doc__id h1 { margin: 0; font-size: 1.4rem; color: #1a202c; }
+.quote-doc__lines { width: 100%; border-collapse: collapse; }
+.quote-doc__lines th, .quote-doc__lines td { border: 1px solid #cbd5e0; padding: 0.3rem 0.5rem; text-align: left; vertical-align: top; }
+.quote-doc__small, .quote-doc__comments { font-size: 0.85em; }

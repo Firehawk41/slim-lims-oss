@@ -30,6 +30,8 @@ class Settings:
     # shared lab (password logins, the CLI); SLIM_REPORT_ENGINE_OSS_DIR has the demo seed's data.
     demo_labs: bool = False
     oss_report_engine_dir: str | None = None
+    # Quotes expiring within this many days are listed as expiring soon (D-139).
+    quote_expiry_warning_days: int = 30
 
     @property
     def is_production(self) -> bool:
@@ -89,4 +91,5 @@ def load_settings() -> Settings:
         demo_personas=_bool(os.environ.get("DEMO_PERSONAS"), False),
         demo_labs=_bool(os.environ.get("DEMO_LABS"), False),
         oss_report_engine_dir=os.environ.get("SLIM_REPORT_ENGINE_OSS_DIR") or None,
+        quote_expiry_warning_days=int(os.environ.get("QUOTE_EXPIRY_WARNING_DAYS", 30)),
     )

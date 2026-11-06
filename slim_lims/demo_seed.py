@@ -50,6 +50,7 @@ from slim_lims.quality import (
 from slim_lims.quality_insights import seed_demo_authorisations
 from slim_lims.quality_records import DEMO_INSTRUMENTS, seed_demo_register
 from slim_lims.quality_system import seed_demo_quality_system
+from slim_lims.quotes import seed_demo_quote_request
 from slim_lims.reference_cache import load_reference
 from slim_lims.repositories import TRSubmissionRepository
 from slim_lims.results import SpecReader, migrate_slim_data, publish_demo_rules
@@ -148,6 +149,7 @@ def seed_demo(
             seed_demo_authorisations(session, clock.today())  # D-132: before anyone acts
             seed_demo_quality_system(session, clock.today())  # D-134, D-135: before anyone acts
             seed_demo_sections(session, reference)  # D-138: the day's board
+            seed_demo_quote_request(session, reference)  # D-139: the queue isn't empty
             session.commit()
             if scenarios:
                 specs = SpecReader(slim_engine)

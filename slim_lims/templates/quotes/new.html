@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}New quote — YourLab{% endblock %}
+{% block extra_head %}<link href="{{ url_for('static', path='css/quotes.css') }}" rel="stylesheet" />{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <h1>New quote{% if form.replaces %}, replacing {{ number(form.replaces) }}{% endif %}{% if form.request_id %}, answering request {{ form.request_id }}{% endif %}</h1>
+    <a href="{{ url_for('quotes_home') }}">All quotes</a>
+  </div>
+  {% if problems %}
+    <div class="flash flash--error" role="alert"><ul>{% for p in problems %}<li>{{ p }}</li>{% endfor %}</ul></div>
+  {% endif %}
+  <p class="hint">A quote is never edited once saved: to change one, replace it with a new one. Leave a price blank
+    for a processing time this line doesn't offer.</p>
+
+  <form method="post" action="{{ url_for('create_quote') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+    {% if form.request_id %}<input type="hidden" name="request_id" value="{{ form.request_id }}">{% endif %}
+    {% if form.replaces %}<input type="hidden" name="replaces" value="{{ form.replaces }}">{% endif %}
+    <section class="form-section">
+      <h2>Who and when</h2>
+      <label class="field">Customers <span class="muted">(Ctrl/⌘-click picks several)</span>
+        <select name="customers" multiple size="5">
+          {% for c in customers %}<option value="{{ c.id }}" {% if c.id in form.customers %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
+        </select>
+      </label>
+      <label class="check"><input type="checkbox" name="is_default" value="1" {% if form.is_default %}checked{% endif %}> The default price list (every customer)</label>
+      <div class="choice-row">
+        <label class="field">Valid from <input type="date" name="effective" value="{{ form.effective }}" required></label>
+        <label class="field">Valid until <input type="date" name="expire" value="{{ form.expire }}" required></label>
+      </div>
+      <div class="choice-row">
+        <label class="field">Payment
+          <select name="payment_method">{% for m in methods %}<option value="{{ m.value }}" {% if m.value == form.payment_method %}selected{% endif %}>{{ "Purchase order" if m.value == 1 else "Credit card" }}</option>{% endfor %}</select>
+        </label>
+        <label class="field">Payment terms (days; blank: 30) <input type="text" name="payment_terms" value="{{ form.payment_terms }}" inputmode="numeric" maxlength="3"></label>
+      </div>
+      <label class="field">Comments (printed on the quote) <textarea name="comments" rows="2" maxlength="2000">{{ form.comments }}</textarea></label>
+    </section>
+
+    {% for line in lines %}
+      {% set n = loop.index0 %}
+      <fieldset class="form-section quote-line">
+        <legend>Line {{ loop.index }}{% if not line.analysis_ids %} (blank lines are ignored){% endif %}</legend>
+        <input type="hidden" name="l{{ n }}_present" value="1">
+        <div class="choice-row">
+          <label class="field">Analyses, priced together <span class="muted">(Ctrl/⌘-click picks several)</span>
+            <select name="l{{ n }}_analyses" multiple size="6">
+              {% for a in analyses %}<option value="{{ a.id }}" {% if a.id in line.analysis_ids %}selected{% endif %}>{{ a.name }}</option>{% endfor %}
+            </select>
+          </label>
+          <label class="field">Bulk from (samples) <input type="text" name="l{{ n }}_bulk_min" value="{{ line.bulk_min }}" inputmode="numeric" maxlength="4"></label>
+        </div>
+        <table class="table quote-prices">
+          <thead><tr><th scope="col">Processing time</th><th scope="col">Per sample ($)</th><th scope="col">Bulk ($)</th></tr></thead>
+          <tbody>
+            {% for pt in times %}
+              {% set typed = line.prices.get(pt.value, ("", "")) %}
+              <tr><td>{{ pt.label }}</td>
+                <td><input type="text" name="l{{ n }}_p{{ pt.value }}" value="{{ typed[0] }}" inputmode="decimal" maxlength="10" aria-label="Line {{ loop.index }} {{ pt.label }} price"></td>
+                <td><input type="text" name="l{{ n }}_b{{ pt.value }}" value="{{ typed[1] }}" inputmode="decimal" maxlength="10" aria-label="Line {{ loop.index }} {{ pt.label }} bulk price"></td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </fieldset>
+    {% endfor %}
+    <button type="submit" class="btn btn--primary">Save quote</button>
+  </form>
+{% endblock %}

@@ -25,6 +25,7 @@ from slim_lims.quality_insights_routes import router as quality_insights_router
 from slim_lims.quality_records_routes import router as quality_records_router
 from slim_lims.quality_routes import router as quality_router
 from slim_lims.quality_system_routes import router as quality_system_router
+from slim_lims.quotes_routes import router as quotes_router
 from slim_lims.reference import ReferenceData
 from slim_lims.reference_cache import ReferenceCache
 from slim_lims.reports import engine_renderer
@@ -123,6 +124,7 @@ def create_app(
     app.include_router(quality_insights_router)
     app.include_router(quality_system_router)
     app.include_router(today_router)
+    app.include_router(quotes_router)
     register_error_handlers(app)
 
     @app.exception_handler(LoginRequired)

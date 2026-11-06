@@ -418,6 +418,81 @@ class DisplayModeRow(Base):
     set_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
 
+# ---------------------------------------------------------------- quotes (D-139)
+# Quotes themselves are invoicing V5's (`inv_quotes`): never edited. The host keeps what V5 doesn't: a
+# customer's request for a quote and what became of it, each quote's PDF and its sendings, and which quote
+# a TR named. All append-only; IDs of V5's quotes are plain integers (no FK into another module).
+
+
+class QuoteRequestRow(Base):
+    """A customer asks for a quote: the analyses, processing times, a rough sample count, a note."""
+
+    __tablename__ = "quote_requests"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    customer_id: Mapped[int] = mapped_column(Integer, index=True)  # SLIM customers."ID"
+    requested_by: Mapped[str] = mapped_column(String(254))  # the customer user's email
+    analysis_ids: Mapped[list] = mapped_column(JSON)
+    processing_times: Mapped[list] = mapped_column(JSON)  # ProcessingTime values
+    samples_estimate: Mapped[str] = mapped_column(String(100), default="")  # "about 20 a month"
+    note: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class QuoteRequestEventRow(Base):
+    """What became of a request: answered with a quote (`quote_id`), or declined (`reason`)."""
+
+    __tablename__ = "quote_request_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    request_id: Mapped[int] = mapped_column(ForeignKey("quote_requests.id"), index=True)
+    kind: Mapped[str] = mapped_column(String(20))  # "answered" | "declined"
+    quote_id: Mapped[int | None] = mapped_column(Integer)
+    reason: Mapped[str] = mapped_column(Text, default="")
+    by: Mapped[str] = mapped_column(String(254))
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class QuotePdfRow(Base):
+    """A quote as PDF, made once (a quote never changes) and kept with its sha256."""
+
+    __tablename__ = "quote_pdfs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    quote_id: Mapped[int] = mapped_column(Integer, unique=True)
+    sha256: Mapped[str] = mapped_column(String(64), unique=True)
+    pdf: Mapped[bytes] = mapped_column(LargeBinary)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class QuoteDeliveryRow(Base):
+    """One sending of a quote to the customer, kept in the outbox like a report's (D-124)."""
+
+    __tablename__ = "quote_deliveries"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    quote_id: Mapped[int] = mapped_column(Integer, index=True)
+    to_addresses: Mapped[list] = mapped_column(JSON)
+    subject: Mapped[str] = mapped_column(String(200))
+    body: Mapped[str] = mapped_column(Text)
+    pdf_sha256: Mapped[str] = mapped_column(String(64))
+    sent_by: Mapped[str] = mapped_column(String(254))
+    transport: Mapped[str] = mapped_column(String(20))
+    sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class TRQuoteRow(Base):
+    """The quote a customer named on their request, for reference (pricing still takes the cheapest valid
+    line). Kept beside the TR, not in it: the TR record and its machine contract (spec §12) are unchanged."""
+
+    __tablename__ = "tr_quotes"
+
+    submission_id: Mapped[int] = mapped_column(
+        ForeignKey("tr_submissions.id", ondelete="CASCADE"), primary_key=True
+    )
+    quote_id: Mapped[int] = mapped_column(Integer)
+
+
 def _append_only_after_create(target, connection, **_kw) -> None:
     append_only(connection, target.name)
 
@@ -429,6 +504,11 @@ for _table in (
     ReportPdfRow.__table__,
     ReportDeliveryRow.__table__,
     DisplayModeRow.__table__,
+    QuoteRequestRow.__table__,
+    QuoteRequestEventRow.__table__,
+    QuotePdfRow.__table__,
+    QuoteDeliveryRow.__table__,
+    TRQuoteRow.__table__,
 ):
     event.listen(_table, "after_create", _append_only_after_create)
 
