@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="refresh" content="{{ refresh }}">
+  <meta name="robots" content="noindex">
+  <title>{{ link.label }} — due today</title>
+  <link href="{{ url_for('static', path='css/style.css') }}" rel="stylesheet" />
+  <link href="{{ url_for('static', path='css/portal.css') }}" rel="stylesheet" />
+  <link href="{{ url_for('static', path='css/admin.css') }}" rel="stylesheet" />
+  <link href="{{ url_for('static', path='css/today.css') }}" rel="stylesheet" />
+</head>
+<body class="admin-theme board-page display-page">
+  <main class="page">
+    <div class="page-head">
+      <h1>{{ link.label }} · due today, {{ board.day.strftime("%A %d %B") }}</h1>
+      <p class="muted">Updated {{ updated.strftime("%H:%M") }}{% if not show_names %} · customer names hidden{% endif %}</p>
+    </div>
+    {% set card_links = False %}
+    {% include "today/_board.html" %}
+  </main>
+</body>
+</html>

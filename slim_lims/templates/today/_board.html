@@ -1,0 +1,38 @@
+{# The day's board (D-138): shared by /today and a screen's page. Needs `board`, `show_names`; `card_links` links each card. #}
+<p class="day-summary" role="status">
+  <strong class="day-summary__left">{{ board.left }} left</strong>
+  <span>{{ board.released }} of {{ board.total }} released</span>
+  {% if board.late %}<span class="day-summary__late">{{ board.late }} late</span>{% endif %}
+  {% if board.rush %}<span class="badge badge--rush">{{ board.rush }} RUSH</span>{% endif %}
+</p>
+<div class="board day-board" role="list" aria-label="Work due by stage">
+  {% for key, title, cards in board.columns %}
+    <section class="board__column board__column--{{ key }}" role="listitem" aria-labelledby="day-{{ key }}">
+      <h2 id="day-{{ key }}" class="board__title">{{ title }} <span class="board__count">{{ board.work|selectattr("stage", "equalto", key)|list|length }}</span></h2>
+      {% for card in cards %}
+        {% set s = card.tr %}
+        <article class="card{% if card.late %} card--late{% endif %}">
+          <header class="card__head">
+            {% if card_links %}<a class="card__tr" href="{{ url_for('request_detail', tr_number=s.tr_number) }}">{{ s.tr_number }}</a>{% else %}<span class="card__tr">{{ s.tr_number }}</span>{% endif %}
+            {% if card.late %}<span class="badge badge--late">LATE</span>{% endif %}
+            {% if s.is_rush %}<span class="badge badge--rush">RUSH</span>{% endif %}
+          </header>
+          <p class="card__meta">
+            {% if show_names %}{{ s.customer_snapshot.name }} · {% endif %}{{ card.done }}/{{ card.work|length }} done · due {{ card.due.strftime("%a %d %b") }}
+          </p>
+          {% if card_links or key != "released" %}{# a screen keeps done work short #}
+          <ul class="chips" aria-label="Samples and analyses">
+            {% for w in card.work %}
+              <li class="chip chip--{{ 'blocked' if w.label == 'Blocked' else (w.state if w.stage == 'in_review' else w.stage) }}{% if w.late %} chip--late{% endif %}">
+                <span class="chip__what">#{{ w.sample }} {{ w.analysis }}</span> <span class="chip__state">{{ w.label }}</span>
+              </li>
+            {% endfor %}
+          </ul>
+          {% endif %}
+        </article>
+      {% else %}
+        <p class="muted board__empty">Nothing here.</p>
+      {% endfor %}
+    </section>
+  {% endfor %}
+</div>

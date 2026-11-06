@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block title %}Sections and screens — YourLab{% endblock %}
+{% block extra_head %}<link href="{{ url_for('static', path='css/today.css') }}" rel="stylesheet" />{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <h1>Sections and screens</h1>
+    <a href="{{ url_for('today') }}">Back to due today</a>
+  </div>
+  <p class="hint">A section is the lab's own: it does some analyses, and each analysis belongs to one section at most
+    (an analysis in no section shows only on the whole lab's board). A screen link shows a section, or the whole lab,
+    on a screen in the lab without a login (D-138).</p>
+
+  {% set back = "setup" %}
+  {% include "today/_names.html" %}
+
+  <section aria-labelledby="sections-heading">
+    <h2 id="sections-heading">Sections</h2>
+    {% for s in sections %}
+      {% set mine = s.analyses|map(attribute="analysis_id")|list %}
+      <details class="section-edit">
+        <summary><strong>{{ s.name }}</strong> <span class="muted">{{ mine|length }} analys{{ "is" if mine|length == 1 else "es" }}</span></summary>
+        <form method="post" action="{{ url_for('section_analyses', section_id=s.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+          <fieldset class="analysis-ticks">
+            <legend>Analyses {{ s.name }} does</legend>
+            {% for a in analyses %}
+              <label class="check"><input type="checkbox" name="analysis" value="{{ a.id }}" {% if a.id in mine %}checked{% endif %}>
+                {{ a.name }}{% if owner.get(a.id) and owner[a.id] != s.id %} <span class="muted">(in {{ (sections|selectattr("id", "equalto", owner[a.id])|first).name }})</span>{% endif %}</label>
+            {% endfor %}
+          </fieldset>
+          <div class="choice-row"><button type="submit" class="btn btn--primary">Save {{ s.name }}</button></div>
+        </form>
+        <form method="post" action="{{ url_for('remove_section', section_id=s.id) }}" class="inline-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+          <button type="submit" class="btn btn--small">Remove {{ s.name }} and its screen links</button>
+        </form>
+      </details>
+    {% else %}
+      <p class="muted">No sections yet.</p>
+    {% endfor %}
+    <form method="post" action="{{ url_for('add_section') }}" class="filters">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+      <label>New section <input type="text" name="name" maxlength="60" required placeholder="e.g. ICP-MS"></label>
+      <button type="submit" class="btn btn--secondary">Add section</button>
+    </form>
+  </section>
+
+  <section aria-labelledby="links-heading">
+    <h2 id="links-heading">Screen links</h2>
+    <p class="hint">The link is shown once, when made: open it on the screen. Revoke a link when a screen goes or the
+      link got out; that screen then shows nothing.</p>
+    <table class="table">
+      <thead><tr><th>Screen</th><th>Shows</th><th>Made</th><th></th></tr></thead>
+      <tbody>
+        {% for l in links %}
+          <tr>
+            <td>{{ l.label }}</td>
+            <td>{{ (sections|selectattr("id", "equalto", l.section_id)|first).name if l.section_id else "Whole lab" }}</td>
+            <td>{{ l.created_at.strftime("%Y-%m-%d") }} by {{ l.created_by }}</td>
+            <td>
+              {% if l.revoked_at %}<span class="muted">Revoked {{ l.revoked_at.strftime("%Y-%m-%d") }}</span>{% else %}
+                <form method="post" action="{{ url_for('revoke_display_link', link_id=l.id) }}" class="inline-form">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+                  <button type="submit" class="btn btn--small">Revoke</button>
+                </form>
+              {% endif %}
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="4" class="muted">No screen links yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <form method="post" action="{{ url_for('add_display_link') }}" class="filters">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+      <label>Shows
+        <select name="section">
+          <option value="">Whole lab</option>
+          {% for s in sections %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Screen name <input type="text" name="label" maxlength="60" placeholder="e.g. ICP-MS room TV"></label>
+      <button type="submit" class="btn btn--secondary">Make a screen link</button>
+    </form>
+  </section>
+{% endblock %}

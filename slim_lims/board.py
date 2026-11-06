@@ -113,7 +113,8 @@ class Card:
         return lab_role in roles
 
 
-def _chip_state(results: list[Result], on_last_issue: set) -> str:
+def chip_state(results: list[Result], on_last_issue: set) -> str:
+    """What a sample × analysis needs, from its results (CHIP_STATES; also the day's board, today.py)."""
     live = [r for r in results if r.status != ResultStatus.REJECTED]
     if not live:
         return "awaiting"
@@ -135,7 +136,7 @@ def _chip_state(results: list[Result], on_last_issue: set) -> str:
     return "released"
 
 
-def _batch_index(session: Session) -> dict[tuple[SampleRef, int], str]:
+def batch_index(session: Session) -> dict[tuple[SampleRef, int], str]:
     """(sample, analysis ID) -> its newest prep batch. Two reads per board, whatever the number of batches
     (app review 2026-10-30b O1: it read every batch whole, one by one)."""
     index = {}
@@ -166,7 +167,7 @@ def card_for(
             state = (
                 "expected"
                 if tr.status == TRStatus.SUBMITTED
-                else _chip_state(results.get((sample.position, analysis_id), []), on_last_issue)
+                else chip_state(results.get((sample.position, analysis_id), []), on_last_issue)
             )
             ref = SampleRef(tr_number=tr.tr_number, position=sample.position)
             chips.append(
@@ -209,7 +210,7 @@ def board(
     in CUSTOMER_COLUMNS."""
     scope = Scope.for_user(user, customer_id)  # a customer's own, whatever was asked (review A6)
     mine = mine and user.is_staff
-    repo, batch_of = TRSubmissionRepository(session), _batch_index(session)
+    repo, batch_of = TRSubmissionRepository(session), batch_index(session)
     columns: dict[str, list[Card]] = {key: [] for key, _ in COLUMNS}
     for status in TRStatus:
         if status == TRStatus.CANCELLED:

@@ -22,6 +22,7 @@
           {% if current_user %}
             <a href="{{ url_for('index') }}">Board</a>
             {% if current_user.is_staff %}
+              <a href="{{ url_for('today') }}">Due today</a>
               <a href="{{ url_for('admin_home') }}">Requests</a>
               <a href="{{ url_for('new_request') }}">New request</a>
               <a href="{{ url_for('samples_home') }}">Samples</a>
