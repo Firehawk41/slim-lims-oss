@@ -364,6 +364,60 @@ class ReportDeliveryRow(Base):
     sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
 
 
+# ---------------------------------------------------------------- the day's board (D-138)
+# Sections are the lab's own: each owns some catalog analyses, an analysis belongs to one section at most.
+# A display link shows one section (or the whole lab) on a screen without a login. Whether the screens
+# show customer names is a lab-wide switch, kept as rows (the latest wins; none: names hidden).
+
+
+class LabSectionRow(Base):
+    __tablename__ = "lab_sections"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(60), unique=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    analyses: Mapped[list["LabSectionAnalysisRow"]] = relationship(
+        cascade="all, delete-orphan", lazy="selectin", order_by="LabSectionAnalysisRow.analysis_id"
+    )
+
+
+class LabSectionAnalysisRow(Base):
+    """An analysis in a section. The analysis is the key: one section each (SLIM analyses."ID", no FK)."""
+
+    __tablename__ = "lab_section_analyses"
+
+    analysis_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+    section_id: Mapped[int] = mapped_column(ForeignKey("lab_sections.id", ondelete="CASCADE"), index=True)
+
+
+class DisplayLinkRow(Base):
+    """A screen's link: only the token's sha256 is kept (the link is shown once). No section: the whole
+    lab. Revoking stamps the row; a revoked link shows nothing."""
+
+    __tablename__ = "display_links"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    token_sha256: Mapped[str] = mapped_column(String(64), unique=True)
+    label: Mapped[str] = mapped_column(String(60))
+    section_id: Mapped[int | None] = mapped_column(ForeignKey("lab_sections.id", ondelete="CASCADE"))
+    created_by: Mapped[str] = mapped_column(String(254))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revoked_by: Mapped[str | None] = mapped_column(String(254))
+
+
+class DisplayModeRow(Base):
+    """The lab-wide switch for the screens: customer names shown (no visitors) or hidden. Append-only."""
+
+    __tablename__ = "display_modes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    names_shown: Mapped[bool] = mapped_column(Boolean)
+    set_by: Mapped[str] = mapped_column(String(254))
+    set_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
 def _append_only_after_create(target, connection, **_kw) -> None:
     append_only(connection, target.name)
 
@@ -374,6 +428,7 @@ for _table in (
     TRInvoicePaymentRow.__table__,
     ReportPdfRow.__table__,
     ReportDeliveryRow.__table__,
+    DisplayModeRow.__table__,
 ):
     event.listen(_table, "after_create", _append_only_after_create)
 

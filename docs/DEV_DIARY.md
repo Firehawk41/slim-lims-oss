@@ -189,6 +189,15 @@ Tally and themes are updated now and then at the bottom.
 | C→C | Who is "involved" in a clause is split where the knowledge is: the host from the acts its modules recorded, slim-quality from who kept that clause's records in it (an NC keeper doesn't audit 7.10). | `test_whoever_kept_a_clauses_records_here_does_not_audit_it`. |
 | C→C | The design said the pack shows "verify's last run", but no run is recorded anywhere: the pack runs every module's `verify` when shown (read-only). | `test_the_validation_pack_lists_the_installed_modules_and_is_signed_for_them`. |
 
+## 2026-11-06: the day's board (what is due today, per section, on the lab's screens)
+
+| Kind | What | Notes |
+|---|---|---|
+| J | A view apart from the board: what is due today and where it is, for a quick look or a screen left up in the lab; per section, set by each lab, so ICP-MS, IC and the wet lab each see only theirs. Open to other layouts than a kanban. | Unparks D-111's live view. |
+| C✓ | Due per sample × analysis; late work stays until released; columns from the facts (prep book, run list, results); a card per request per section; analyses owned by one section each; a secret, revocable display link; a minute's reload; at-risk and forecasts left parked. | D-138. |
+| C→J | Claude proposed screens that always hide customer names (visitors may see them). Jamie: also a named mode for when there are no visitors, or the screen is trivia, not useful. | Built as a lab-wide switch any staff member flips; never set means hidden. D-138. |
+| C→C | Claude proposed a script polling every minute; a `meta refresh` does the same with no script at all (nothing for the CSP to allow, nothing to break on a TV browser). | `test_staff_see_the_day_with_names_and_set_up_sections_and_screens`. |
+
 ## Themes so far
 - **Domain facts are Jamie's, and they overrule Claude's defaults:** DF < 1, MDL averaging, standards as
   recipes, spike placement. Claude's "cautious" engineering defaults were wrong more than once where

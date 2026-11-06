@@ -1,0 +1,25 @@
+/* The day's board (D-138): /today and a screen's page. Reuses the board's columns, cards and chips. */
+.day-summary { display: flex; flex-wrap: wrap; gap: 1rem; align-items: baseline; font-size: 1.1rem; margin: 0.5rem 0 0.75rem; }
+.day-summary__left { font-size: 1.6rem; }
+.day-summary__late { color: #F56565; font-weight: 700; }
+.badge--late { color: #C53030; font-weight: 700; }
+.admin-theme .badge--late { color: #FC8181; }
+.card--late { border-left: 4px solid #C53030; }
+.chip--late { font-weight: 600; }
+.chip--received, .chip--not_arrived { border-left-color: #9CA3AF; }
+.chip--in_prep { border-left-color: #805AD5; }
+.chip--on_instrument { border-left-color: #319795; }
+.chip--blocked { border-left-color: #C53030; }
+.day-board { grid-auto-columns: minmax(11rem, 1fr); }
+.names-switch { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; margin: 0.5rem 0; }
+.section-edit { border: 1px solid var(--color-border); border-radius: 4px; padding: 0.5rem 0.75rem; margin: 0.5rem 0; }
+.analysis-ticks { display: grid; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); gap: 0.2rem 1rem; border: 0; padding: 0; }
+/* A screen across the room: bigger type, the whole width, no page chrome. */
+.display-page .page { padding: 1rem 1.5rem; }
+.display-page h1 { font-size: 2rem; margin: 0; }
+.display-page .day-summary { font-size: 1.6rem; }
+.display-page .day-summary__left { font-size: 2.6rem; }
+.display-page .card__tr { font-size: 1.25rem; font-weight: 700; }
+.display-page .card__meta { font-size: 1rem; }
+.display-page .chip { font-size: 0.95rem; }
+.display-page .board__title { font-size: 1.2rem; }

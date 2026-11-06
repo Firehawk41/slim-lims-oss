@@ -87,7 +87,8 @@ slim_lims/
 ├── oss_guard.py     # OSS-only guard (called by make_engine)
 ├── domain/          # spec §3–4: enums, tr (TRSubmission, ...), workflow (transitions); pure
 ├── models.py        # User (full_name, job_title: how they sign), TR tables, tr_versions (D-104), invoices + payments (D-119),
-│                    #   report_pdfs, report_deliveries (all five append-only), user_capabilities, report_files
+│                    #   report_pdfs, report_deliveries, display_modes (all six append-only), user_capabilities,
+│                    #   report_files, lab_sections (+ lab_section_analyses), display_links
 ├── repositories.py  # TRSubmissionRepository: the only TR writer; gapless numbers; versions / as_of (D-104)
 ├── scope.py         # Scope.for_user: whose TRs a listing shows; fails closed (D-103)
 ├── services.py      # SubmissionService: submit, check-in, status (facts only, D-99), history
@@ -122,6 +123,8 @@ slim_lims/
 ├── reports.py       # issued reports: engine_renderer / plain_renderer, report_files; signing (D-122), the PDF (D-123)
 ├── delivery.py      # sending an issued report: report_deliveries, the outbox (/outbox; not transmitted, D-124)
 ├── board.py         # the lab board (spec §13)
+├── today.py, today_routes.py  # the day's board (D-138): what is due today per section; sections, screen links,
+│                    #   the names switch; /today, /today/setup, /display/{token} (no login, read-only)
 ├── about.py         # the landing page's facts (/about; its words: templates/about/_copy.html, Jamie's)
 ├── personas.py, demo_scenarios.py, demo_prep.py  # demo personas (quality ones hold a capability) and scenarios
 ├── api.py           # /api/submissions; service errors -> 422/403/404/409
@@ -180,6 +183,10 @@ scripts/seed_demo.py; tests/ (SQLite per test, or Postgres via TEST_DATABASE_URL
 - Competence (D-132): the app's capabilities decide who may act; slim-quality's authorisation register is the
   competence record, checked after the fact against every act (never blocks). Uncertainty (D-131) is signed
   in slim-quality and not on the report.
+- The day's board (D-138): `/today` shows each sample × analysis due today (plus late work) by stage, for
+  the whole lab or a section (the lab's own; one per analysis; the *lab displays* capability sets them up).
+  A screen opens a display link (secret, revocable, no login, reloads every minute). Screens show customer
+  names only while the lab-wide switch says no visitors; never set, they hide them.
 - Reports: "Sign and issue" needs the `signatory` capability (supervisors by default) and a name; the signatory may
   be the releaser (four-eyes stands at release). Its PDF is made at issue (WeasyPrint; needs Pango). Sending
   records a delivery in the outbox, never transmitted on the demo; it changes no status (D-122…D-124).

@@ -1,0 +1,13 @@
+<form method="post" action="{{ url_for('today_names') }}" class="names-switch">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+  {% if back %}<input type="hidden" name="back" value="{{ back }}">{% endif %}
+  {% if names_shown %}
+    <span>The lab's screens <strong>show customer names</strong> (no visitors).</span>
+    <input type="hidden" name="shown" value="0">
+    <button type="submit" class="btn btn--small btn--primary">Visitors in the lab: hide names</button>
+  {% else %}
+    <span>The lab's screens <strong>hide customer names</strong> (visitors may be in the lab).</span>
+    <input type="hidden" name="shown" value="1">
+    <button type="submit" class="btn btn--small">No visitors: show names</button>
+  {% endif %}
+</form>

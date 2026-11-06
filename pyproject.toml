@@ -64,6 +64,7 @@ select = ["E", "F", "W", "I", "B", "UP"]
 "tests/test_invoicing.py" = ["F811"]
 "tests/test_samples.py" = ["F811"]
 "tests/test_signatory_delivery.py" = ["F811"]
+"tests/test_today.py" = ["F811"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

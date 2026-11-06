@@ -35,6 +35,7 @@ from slim_lims.routes import router as pages_router
 from slim_lims.samples_routes import api_router as samples_api_router
 from slim_lims.samples_routes import router as samples_router
 from slim_lims.security import BodySizeLimitMiddleware, LoginThrottle, SecurityHeadersMiddleware
+from slim_lims.today_routes import router as today_router
 from slim_lims.web import STATIC_DIR, render
 
 SESSION_COOKIE = "slim_portal_session"
@@ -121,6 +122,7 @@ def create_app(
     app.include_router(quality_records_router)
     app.include_router(quality_insights_router)
     app.include_router(quality_system_router)
+    app.include_router(today_router)
     register_error_handlers(app)
 
     @app.exception_handler(LoginRequired)

@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}Due today — YourLab{% endblock %}
+{% block body_class %}board-page{% endblock %}
+{% block extra_head %}<link href="{{ url_for('static', path='css/today.css') }}" rel="stylesheet" />{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <h1>{{ chosen.name if chosen else "Whole lab" }}: due {{ "on" if next_day else "today," }} {{ board.day.strftime("%A %d %B") }}</h1>
+    {% if can_set_up %}<a class="btn btn--secondary" href="{{ url_for('today_setup') }}">Sections and screens</a>{% endif %}
+  </div>
+
+  <form method="get" class="filters" aria-label="Choose a section">
+    <label>Section
+      <select name="section">
+        <option value="">Whole lab</option>
+        {% for s in sections %}<option value="{{ s.id }}" {% if chosen and chosen.id == s.id %}selected{% endif %}>{{ s.name }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="check"><input type="checkbox" name="day" value="next" {% if next_day %}checked{% endif %}> Next working day</label>
+    <button type="submit" class="btn btn--secondary">Show</button>
+  </form>
+
+  {% include "today/_names.html" %}
+  <p class="hint">Due: receipt + each sample's processing time in working days (the request's service date if set). Late
+    work stays until it is released. Cards follow what happened; nothing here changes a fact.</p>
+
+  {% set card_links = True %}
+  {% include "today/_board.html" %}
+{% endblock %}
