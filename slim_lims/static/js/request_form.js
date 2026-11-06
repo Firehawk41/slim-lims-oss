@@ -413,6 +413,7 @@
       customer_phone: $("customer_phone").value.trim(),
       payment_method: intOrNull((document.querySelector('input[name="payment_method"]:checked') || {}).value),
       po_number: $("po_number").value.trim(),
+      quote_number: $("quote_number").value.trim(),
       results_to: splitList($("results_to").value),
       results_cc: splitList($("results_cc").value),
       invoice_to: splitList($("invoice_to").value),
@@ -446,7 +447,7 @@
 
   const FIELD_LABELS = {
     customer_id: "Customer", request_type: "Request type", location: "Site", customer_contact: "Contact name",
-    customer_phone: "Phone", payment_method: "Payment", po_number: "PO number", results_to: "Results to",
+    customer_phone: "Phone", payment_method: "Payment", po_number: "PO number", quote_number: "Quote", results_to: "Results to",
     results_cc: "Results cc", invoice_to: "Invoice to", invoice_cc: "Invoice cc",
     expected_arrival_date: "Expected arrival", sample_name: "Sample ID", chemical_name: "Chemical",
     processing_time: "Processing time", requested_time: "Report-by time", analysis_ids: "Analyses",

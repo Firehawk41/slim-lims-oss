@@ -17,7 +17,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from slim_lims import about as about_page
-from slim_lims import board, capabilities, invoices, reports
+from slim_lims import board, capabilities, invoices, quotes, reports
 from slim_lims.api import Service, get_reference
 from slim_lims.auth import CurrentUser, RequireStaff, RequireUser
 from slim_lims.db import get_db
@@ -287,6 +287,7 @@ def request_detail(
             "chemicals": reference.chemical_choices() if user.is_staff else [],
             "TRStatus": TRStatus,
             "bottles": _bottles_of(db, reference, submission) if user.is_staff else None,
+            "quote_id": quotes.named_by(db, submission.id),
         },
     )
 

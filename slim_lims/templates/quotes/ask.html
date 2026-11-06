@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}Ask for a quote — YourLab{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <h1>Ask for a quote</h1>
+    <a href="{{ url_for('quotes_home') }}">Your quotes</a>
+  </div>
+  <p class="hint">Tell the lab what you'd like tested and how fast; it sends you a quote, or tells you why not.</p>
+  <form method="post" action="{{ url_for('ask_quote_form') }}" class="form-section">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+    <label class="field">Analyses <span class="muted">(Ctrl/⌘-click picks several)</span>
+      <select name="analyses" multiple size="10" required>
+        {% for a in analyses %}<option value="{{ a.id }}">{{ a.name }}</option>{% endfor %}
+      </select>
+    </label>
+    <fieldset class="choice-row"><legend>Processing times</legend>
+      {% for pt in times %}<label class="check"><input type="checkbox" name="times" value="{{ pt.value }}"> {{ pt.label }}</label>{% endfor %}
+    </fieldset>
+    <label class="field">How many samples, roughly <input type="text" name="samples_estimate" maxlength="100" placeholder="e.g. about 20 a month"></label>
+    <label class="field">Anything else <textarea name="note" rows="3" maxlength="2000"></textarea></label>
+    <button type="submit" class="btn btn--primary">Send request</button>
+  </form>
+{% endblock %}

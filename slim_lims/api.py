@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
+from slim_lims import quotes
 from slim_lims.auth import RequireUser
 from slim_lims.db import get_db
 from slim_lims.domain import (
@@ -26,7 +27,14 @@ from slim_lims.samples import check_in_with_bottles
 from slim_lims.schemas import CheckInIn, ChemicalMatchIn, StatusChangeIn, SubmissionIn
 from slim_lims.scope import ScopeError
 from slim_lims.security import csrf_protect
-from slim_lims.services import Conflict, Forbidden, NotFound, SubmissionRejected, SubmissionService
+from slim_lims.services import (
+    Conflict,
+    FieldError,
+    Forbidden,
+    NotFound,
+    SubmissionRejected,
+    SubmissionService,
+)
 
 router = APIRouter(prefix="/api/submissions", tags=["submissions"], dependencies=[Depends(csrf_protect)])
 
@@ -52,13 +60,30 @@ Service = Annotated[SubmissionService, Depends(get_service)]
 DB = Annotated[Session, Depends(get_db)]
 
 
+def _named_quote(db: Session, data: SubmissionIn, user, service: SubmissionService) -> int | None:
+    """The quote a request names (D-139): the customer's own, in force today; refused otherwise."""
+    typed = data.quote_number.strip().upper().removeprefix("Q")
+    if not typed:
+        return None
+    customer_id = data.customer_id if user.is_staff else user.customer_id
+    own = {q.id for q in quotes.own_in_force(db, customer_id, service.lab_today())} if customer_id else set()
+    if not typed.isdigit() or int(typed) not in own:
+        raise SubmissionRejected(
+            [FieldError(("quote_number",), "not one of this customer's quotes in force today")]
+        )
+    return int(typed)
+
+
 def _dump(submission: TRSubmission) -> dict[str, Any]:
     return submission.model_dump(mode="json")
 
 
 @router.post("", status_code=201, summary="Submit a Testing Request")
 def create_submission(data: SubmissionIn, user: RequireUser, service: Service, db: DB):
+    quote_id = _named_quote(db, data, user, service)
     submission = service.submit(data, user)
+    if quote_id is not None:
+        quotes.name_on_tr(db, submission.id, quote_id)
     db.commit()
     return _dump(submission)
 

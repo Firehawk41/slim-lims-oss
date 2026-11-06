@@ -6,7 +6,7 @@
   <div class="page-head">
     <h1>Outbox</h1>
   </div>
-  <p class="muted">Every report sent to a customer, newest first, as they would have received it.
+  <p class="muted">Every report and quote sent to a customer, newest first, as they would have received it.
     This is a demo: messages are kept here and never transmitted.</p>
 
   {% for d in deliveries %}
@@ -21,6 +21,21 @@
       <pre class="mail__body">{{ d.body }}</pre>
     </section>
   {% else %}
-    <p class="muted">Nothing sent yet. Send an issued report from its report page (Results → a request's report).</p>
+    <p class="muted">No report sent yet. Send an issued report from its report page (Results → a request's report).</p>
+  {% endfor %}
+
+  <h2>Quotes</h2>
+  {% for d in quote_deliveries %}
+    <section class="form-section mail" aria-labelledby="quote-mail-{{ d.id }}">
+      <h3 id="quote-mail-{{ d.id }}">{{ d.subject }}</h3>
+      <dl class="mail__head">
+        <dt>To</dt><dd>{{ d.to_addresses|join(", ") }}</dd>
+        <dt>Sent</dt><dd>{{ d.sent_at.strftime("%Y-%m-%d %H:%M UTC") }} by {{ d.sent_by }} <span class="badge badge--submitted">demo: not transmitted</span></dd>
+        <dt>Attachment</dt><dd><a href="{{ url_for('quote_pdf', quote_id=d.quote_id) }}">{{ number(d.quote_id) }}.pdf</a> <code>{{ d.pdf_sha256[:12] }}…</code></dd>
+      </dl>
+      <pre class="mail__body">{{ d.body }}</pre>
+    </section>
+  {% else %}
+    <p class="muted">No quote sent yet. Send one from its page (Quotes → a quote).</p>
   {% endfor %}
 {% endblock %}

@@ -1,0 +1,30 @@
+{# A quote as the customer receives it (D-139): the page and its PDF. Plain HTML, no app chrome. #}
+<article class="quote-doc">
+  <header class="quote-doc__head">
+    <div>{% for line in lab %}<div{% if loop.first %} class="quote-doc__lab"{% endif %}>{{ line }}</div>{% endfor %}</div>
+    <div class="quote-doc__id"><h1>Quote {{ number }}</h1>
+      <div>Valid {{ q.effective_date.strftime("%d %b %Y") }} to {{ q.expire_date.strftime("%d %b %Y") }}</div></div>
+  </header>
+  <p><strong>For:</strong>
+    {% if q.is_default %}every customer (the lab's price list){% else %}{% for c in q.customer_ids %}{{ reference.customer(c).name if reference.customer(c) else "Customer " ~ c }}{{ ", " if not loop.last }}{% endfor %}{% endif %}
+    · <strong>Payment:</strong> {{ "Purchase order" if q.payment_method.value == 1 else "Credit card (the lab calls you)" }},
+    {{ q.payment_terms or 30 }} days</p>
+  <table class="quote-doc__lines">
+    <thead><tr><th scope="col">Analyses</th><th scope="col">Processing time</th><th scope="col">Per sample</th><th scope="col">Bulk</th></tr></thead>
+    <tbody>
+      {% for li in q.line_items %}
+        {% for p in li.prices %}
+          <tr>
+            {% if loop.first %}<td rowspan="{{ li.prices|length }}">{% for a in li.analysis_ids %}{{ reference.analysis(a).name if reference.analysis(a) else "Analysis " ~ a }}{{ " + " if not loop.last }}{% endfor %}</td>{% endif %}
+            <td>{{ p.processing_time.label }}</td>
+            <td>${{ "%.2f"|format(p.regular_price) }}</td>
+            <td>{% if p.bulk_price is not none and li.bulk_price_min %}${{ "%.2f"|format(p.bulk_price) }} from {{ li.bulk_price_min }} samples{% endif %}</td>
+          </tr>
+        {% endfor %}
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if q.comments %}<p class="quote-doc__comments">{{ q.comments }}</p>{% endif %}
+  <p class="quote-doc__small">Name {{ number }} on your Testing Request. Each analysis is billed once, at the cheapest
+    valid price for what was reported; prices outside this quote follow the lab's price list.</p>
+</article>

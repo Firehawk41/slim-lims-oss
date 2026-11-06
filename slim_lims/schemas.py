@@ -47,6 +47,8 @@ class SubmissionIn(_Input):
     customer_phone: Annotated[Text, StringConstraints(min_length=1, max_length=50)]
     payment_method: PaymentMethod
     po_number: Annotated[Text, StringConstraints(max_length=100)] = ""
+    # The customer's own quote in force, for reference (D-139): kept beside the TR, not in it.
+    quote_number: Annotated[Text, StringConstraints(max_length=20)] = ""
     results_to: Annotated[EmailList, Field(min_length=1)]
     results_cc: EmailList = []
     invoice_to: Annotated[EmailList, Field(min_length=1)]

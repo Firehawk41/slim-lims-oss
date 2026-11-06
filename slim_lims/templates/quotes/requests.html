@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}Quote requests — YourLab{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <h1>Quote requests</h1>
+    <a href="{{ url_for('quotes_home') }}">All quotes</a>
+  </div>
+  {% for r in requests %}
+    <section class="form-section" aria-labelledby="req-{{ r.row.id }}">
+      <h2 id="req-{{ r.row.id }}">Request {{ r.row.id }}: {{ reference.customer(r.row.customer_id).name if reference.customer(r.row.customer_id) else "Customer " ~ r.row.customer_id }}
+        <span class="muted">{{ r.row.created_at.strftime("%Y-%m-%d") }} · {{ r.row.requested_by }}</span></h2>
+      <p><strong>Analyses:</strong> {% for a in r.row.analysis_ids %}{{ reference.analysis(a).name if reference.analysis(a) else a }}{{ ", " if not loop.last }}{% endfor %}
+        · <strong>Processing:</strong> {% for t in r.row.processing_times %}{{ times.get(t, t) }}{{ ", " if not loop.last }}{% endfor %}
+        {% if r.row.samples_estimate %}· <strong>Samples:</strong> {{ r.row.samples_estimate }}{% endif %}</p>
+      {% if r.row.note %}<p>{{ r.row.note }}</p>{% endif %}
+      {% if r.state == "answered" %}
+        <p>Answered with <a href="{{ url_for('quote_detail', quote_id=r.event.quote_id) }}">{{ number(r.event.quote_id) }}</a> by {{ r.event.by }}.</p>
+      {% elif r.state == "declined" %}
+        <p>Declined by {{ r.event.by }}: {{ r.event.reason }}</p>
+      {% elif can_price %}
+        <p><a class="btn btn--primary" href="{{ url_for('new_quote') }}?request={{ r.row.id }}">Answer with a quote</a></p>
+        <form method="post" action="{{ url_for('decline_quote_request', request_id=r.row.id) }}" class="choice-row">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+          <label class="field">Decline, because (the customer sees this) <input type="text" name="reason" maxlength="2000" required></label>
+          <button type="submit" class="btn btn--small">Decline</button>
+        </form>
+      {% else %}
+        <p class="muted">Open: someone with the pricing capability answers it.</p>
+      {% endif %}
+    </section>
+  {% else %}
+    <p class="muted">No quote requests yet.</p>
+  {% endfor %}
+{% endblock %}

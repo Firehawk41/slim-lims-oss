@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}Quote {{ number }} — YourLab{% endblock %}
+{% block extra_head %}<link href="{{ url_for('static', path='css/quotes.css') }}" rel="stylesheet" />{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <h1>Quote {{ number }} <span class="quote-state quote-state--{{ state }}">{{ labels[state] }}</span></h1>
+    <a href="{{ url_for('quotes_home') }}">All quotes</a>
+  </div>
+  <p>
+    <a class="btn btn--secondary" href="{{ url_for('quote_pdf', quote_id=q.id) }}">PDF</a>
+    {% if can_price %}<a class="btn btn--secondary" href="{{ url_for('new_quote') }}?replaces={{ q.id }}">Replace with a new quote</a>{% endif %}
+  </p>
+  {% if current_user.is_staff %}<p class="muted">Made by {{ q.created_by }}.{% if sent %} Sent {{ sent|length }} time{{ "" if sent|length == 1 else "s" }}, last {{ sent[-1].strftime("%Y-%m-%d") }}.{% endif %}</p>{% endif %}
+
+  {{ document|safe }}
+
+  {% if can_price and not q.is_default %}
+    <form method="post" action="{{ url_for('send_quote', quote_id=q.id) }}" class="form-section">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+      <h2>Send to the customer</h2>
+      <label class="field">To <input type="text" name="to" value="{{ recipients }}" maxlength="2000" required></label>
+      <p class="hint">The PDF goes with it. Kept in the outbox, not transmitted (demo).</p>
+      <button type="submit" class="btn btn--primary">Send</button>
+    </form>
+  {% endif %}
+{% endblock %}

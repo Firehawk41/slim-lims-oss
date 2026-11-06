@@ -19,18 +19,20 @@ QUALITY = "quality"
 QUALITY_MANAGER = "quality_manager"
 SIGNATORY = "signatory"
 LAB_DISPLAYS = "lab_displays"
+PRICING = "pricing"
 CAPABILITIES = {
     SIGNATORY: "Signatory: sign and issue reports (ISO 17025 §7.8; D-122)",
     MANAGE_USERS: "Manage users: add users, deactivate them, set lab roles",
     QUALITY: "Quality: see the QC charts and tools, record events and notes, propose changes",
     QUALITY_MANAGER: "Quality manager: also approve changes to the quality rules and sign QC reviews",
     LAB_DISPLAYS: "Lab displays: set up the lab's sections and the links for screens in the lab (D-138)",
+    PRICING: "Pricing: make quotes, send them, answer customers' quote requests (D-139)",
 }
 ROLE_DEFAULTS: dict[int, frozenset[str]] = {
-    LAB_ROLE_SUPERVISOR: frozenset({MANAGE_USERS, SIGNATORY, LAB_DISPLAYS})
+    LAB_ROLE_SUPERVISOR: frozenset({MANAGE_USERS, SIGNATORY, LAB_DISPLAYS, PRICING})
 }
 GRANTED_BY_USER_MANAGERS = frozenset({QUALITY, QUALITY_MANAGER})
-PERSONA_GRANTABLE = frozenset({QUALITY, QUALITY_MANAGER, SIGNATORY, LAB_DISPLAYS})
+PERSONA_GRANTABLE = frozenset({QUALITY, QUALITY_MANAGER, SIGNATORY, LAB_DISPLAYS, PRICING})
 
 
 def granted(db: Session, user: User) -> frozenset[str]:
