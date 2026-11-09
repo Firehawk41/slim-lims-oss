@@ -22,6 +22,7 @@ dependencies = [
     # The report PDF (D-123). Needs Pango on the machine: libpango-1.0-0 and libpangoft2-1.0-0 (Debian).
     "weasyprint>=62,<71",
     "tzdata",  # zoneinfo data for LAB_TIMEZONE on slim container images
+    "segno>=1.6,<2",  # the MFA setup's QR code, as inline SVG (D-142); pure Python
     # Every SLIM module is pinned to a merged commit (slim-data D-117): a module's main moving never
     # changes what this app runs. Bump a pin in a host PR, with the CI workflow and render.yaml
     # (tests/test_pins.py checks they agree).

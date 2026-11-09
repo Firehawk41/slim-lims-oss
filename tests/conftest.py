@@ -28,6 +28,7 @@ def make_settings(database_url: str, **overrides) -> Settings:
         session_cookie_secure=False,
         session_max_age_seconds=3600,
         max_body_bytes=1024 * 1024,
+        require_mfa=False,  # tests/test_accounts.py turns it on
     )
     values.update(overrides)
     return Settings(**values)

@@ -222,6 +222,13 @@ Tally and themes are updated now and then at the bottom.
 | C✓ | Writes only through slim-domain's services; customers, chemicals, the app's catalog; a *reference data* capability; a reason per change, kept; no deletes; specs parked with change control. | D-141. |
 | F | Building it, Claude found the reference cache is one for the whole app: on the public demo a visitor's edit would not show, or would leak. Each lab got its own cache. Also: the catalog sync would have wiped edits made in the app; it keeps them now. | `test_each_visitors_lab_has_its_own_reference_cache`, `test_the_catalog_is_edited_with_a_reason_and_a_sync_keeps_it`. |
 
+## 2026-11-09: accounts, password reset and MFA (roadmap phase 6, last part)
+
+| Kind | What | Notes |
+|---|---|---|
+| C✓ | Reset links made by whoever manages users (shown once, in the outbox; no public form without a mail transport); change one's own password; TOTP with recovery codes; MFA required for supervisors and quality managers; a lost phone reset with a reason; the secret sealed; an append-only account log. | D-142. |
+| F | Sessions are signed cookies, so "signed out everywhere" needed a per-user `auth_version` each session carries; and the MFA hold had to sit in `current_user`, since the board route takes an optional user. | `test_a_reset_link_sets_a_new_password_once_and_signs_the_user_out`, `test_a_supervisor_must_set_up_mfa_and_then_signs_in_with_a_code`. |
+
 ## Themes so far
 - **Domain facts are Jamie's, and they overrule Claude's defaults:** DF < 1, MDL averaging, standards as
   recipes, spike placement. Claude's "cautious" engineering defaults were wrong more than once where

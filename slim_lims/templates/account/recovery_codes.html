@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+{% block title %}Recovery codes — YourLab{% endblock %}
+
+{% block content %}
+  <div class="page-head"><h1>MFA is on: your recovery codes</h1></div>
+  <p><strong>Shown once.</strong> Keep them somewhere safe, away from your phone. Each one signs you in once, instead
+    of a code from the app, if you lose your phone.</p>
+  <ul class="recovery-codes">{% for c in codes %}<li><code>{{ c }}</code></li>{% endfor %}</ul>
+  <a class="btn btn--primary" href="{{ url_for('account_home') }}">I've kept them</a>
+{% endblock %}

@@ -67,6 +67,9 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     # A demo persona (personas.py): chosen, not logged in; never signs in through /login.
     is_persona: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    # Bumped when the password is reset or changed, or MFA reset (D-142): a session made before carries the
+    # old number and is signed out.
+    auth_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
     @property
@@ -514,6 +517,75 @@ class ReferenceChangeRow(Base):
     at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
 
+# ---------------------------------------------------------------- accounts (D-142)
+
+
+class UserMfaRow(Base):
+    """A user's authenticator (TOTP): the secret, sealed with a key from SECRET_KEY, and the last time
+    step used (a code never counts twice). Removed when MFA is reset or turned off."""
+
+    __tablename__ = "user_mfa"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    secret_sealed: Mapped[str] = mapped_column(String(200))
+    enabled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    last_step: Mapped[int | None] = mapped_column(Integer)
+
+
+class MfaRecoveryCodeRow(Base):
+    """A single-use recovery code, kept only as a bcrypt hash."""
+
+    __tablename__ = "mfa_recovery_codes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    code_hash: Mapped[str] = mapped_column(String(100))
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class PasswordResetRow(Base):
+    """A one-time reset link made by someone who manages users: only its token's sha256 is kept."""
+
+    __tablename__ = "password_resets"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    token_sha256: Mapped[str] = mapped_column(String(64), unique=True)
+    created_by: Mapped[str] = mapped_column(String(254))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class AccountEventRow(Base):
+    """What happened to an account: a reset link made or used, the password changed, MFA set up, turned
+    off or reset, a recovery code used. Who, why, when. Append-only."""
+
+    __tablename__ = "account_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(Uuid, index=True)  # no FK: kept if the user row goes
+    kind: Mapped[str] = mapped_column(String(30))
+    by: Mapped[str] = mapped_column(String(254))
+    reason: Mapped[str] = mapped_column(Text, default="")
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class AccountMessageRow(Base):
+    """A message to a user about their account (a reset link), kept in the outbox, not transmitted (D-124).
+    Append-only."""
+
+    __tablename__ = "account_messages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    to_address: Mapped[str] = mapped_column(String(254))
+    subject: Mapped[str] = mapped_column(String(200))
+    body: Mapped[str] = mapped_column(Text)
+    sent_by: Mapped[str] = mapped_column(String(254))
+    transport: Mapped[str] = mapped_column(String(20))
+    sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
 def _append_only_after_create(target, connection, **_kw) -> None:
     append_only(connection, target.name)
 
@@ -531,6 +603,8 @@ for _table in (
     QuoteDeliveryRow.__table__,
     TRQuoteRow.__table__,
     ReferenceChangeRow.__table__,
+    AccountEventRow.__table__,
+    AccountMessageRow.__table__,
 ):
     event.listen(_table, "after_create", _append_only_after_create)
 

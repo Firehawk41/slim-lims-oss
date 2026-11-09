@@ -38,4 +38,18 @@
   {% else %}
     <p class="muted">No quote sent yet. Send one from its page (Quotes → a quote).</p>
   {% endfor %}
+
+  <h2>Accounts</h2>
+  {% for m in account_messages %}
+    <section class="form-section mail" aria-labelledby="acct-mail-{{ m.id }}">
+      <h3 id="acct-mail-{{ m.id }}">{{ m.subject }}</h3>
+      <dl class="mail__head">
+        <dt>To</dt><dd>{{ m.to_address }}</dd>
+        <dt>Sent</dt><dd>{{ m.sent_at.strftime("%Y-%m-%d %H:%M UTC") }} by {{ m.sent_by }} <span class="badge badge--submitted">demo: not transmitted</span></dd>
+      </dl>
+      <pre class="mail__body">{{ m.body }}</pre>
+    </section>
+  {% else %}
+    <p class="muted">No account message yet (a reset link from the Users page).</p>
+  {% endfor %}
 {% endblock %}

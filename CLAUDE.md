@@ -53,10 +53,10 @@ docker-compose for the VPS (**deferred, do not start**); the landing page (`/abo
 placeholders; Jamie writes its words in `templates/about/_copy.html`. slim-quality parts 1 and 2 are in
 (phases 3 and 5: vertical audit, NCs; 5a equipment, lots, PT, complaints, D-125…D-130; 5b uncertainty,
 competence, trends, D-131…D-133; 5c risks, internal audits, readiness, management review, the §7.11 pack,
-D-134…D-137); phase 4 is done (slim-samples; signed reports, their PDF, the outbox). Phase 6 has begun: quote
-screens are in (D-139, D-140), reference data upkeep (D-141; spec limits parked); next in phase 6:
-accounts (password reset, MFA)
-(`docs/ROADMAP.md`); slim-quality part 3 stays parked. Parked: an SMTP transport (D-124).
+D-134…D-137); phase 4 is done (slim-samples; signed reports, their PDF, the outbox). Phase 6 is done: quote
+screens (D-139, D-140), reference data upkeep (D-141; spec limits parked), accounts (D-142). Next: phase 7
+(`docs/ROADMAP.md`, the VPS: deferred, do not start). slim-quality part 3 stays parked. Parked: an SMTP
+transport (D-124), spec limit editing (needs slim-domain writes and change control).
 
 ## How to run
 
@@ -90,8 +90,9 @@ slim_lims/
 ├── domain/          # spec §3–4: enums, tr (TRSubmission, ...), workflow (transitions); pure
 ├── models.py        # User (full_name, job_title: how they sign), TR tables, tr_versions (D-104), invoices + payments (D-119),
 │                    #   report_pdfs, report_deliveries, display_modes, quote_requests (+ events), quote_pdfs,
-│                    #   quote_deliveries, tr_quotes, reference_changes (all append-only), user_capabilities, report_files,
-│                    #   lab_sections (+ lab_section_analyses), display_links
+│                    #   quote_deliveries, tr_quotes, reference_changes, account_events, account_messages (all
+│                    #   append-only), user_capabilities, report_files, user_mfa, mfa_recovery_codes,
+│                    #   password_resets, lab_sections (+ lab_section_analyses), display_links
 ├── repositories.py  # TRSubmissionRepository: the only TR writer; gapless numbers; versions / as_of (D-104)
 ├── scope.py         # Scope.for_user: whose TRs a listing shows; fails closed (D-103)
 ├── services.py      # SubmissionService: submit, check-in, status (facts only, D-99), history
@@ -100,7 +101,10 @@ slim_lims/
 ├── labtime.py       # LabClock: the lab's now / today (D-101)
 ├── labs.py          # a lab per visitor: Labs (claim, spares, sweep), with_schema (D-102)
 ├── demo_seed.py     # seed_demo(url): the whole demo seed (scripts/seed_demo.py and each lab); upgrade_lab (D-115)
-├── auth.py          # current_user, require_*; /login, /logout, /demo/personas, fresh lab
+├── auth.py          # current_user (holds MFA-required users for setup, D-142), require_*; /login (+ /login/code),
+│                    #   /logout, /demo/personas, fresh lab
+├── accounts.py, account_routes.py, totp.py  # D-142: reset links, password change, MFA (TOTP + recovery codes,
+│                    #   the sealed secret); /account, /account/mfa, /reset/{token}; the Users page's resets
 ├── reference.py, reference_cache.py, slim_tables.py, catalog.py  # SLIM reference data (read-only) + analysis catalog
 ├── bridge.py        # to_slim_v1: TR -> slim-domain v1 TRSubmission
 ├── results.py, results_routes.py  # slim-data host side; /results, /api/results (staff)
@@ -203,6 +207,10 @@ scripts/seed_demo.py; tests/ (SQLite per test, or Postgres via TEST_DATABASE_URL
 - Reference data (D-141): `/reference` (*reference data* capability) adds and edits customers and adds chemicals
   through slim-domain, and edits the analysis catalog; a reason per change (`reference_changes`); no deletes;
   a catalog sync keeps app edits; each demo lab has its own reference cache. Spec limits: parked.
+- Accounts (D-142): reset links come from whoever manages users (shown once, in the outbox; 24 h, one use); a
+  user changes their own password on `/account`; either signs older sessions out (`users.auth_version`). MFA is
+  TOTP + 10 recovery codes, required for supervisors and quality managers (`REQUIRE_MFA`, default on; off in
+  tests unless asked), never for personas or the API token; a lost phone is reset with a reason.
 - Reports: "Sign and issue" needs the `signatory` capability (supervisors by default) and a name; the signatory may
   be the releaser (four-eyes stands at release). Its PDF is made at issue (WeasyPrint; needs Pango). Sending
   records a delivery in the outbox, never transmitted on the demo; it changes no status (D-122…D-124).

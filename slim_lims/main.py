@@ -4,15 +4,16 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException
 from starlette.middleware.sessions import SessionMiddleware
 
 from slim_lims import __version__
+from slim_lims.account_routes import router as account_router
 from slim_lims.api import reference_router, register_error_handlers
 from slim_lims.api import router as submissions_router
-from slim_lims.auth import LoginRequired, StaffRequired, login_redirect
+from slim_lims.auth import LoginRequired, MfaSetupRequired, StaffRequired, login_redirect
 from slim_lims.auth import router as auth_router
 from slim_lims.config import Settings, load_settings
 from slim_lims.db import make_engine, make_session_factory
@@ -128,6 +129,7 @@ def create_app(
     app.include_router(today_router)
     app.include_router(quotes_router)
     app.include_router(refdata_router)
+    app.include_router(account_router)
     register_error_handlers(app)
 
     @app.exception_handler(LoginRequired)
@@ -135,6 +137,12 @@ def create_app(
         if _wants_json(request):
             return JSONResponse({"detail": "Not authenticated."}, status_code=401)
         return login_redirect(request)
+
+    @app.exception_handler(MfaSetupRequired)
+    async def _mfa_setup_required(request: Request, _exc: MfaSetupRequired):
+        if _wants_json(request):
+            return JSONResponse({"detail": "Set up MFA first (your role requires it)."}, status_code=403)
+        return RedirectResponse(request.url_for("account_mfa").path, status_code=303)
 
     @app.exception_handler(StaffRequired)
     async def _staff_required(request: Request, _exc: StaffRequired):

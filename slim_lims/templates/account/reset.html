@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}Set a new password — YourLab{% endblock %}
+
+{% block content %}
+  <h1>Set a new password</h1>
+  {% if error %}<div class="form-error" role="alert">{{ error }}</div>{% endif %}
+  {% if ok %}
+    <section class="form-section">
+      <form method="post" action="{{ url_for('password_reset_form', token=token) }}" class="stack-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+        <label>New password (12+ characters) <input type="password" name="new" minlength="12" required autocomplete="new-password" autofocus></label>
+        <label>Again <input type="password" name="again" minlength="12" required autocomplete="new-password"></label>
+        <button type="submit" class="btn btn--primary">Set password</button>
+      </form>
+      <p class="hint">This signs out every session on the account. If MFA is on, it stays on.</p>
+    </section>
+  {% else %}
+    <p>This link has expired or was already used. Ask whoever manages users at the lab for a new one.</p>
+  {% endif %}
+{% endblock %}
