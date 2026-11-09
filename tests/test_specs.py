@@ -213,3 +213,31 @@ def sc_session(engine):
     from slim_lims.refdata import slim_session
 
     return slim_session(engine)
+
+
+def test_s1_a_batch_that_cant_be_re_evaluated_doesnt_undo_the_approval(
+    client, db, seeded, spec_table, people, monkeypatch
+):
+    """The limits are on file once slim-domain writes them; a batch that can't be evaluated (no ruleset)
+    is named on the decision, never a 500 that leaves the set changed and the decision unrecorded."""
+
+    def no_ruleset(*_args, **_kwargs):
+        raise LookupError("no published ruleset for analysis 1 / dry ash")
+
+    monkeypatch.setattr(sc, "evaluate_batch", no_ruleset)
+    login(client, "uma@lab.example")
+    propose(client, Fe="0.29", Zn="0.2")
+    client.cookies.clear()
+    login(client, "staff@lab.example")
+    page = client.get("/specs/proposals/1")
+    done = client.post(
+        "/specs/proposals/1/approve", data={"csrf_token": csrf_from(page.text)}, follow_redirects=True
+    )
+    assert done.status_code == 200 and "Not re-evaluated, do it by hand: PB-" in done.text
+    db.rollback()
+    decision = db.scalars(select(SpecDecisionRow)).one()
+    assert (
+        decision.outcome == "approved"
+        and decision.reevaluated == []
+        and "no published ruleset" in decision.reason
+    )

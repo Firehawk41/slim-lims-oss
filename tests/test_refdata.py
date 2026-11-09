@@ -226,3 +226,38 @@ def test_each_visitors_lab_has_its_own_reference_cache(engine):
     assert mine is labs.reference_for("lab_a") and labs.reference_for("lab_b") is None
     assert labs.engine_for("lab_a") is engine and labs.engine_for("lab_b") is None
     assert timedelta(seconds=mine._ttl) == timedelta(seconds=60)
+
+
+def test_l2_a_visitors_writes_never_fall_back_to_the_shared_lab():
+    """The visitor's lab is entered if no dependency did yet; one that has gone fails closed (409)."""
+    from types import SimpleNamespace
+
+    from fastapi import HTTPException
+
+    from slim_lims.api import slim_engine_for, specs_for
+
+    lab_engine, shared = object(), object()
+
+    class FakeLabs:
+        def __init__(self, alive):
+            self.alive, self.engines = alive, {}
+
+        def engine_for(self, schema):
+            return self.engines.get(schema)
+
+        def enter(self, schema):
+            if not self.alive:
+                return None
+            self.engines[schema] = lab_engine
+            return object()
+
+    def request(labs, lab="lab_abc"):
+        state = SimpleNamespace(labs=labs, slim_engine=shared, specs="the app's reader")
+        return SimpleNamespace(app=SimpleNamespace(state=state), session={"lab": lab} if lab else {})
+
+    assert slim_engine_for(request(FakeLabs(alive=True))) is lab_engine  # entered here, not the shared lab
+    assert slim_engine_for(request(FakeLabs(alive=True), lab=None)) is shared  # a password login: SLIM's
+    for gone in (slim_engine_for, specs_for):
+        with pytest.raises(HTTPException) as refused:
+            gone(request(FakeLabs(alive=False)))
+        assert refused.value.status_code == 409

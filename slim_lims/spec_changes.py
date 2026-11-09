@@ -277,7 +277,7 @@ def approve(
         )  # fmt: skip
     except ValueError as refused:
         raise SpecRefused(str(refused)) from refused
-    reevaluated, differ = [], []
+    reevaluated, differ, skipped = [], [], []
     if key.kind == "specification":
         why = f"spec limits changed (proposal {proposal_id})"
         wanted = _matching_samples(db, reference, key)
@@ -285,13 +285,19 @@ def approve(
         for code in _matching_batches(db, wanted):
             if not batch_readings(db, results_batch(db, code).id):
                 continue
-            receipt = evaluate_batch(db, code, actor, lookup, reason=why)
+            try:
+                with db.begin_nested():  # one batch that can't be evaluated doesn't undo the others (S1)
+                    receipt = evaluate_batch(db, code, actor, lookup, reason=why)
+            except (LookupError, ValueError) as why_not:
+                skipped.append(f"{code} ({why_not})")
+                continue
             reevaluated.append(code)
             differ += [
                 f"{k.sample} {k.analyte.code}: would read differently" for k in receipt.released_affected
             ]
+    note = f"Not re-evaluated, do it by hand: {'; '.join(skipped)}" if skipped else ""
     row = SpecDecisionRow(
-        proposal_id=proposal_id, outcome=APPROVED, by=user.email, reevaluated=reevaluated,
+        proposal_id=proposal_id, outcome=APPROVED, by=user.email, reevaluated=reevaluated, reason=note,
         now_differ=list(dict.fromkeys(differ)),
     )  # fmt: skip
     db.add(row)

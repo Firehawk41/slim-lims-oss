@@ -239,6 +239,14 @@ Tally and themes are updated now and then at the bottom.
 | F | slim-data's "would read differently" ignores an INFO flag, so a pass that now fails wasn't listed; the host compares the reported value with the old and new limit itself. Also: spec limits are read per demo lab, as reference data is. | `test_a_change_is_proposed_approved_by_another_and_bears_on_the_results`. |
 | F | slim-domain-oss is synced from a private repo: this change must be made there too. | Flagged to Jamie. |
 
+## 2026-11-09: app review after slim-quality 5c
+
+| Kind | What | Notes |
+|---|---|---|
+| J | "Do the app review." | `REVIEW_2026-11-09.md`. |
+| F | A2: reset links readable by every staff member in the outbox (an account takeover); L2: a visitor's writes could fall back to the shared lab; S1: a spec approval half-done by one batch that couldn't be evaluated; A1: MFA a 500 after a key change; F1: quote prices silently dropped. All fixed, each with its guard. | `test_a2_…`, `test_l2_…`, `test_s1_…`, `test_a1_…`, `test_f1_…`. |
+| F | For decision: R5 (the host reads V5's tables), R6 (slim-domain's private sync would drop `set_limits`), R7 (the spec write and its decision commit apart). | Raised with Jamie. |
+
 ## Themes so far
 - **Domain facts are Jamie's, and they overrule Claude's defaults:** DF < 1, MDL averaging, standards as
   recipes, spike placement. Claude's "cautious" engineering defaults were wrong more than once where

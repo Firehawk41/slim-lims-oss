@@ -198,7 +198,7 @@ def test_a_reset_link_sets_a_new_password_once_and_signs_the_user_out(client, db
         )
         url = re.search(r"(http://testserver/reset/[\w-]+)", made.text).group(1)
         token = url.rsplit("/", 1)[1]
-        assert f"/reset/{token}" in client.get("/outbox").text  # kept as a message, not transmitted
+        assert "Set a new password" in client.get("/outbox").text  # kept as a message (the link not kept: A2)
         assert token not in db.scalars(select(PasswordResetRow.token_sha256)).one()
         db.rollback()
 
@@ -291,3 +291,28 @@ def test_personas_have_no_password_to_reset_and_the_log_is_append_only(engine, d
     db.commit()
     with pytest.raises(DBAPIError), engine.begin() as connection:
         connection.execute(update(AccountEventRow).values(reason="x"))
+
+
+# ---------------------------------------------------------------- app review 2026-11-09
+
+
+def test_a2_the_outbox_never_holds_a_reset_link(client, db, staff_user, customer_user):
+    """Every staff member reads the outbox; a reset link there would be anyone's way into the account."""
+    login(client, "staff@lab.example")
+    csrf = csrf_from(client.get("/admin/users").text)
+    made = client.post(
+        f"/admin/users/{customer_user.id}/reset-link", data={"csrf_token": csrf}, follow_redirects=True
+    )
+    token = re.search(r"/reset/([\w-]+)", made.text).group(1)  # shown once, to whoever made it
+    outbox = client.get("/outbox").text
+    assert token not in outbox and "shown once to staff@lab.example" in outbox
+    db.rollback()
+    assert all(token not in m.body for m in accounts.messages(db))
+
+
+def test_a1_a_secret_sealed_under_another_key_falls_back_to_recovery_codes(db, customer_user):
+    """SECRET_KEY rotated: the authenticator can't be checked (no 500); a recovery code still signs in."""
+    secret, now = totp.new_secret(), time.time()
+    codes = accounts.confirm(db, customer_user, secret, totp.code_at(secret, now), "old key", now)
+    assert not accounts.check_code(db, customer_user, totp.code_at(secret, now + 30), "new key", now + 30)
+    assert accounts.check_code(db, customer_user, codes[0], "new key", now + 30)
