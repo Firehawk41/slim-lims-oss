@@ -207,6 +207,13 @@ Tally and themes are updated now and then at the bottom.
 | C✓ | Early withdrawal as a row added in V5, honoured by pricing. | Agreed, **not built**: attaching the invoicing repo was refused in the session. A replaced quote stays in force to its expiry; the page says so. |
 | C→C | The request form's quote reference was to go on the TR; but the TR's JSON is a machine contract (spec §12). Kept beside it in `tr_quotes` instead. | `test_a_request_names_one_of_the_customers_quotes_in_force`. |
 
+## 2026-11-09: quote withdrawal (D-139 #3, finished)
+
+| Kind | What | Notes |
+|---|---|---|
+| J | Attached the invoicing repo so the agreed withdrawal could be built where pricing reads quotes. | D-140. |
+| C✓ | A withdrawal row in V5 (never an edit), honoured by `valid_on`; Withdraw on the quote page; Replace withdraws the old quote from the new one's first day. | D-140; `test_a_withdrawn_quote_prices_nothing_from_its_day`, `test_replacing_withdraws_the_old_quote_from_the_new_ones_first_day`. |
+
 ## Themes so far
 - **Domain facts are Jamie's, and they overrule Claude's defaults:** DF < 1, MDL averaging, standards as
   recipes, spike placement. Claude's "cautious" engineering defaults were wrong more than once where

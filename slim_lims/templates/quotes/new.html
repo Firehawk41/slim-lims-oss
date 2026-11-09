@@ -11,7 +11,8 @@
   {% if problems %}
     <div class="flash flash--error" role="alert"><ul>{% for p in problems %}<li>{{ p }}</li>{% endfor %}</ul></div>
   {% endif %}
-  <p class="hint">A quote is never edited once saved: to change one, replace it with a new one. Leave a price blank
+  <p class="hint">A quote is never edited once saved: to change one, replace it with a new one{% if form.replaces %}
+    ({{ number(form.replaces) }} is withdrawn from the day this one takes effect){% endif %}. Leave a price blank
     for a processing time this line doesn't offer.</p>
 
   <form method="post" action="{{ url_for('create_quote') }}">
