@@ -229,6 +229,16 @@ Tally and themes are updated now and then at the bottom.
 | C✓ | Reset links made by whoever manages users (shown once, in the outbox; no public form without a mail transport); change one's own password; TOTP with recovery codes; MFA required for supervisors and quality managers; a lost phone reset with a reason; the secret sealed; an append-only account log. | D-142. |
 | F | Sessions are signed cookies, so "signed out everywhere" needed a per-user `auth_version` each session carries; and the MFA hold had to sit in `current_user`, since the board route takes an optional user. | `test_a_reset_link_sets_a_new_password_once_and_signs_the_user_out`, `test_a_supervisor_must_set_up_mfa_and_then_signs_in_with_a_code`. |
 
+## 2026-11-09: spec limit changes
+
+| Kind | What | Notes |
+|---|---|---|
+| J | Go-ahead to change slim-domain for spec limit writes. | D-143. |
+| C→J | Claude proposed: reference-data holders propose, a quality manager approves. Jamie: quality staff and quality managers propose; a quality manager or a lab supervisor approves. | Four eyes kept: never the proposer. D-143. |
+| C✓ | One limit set at a time; only approval writes, through slim-domain, if the set on file is still what was proposed; unreleased results re-evaluated; released ones listed when they'd now judge otherwise, one click to an NC. | D-143. |
+| F | slim-data's "would read differently" ignores an INFO flag, so a pass that now fails wasn't listed; the host compares the reported value with the old and new limit itself. Also: spec limits are read per demo lab, as reference data is. | `test_a_change_is_proposed_approved_by_another_and_bears_on_the_results`. |
+| F | slim-domain-oss is synced from a private repo: this change must be made there too. | Flagged to Jamie. |
+
 ## Themes so far
 - **Domain facts are Jamie's, and they overrule Claude's defaults:** DF < 1, MDL averaging, standards as
   recipes, spike placement. Claude's "cautious" engineering defaults were wrong more than once where

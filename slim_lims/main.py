@@ -38,6 +38,7 @@ from slim_lims.routes import router as pages_router
 from slim_lims.samples_routes import api_router as samples_api_router
 from slim_lims.samples_routes import router as samples_router
 from slim_lims.security import BodySizeLimitMiddleware, LoginThrottle, SecurityHeadersMiddleware
+from slim_lims.specs_routes import router as specs_router
 from slim_lims.today_routes import router as today_router
 from slim_lims.web import STATIC_DIR, render
 
@@ -130,6 +131,7 @@ def create_app(
     app.include_router(quotes_router)
     app.include_router(refdata_router)
     app.include_router(account_router)
+    app.include_router(specs_router)
     register_error_handlers(app)
 
     @app.exception_handler(LoginRequired)

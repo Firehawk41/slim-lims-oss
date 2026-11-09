@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}Spec proposal {{ p.id }} — YourLab{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <h1>Proposal {{ p.id }}: {{ kinds[p.kind] }}</h1>
+    <a href="{{ url_for('specs_home') }}">Spec limits</a>
+  </div>
+  <p>{{ reference.customer(p.customer_id).name if reference.customer(p.customer_id) else p.customer_id }} ·
+    {{ reference.chemical(p.chemical_id).name if reference.chemical(p.chemical_id) else p.chemical_id }}{% if p.location %} · site {{ p.location }}{% endif %}
+    · unit {{ p.unit or "—" }}</p>
+  <p class="muted">Proposed by {{ p.proposed_by }} on {{ p.proposed_at.strftime("%Y-%m-%d %H:%M") }}: {{ p.reason }}</p>
+  <table class="table">
+    <thead><tr><th scope="col">Element</th><th scope="col">On file then</th><th scope="col">Proposed</th><th scope="col"></th></tr></thead>
+    <tbody>
+      {% for el in elements %}
+        {% set was, now = p.before.get(el), p.after.get(el) %}
+        <tr><td>{{ el }}</td><td>{{ was or "—" }}</td><td>{{ now or "—" }}</td>
+          <td>{% if was and not now %}removed{% elif now and not was %}added{% elif was != now %}changed{% endif %}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% if d %}
+    <section class="form-section">
+      <h2>{{ d.outcome|capitalize }} by {{ d.by }}, {{ d.at.strftime("%Y-%m-%d %H:%M") }}</h2>
+      {% if d.reason %}<p>{{ d.reason }}</p>{% endif %}
+      {% if d.outcome == "approved" %}
+        <p>Re-evaluated: {{ d.reevaluated|join(", ") if d.reevaluated else "nothing (no batch, or warning limits)" }}.</p>
+        {% if d.now_differ %}
+          <p><strong>{{ d.now_differ|length }} released result{{ "" if d.now_differ|length == 1 else "s" }} would now read differently</strong>
+            (they keep the limits they were judged by): {{ d.now_differ|join(", ") }}.</p>
+          <a class="btn btn--secondary" href="{{ nc_link }}">Raise a nonconformity for them</a>
+        {% else %}<p>No released result would read differently.</p>{% endif %}
+      {% endif %}
+    </section>
+  {% elif may_decide %}
+    <section class="form-section">
+      <h2>Decide</h2>
+      <form method="post" action="{{ url_for('specs_approve', proposal_id=p.id) }}" class="inline-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+        <button type="submit" class="btn btn--primary">Approve: put these limits on file</button>
+      </form>
+      <form method="post" action="{{ url_for('specs_reject', proposal_id=p.id) }}" class="choice-row">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+        <label class="field">Reject, because <input type="text" name="reason" maxlength="2000" required></label>
+        <button type="submit" class="btn btn--small">Reject</button>
+      </form>
+      <p class="hint">Approving re-evaluates the unreleased results this set bears on, and lists released ones that would now
+        read differently.</p>
+    </section>
+  {% else %}
+    <p class="muted">Waiting for a quality manager or a lab supervisor other than the proposer.</p>
+  {% endif %}
+{% endblock %}

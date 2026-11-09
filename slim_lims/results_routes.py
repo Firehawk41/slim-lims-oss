@@ -42,7 +42,7 @@ from slim_data.service.views import batch_view, batches, report_view
 from sqlalchemy.orm import Session
 
 from slim_lims import capabilities, delivery, reports
-from slim_lims.api import Service, get_reference
+from slim_lims.api import Service, get_reference, specs_for
 from slim_lims.auth import RequireStaff
 from slim_lims.db import get_db
 from slim_lims.labtime import lab_clock
@@ -78,7 +78,7 @@ Reference = Annotated[ReferenceData, Depends(get_reference)]
 
 
 def _lookup(request: Request, db: Session, reference: ReferenceData):
-    return reference_lookup(db, reference, request.app.state.specs)
+    return reference_lookup(db, reference, specs_for(request))
 
 
 def _plan_json(plan: ImportPlan) -> dict[str, Any]:

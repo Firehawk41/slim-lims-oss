@@ -57,5 +57,6 @@ specifications = Table(
     Column("chemical_id", Integer),
     Column("element_symbol", String),
     Column("value", Float),
+    Column("unit", String),  # the set's unit (D-143: shown and kept when the set is edited)
     Column("location", String),
 )

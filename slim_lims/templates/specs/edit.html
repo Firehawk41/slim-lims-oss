@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}Propose spec limits — YourLab{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <h1>{{ kinds[key.kind] }}: {{ reference.customer(key.customer_id).name if reference.customer(key.customer_id) else key.customer_id }} ·
+      {{ reference.chemical(key.chemical_id).name if reference.chemical(key.chemical_id) else key.chemical_id }}{% if key.location %} · {{ key.location }}{% endif %}</h1>
+    <a href="{{ url_for('specs_home') }}">Spec limits</a>
+  </div>
+  {% if pending %}
+    <p class="flash flash--info" role="status">Proposal <a href="{{ url_for('specs_proposal', proposal_id=pending.id) }}">{{ pending.id }}</a> for this set is waiting: decide it first.</p>
+  {% else %}
+    <p class="hint">The set as it stands; change values, blank a row to remove an element, use the empty rows to add one.
+      Upper limits, in the unit below.</p>
+    <form method="post" action="{{ url_for('specs_propose') }}" class="form-section">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+      <input type="hidden" name="customer" value="{{ key.customer_id }}">
+      <input type="hidden" name="chemical" value="{{ key.chemical_id }}">
+      <input type="hidden" name="location" value="{{ key.location }}">
+      <input type="hidden" name="kind" value="{{ key.kind }}">
+      <label class="field">Unit <input type="text" name="unit" value="{{ unit }}" maxlength="20" size="6" required></label>
+      <table class="table">
+        <thead><tr><th scope="col">Element</th><th scope="col">Limit</th></tr></thead>
+        <tbody>
+          {% for el, val in rows %}
+            <tr><td><input type="text" name="element" value="{{ el }}" maxlength="5" size="5" aria-label="Element {{ loop.index }}"></td>
+              <td><input type="text" name="value" value="{{ val }}" inputmode="decimal" maxlength="20" size="10" aria-label="Limit {{ loop.index }}"></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <label class="field">Why <input type="text" name="reason" maxlength="2000" required placeholder="e.g. the customer's new specification sheet, rev. C"></label>
+      <button type="submit" class="btn btn--primary">Propose</button>
+    </form>
+  {% endif %}
+{% endblock %}
