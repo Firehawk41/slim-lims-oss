@@ -523,7 +523,7 @@ def admin_home(
         page=max(page, 1),
         per_page=PER_PAGE,
     )
-    reference = request.app.state.reference
+    reference = get_reference(request)
     reference_status = None
     if hasattr(reference, "status"):
         reference.snapshot()  # the cache loads lazily; make sure the page reports a real load
@@ -543,7 +543,7 @@ def admin_home(
 
 @router.post("/admin/reference/refresh", name="refresh_reference")
 def refresh_reference(request: Request, user: RequireStaff):
-    reference = request.app.state.reference
+    reference = get_reference(request)
     if not hasattr(reference, "refresh"):
         flash(request, "This reference data source cannot be refreshed.", "error")
     elif reference.refresh():

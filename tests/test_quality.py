@@ -91,11 +91,13 @@ def test_the_quality_personas_hold_their_capability_and_nothing_else(db, seeded)
     quinn, uma, sue = (persona(db, e) for e in ("quinn@demo.example", "uma@demo.example", "sue@demo.example"))
     assert capabilities.effective(db, quinn) == {capabilities.QUALITY_MANAGER}
     assert capabilities.effective(db, uma) == {capabilities.QUALITY}
-    # signs (D-122), sets up the lab's screens (D-138), makes quotes (D-139); never manages users
+    # signs (D-122), sets up the lab's screens (D-138), makes quotes (D-139), keeps reference data (D-141);
+    # never manages users
     assert capabilities.effective(db, sue) == {
         capabilities.SIGNATORY,
         capabilities.LAB_DISPLAYS,
         capabilities.PRICING,
+        capabilities.REFERENCE_DATA,
     }
     assert (
         quality_actor(db, quinn).role == QualityRole.MANAGER

@@ -55,10 +55,14 @@ def read_catalog(path: Path = CATALOG_CSV) -> list[CatalogEntry]:
 def sync_analysis_catalog(
     slim_engine: Engine, portal_session: Session, path: Path = CATALOG_CSV
 ) -> SyncReport:
-    """Replaces analysis_catalog with the CSV's entries that exist in SLIM. The caller commits."""
+    """Replaces analysis_catalog with the CSV's entries that exist in SLIM, keeping what was edited in
+    the app since (D-141: group, request types, offered). The caller commits."""
+    from slim_lims.refdata import edited_in_app
+
     with slim_engine.connect() as conn:
         slim_ids = {r.analysis_name.strip().lower(): r.id for r in conn.execute(select(t.analyses))}
     entries = read_catalog(path)
+    kept = edited_in_app(portal_session)
     portal_session.execute(delete(AnalysisCatalogRow))
     matched, not_in_slim = 0, []
     for entry in entries:
@@ -66,13 +70,16 @@ def sync_analysis_catalog(
         if analysis_id is None:
             not_in_slim.append(entry.slim_name)
             continue
+        edited = kept.get(analysis_id)
         portal_session.add(
             AnalysisCatalogRow(
                 analysis_id=analysis_id,
                 code=entry.code,
-                group_name=entry.group,
-                request_types=",".join(str(int(rt)) for rt in entry.request_types),
-                portal_selectable=entry.portal_selectable,
+                group_name=edited["group_name"] if edited else entry.group,
+                request_types=",".join(
+                    str(rt) for rt in (edited["request_types"] if edited else map(int, entry.request_types))
+                ),
+                portal_selectable=edited["portal_selectable"] if edited else entry.portal_selectable,
                 sort_order=entry.sort_order,
             )
         )

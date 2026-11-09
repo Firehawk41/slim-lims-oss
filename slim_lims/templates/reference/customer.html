@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}{{ c.name }} — YourLab{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <h1>{{ c.name }}</h1>
+    <a href="{{ url_for('reference_home') }}">Reference data</a>
+  </div>
+  <form method="post" action="{{ url_for('save_customer', customer_id=c.id) }}" class="form-section">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+    {% for f in fields %}
+      <label class="field">{{ f.replace("_", " ")|capitalize }} <input type="text" name="{{ f }}" value="{{ c[f] }}" maxlength="200" required></label>
+    {% endfor %}
+    <label class="field">Why <input type="text" name="reason" maxlength="2000" required></label>
+    <p class="hint">Requests already made keep the name and address they were made with.</p>
+    <button type="submit" class="btn btn--primary">Save</button>
+  </form>
+  <h2>Changes made here</h2>
+  {% include "reference/_changes.html" %}
+{% endblock %}

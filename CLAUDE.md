@@ -54,7 +54,8 @@ placeholders; Jamie writes its words in `templates/about/_copy.html`. slim-quali
 (phases 3 and 5: vertical audit, NCs; 5a equipment, lots, PT, complaints, D-125…D-130; 5b uncertainty,
 competence, trends, D-131…D-133; 5c risks, internal audits, readiness, management review, the §7.11 pack,
 D-134…D-137); phase 4 is done (slim-samples; signed reports, their PDF, the outbox). Phase 6 has begun: quote
-screens are in (D-139, D-140); next in phase 6: reference-data upkeep, accounts
+screens are in (D-139, D-140), reference data upkeep (D-141; spec limits parked); next in phase 6:
+accounts (password reset, MFA)
 (`docs/ROADMAP.md`); slim-quality part 3 stays parked. Parked: an SMTP transport (D-124).
 
 ## How to run
@@ -89,7 +90,7 @@ slim_lims/
 ├── domain/          # spec §3–4: enums, tr (TRSubmission, ...), workflow (transitions); pure
 ├── models.py        # User (full_name, job_title: how they sign), TR tables, tr_versions (D-104), invoices + payments (D-119),
 │                    #   report_pdfs, report_deliveries, display_modes, quote_requests (+ events), quote_pdfs,
-│                    #   quote_deliveries, tr_quotes (all append-only), user_capabilities, report_files,
+│                    #   quote_deliveries, tr_quotes, reference_changes (all append-only), user_capabilities, report_files,
 │                    #   lab_sections (+ lab_section_analyses), display_links
 ├── repositories.py  # TRSubmissionRepository: the only TR writer; gapless numbers; versions / as_of (D-104)
 ├── scope.py         # Scope.for_user: whose TRs a listing shows; fails closed (D-103)
@@ -124,6 +125,8 @@ slim_lims/
 ├── invoices.py, demo_prices.py    # invoicing V5; /invoices; the accounting CSV (V5 writes formula cells as text, D-118)
 ├── quotes.py, quotes_routes.py    # quote screens over V5's quotes (D-139): list by state, make / replace, the document
 │                                  #   and its PDF, sending (outbox), customers' requests; a TR's quote (tr_quotes)
+├── refdata.py, refdata_routes.py  # reference data upkeep (D-141): customers, chemicals via slim-domain's services;
+│                                  #   the analysis catalog; reference_changes; /reference
 ├── reports.py       # issued reports: engine_renderer / plain_renderer, report_files; signing (D-122), the PDF (D-123)
 ├── delivery.py      # sending an issued report: report_deliveries, the outbox (/outbox; not transmitted, D-124)
 ├── board.py         # the lab board (spec §13)
@@ -143,7 +146,8 @@ scripts/seed_demo.py; tests/ (SQLite per test, or Postgres via TEST_DATABASE_URL
 
 - **Layers:** `domain/` pure (liftable into slim-domain) ← input models ← repositories, the only code that
   touches TR tables. Modules flush; routes commit.
-- **Data:** the app only reads SLIM's reference tables, never declares them on `db.Base`, no FKs into them.
+- **Data:** the app writes SLIM's reference tables only through slim-domain's services (D-141), never with its
+  own SQL; it never declares them on `db.Base`, no FKs into them.
   Portable schema (SQLite + Postgres): no ARRAY, enums as ints; TR tables integer keys, `users` UUIDs.
 - **Access:** every listing takes a `Scope` (D-103); customers see only their customer's TRs (others 404).
   Roles: `customer` (needs `customer_id`) and `staff` (needs `initials`, `lab_role`). Managing users is a
@@ -196,6 +200,9 @@ scripts/seed_demo.py; tests/ (SQLite per test, or Postgres via TEST_DATABASE_URL
   quote in force (`tr_quotes`; the TR's JSON contract is unchanged); pricing still takes the cheapest valid
   line. A quote is withdrawn early as a row added in V5 (D-140); Replace withdraws the old one from the new
   one's first day.
+- Reference data (D-141): `/reference` (*reference data* capability) adds and edits customers and adds chemicals
+  through slim-domain, and edits the analysis catalog; a reason per change (`reference_changes`); no deletes;
+  a catalog sync keeps app edits; each demo lab has its own reference cache. Spec limits: parked.
 - Reports: "Sign and issue" needs the `signatory` capability (supervisors by default) and a name; the signatory may
   be the releaser (four-eyes stands at release). Its PDF is made at issue (WeasyPrint; needs Pango). Sending
   records a delivery in the outbox, never transmitted on the demo; it changes no status (D-122…D-124).

@@ -110,6 +110,7 @@ class Labs:
         self.base = make_engine(self.url, poolclass=NullPool)
         self._factories: dict[str, sessionmaker[Session]] = {}
         self._engines: dict[str, Engine] = {}
+        self._references: dict = {}  # schema -> its ReferenceCache (D-141)
         self._seen: dict[str, datetime] = {}
         self._lock = threading.Lock()
         self._filling = threading.Lock()
@@ -184,10 +185,28 @@ class Labs:
                 self._seen[schema] = now
         return self._factory(schema)
 
+    def reference_for(self, schema: str, ttl_seconds: float = 300):
+        """A lab's own reference cache (its SLIM tables are its own, D-141): a visitor's edits show in
+        their lab and nowhere else. None for a lab not entered in this process."""
+        from slim_lims.reference_cache import ReferenceCache
+
+        with self._lock:
+            engine = self._engines.get(schema)
+            if engine is None:
+                return None
+            if schema not in self._references:
+                self._references[schema] = ReferenceCache(engine, engine, ttl_seconds=ttl_seconds)
+            return self._references[schema]
+
+    def engine_for(self, schema: str) -> Engine | None:
+        with self._lock:
+            return self._engines.get(schema)
+
     def drop(self, schema: str) -> None:
         if not LAB_NAME.match(schema):
             raise ValueError(f"not a lab schema name: {schema!r}")
         with self._lock:
+            self._references.pop(schema, None)
             self._factories.pop(schema, None)
             self._seen.pop(schema, None)
             engine = self._engines.pop(schema, None)

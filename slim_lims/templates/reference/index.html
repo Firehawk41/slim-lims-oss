@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block title %}Reference data — YourLab{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <h1>Reference data</h1>
+    <a href="{{ url_for('admin_home') }}">Requests</a>
+  </div>
+  <p class="hint">Customers and chemicals are SLIM's, written through slim-domain (its checks: unique names, complete
+    addresses, prep methods from its lists). The analysis catalog is the app's. Nothing is deleted; every change is kept
+    with its reason. Spec limits aren't edited here yet.</p>
+
+  <section class="form-section" aria-labelledby="cust-heading">
+    <h2 id="cust-heading">Customers <span class="muted">{{ customers|length }}</span></h2>
+    <details><summary>The list</summary>
+      <table class="table">
+        <thead><tr><th scope="col">Name</th><th scope="col">Address</th><th scope="col"></th></tr></thead>
+        <tbody>{% for c in customers %}<tr><td>{{ c.name }}</td><td>{{ c.street_address }}, {{ c.city }} {{ c.state }} {{ c.postal_code }}, {{ c.country }}</td>
+          <td><a href="{{ url_for('edit_customer', customer_id=c.id) }}">Edit</a></td></tr>{% endfor %}</tbody>
+      </table>
+    </details>
+    <form method="post" action="{{ url_for('add_customer') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+      <h3>Add a customer</h3>
+      <div class="choice-row">
+        <label class="field">Name <input type="text" name="name" maxlength="200" required></label>
+        <label class="field">Street address <input type="text" name="street_address" maxlength="200" required></label>
+      </div>
+      <div class="choice-row">
+        <label class="field">City <input type="text" name="city" maxlength="100" required></label>
+        <label class="field">State <input type="text" name="state" maxlength="50" required></label>
+        <label class="field">Postal code <input type="text" name="postal_code" maxlength="20" required></label>
+        <label class="field">Country <input type="text" name="country" maxlength="60" value="USA" required></label>
+      </div>
+      <label class="field">Why <input type="text" name="reason" maxlength="2000" required placeholder="e.g. new customer, first request on its way"></label>
+      <button type="submit" class="btn btn--primary">Add customer</button>
+    </form>
+  </section>
+
+  <section class="form-section" aria-labelledby="chem-heading">
+    <h2 id="chem-heading">Chemicals <span class="muted">{{ chemicals|length }}</span></h2>
+    <details><summary>The list</summary>
+      <table class="table">
+        <thead><tr><th scope="col">Name</th><th scope="col">Metals prep</th><th scope="col">Silicon prep</th><th scope="col">Ions prep</th><th scope="col">Instrument</th></tr></thead>
+        <tbody>{% for c in chemicals %}<tr><td>{{ c.name }}</td><td>{{ c.metals_prep }}</td><td>{{ c.silicon_prep }}</td><td>{{ c.ions_prep }}</td><td>{{ c.metals_instrument }}</td></tr>{% endfor %}</tbody>
+      </table>
+    </details>
+    <form method="post" action="{{ url_for('add_chemical') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+      <h3>Add a chemical</h3>
+      <div class="choice-row">
+        <label class="field">Name <input type="text" name="name" maxlength="200" required></label>
+        <label class="field">Metals instrument
+          <select name="metals_instrument">{% for i in instruments %}<option>{{ i }}</option>{% endfor %}</select></label>
+      </div>
+      <div class="choice-row">
+        {% for key, options in preps.items() %}
+          <label class="field">{{ key.replace("_", " ")|capitalize }}
+            <select name="{{ key }}">{% for o in options %}<option>{{ o }}</option>{% endfor %}</select></label>
+        {% endfor %}
+      </div>
+      <label class="field">KED elements <span class="muted">(Ctrl/⌘-click picks several)</span>
+        <select name="ked" multiple size="5">{% for e in elements %}<option value="{{ e.id }}">{{ e.symbol }} {{ e.name }}</option>{% endfor %}</select></label>
+      <label class="field">Why <input type="text" name="reason" maxlength="2000" required></label>
+      <button type="submit" class="btn btn--primary">Add chemical</button>
+    </form>
+  </section>
+
+  <section class="form-section" aria-labelledby="cat-heading">
+    <h2 id="cat-heading">Analysis catalog</h2>
+    <p class="hint">Which group an analysis is listed under, which request types offer it, and whether the request form
+      offers it at all. A catalog sync from the CSV keeps what was edited here.</p>
+    <table class="table">
+      <thead><tr><th scope="col">Analysis</th><th scope="col">Group</th><th scope="col">On the form</th><th scope="col"></th></tr></thead>
+      <tbody>{% for a in analyses %}<tr><td>{{ a.name }}</td><td>{{ a.group }}</td><td>{{ "Yes" if a.portal_selectable else "No" }}</td>
+        <td><a href="{{ url_for('edit_analysis', analysis_id=a.id) }}">Edit</a></td></tr>{% endfor %}</tbody>
+    </table>
+  </section>
+
+  <section aria-labelledby="hist-heading">
+    <h2 id="hist-heading">Recent changes</h2>
+    {% include "reference/_changes.html" %}
+  </section>
+{% endblock %}

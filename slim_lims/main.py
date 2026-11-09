@@ -26,6 +26,7 @@ from slim_lims.quality_records_routes import router as quality_records_router
 from slim_lims.quality_routes import router as quality_router
 from slim_lims.quality_system_routes import router as quality_system_router
 from slim_lims.quotes_routes import router as quotes_router
+from slim_lims.refdata_routes import router as refdata_router
 from slim_lims.reference import ReferenceData
 from slim_lims.reference_cache import ReferenceCache
 from slim_lims.reports import engine_renderer
@@ -87,6 +88,7 @@ def create_app(
     if reference is None:
         reference = ReferenceCache(slim_engine, engine, ttl_seconds=settings.reference_cache_ttl_seconds)
     app.state.reference = reference
+    app.state.slim_engine = slim_engine  # where slim-domain writes reference data (D-141)
     # SLIM spec limits for slim-data: (customer_id, chemical_id, location) -> {element: limit}.
     app.state.specs = specs or SpecReader(slim_engine)
     app.state.report_renderer = report_renderer or engine_renderer  # spec §13, slim-data D-79
@@ -125,6 +127,7 @@ def create_app(
     app.include_router(quality_system_router)
     app.include_router(today_router)
     app.include_router(quotes_router)
+    app.include_router(refdata_router)
     register_error_handlers(app)
 
     @app.exception_handler(LoginRequired)
