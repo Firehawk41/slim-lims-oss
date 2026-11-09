@@ -54,7 +54,7 @@ placeholders; Jamie writes its words in `templates/about/_copy.html`. slim-quali
 (phases 3 and 5: vertical audit, NCs; 5a equipment, lots, PT, complaints, D-125…D-130; 5b uncertainty,
 competence, trends, D-131…D-133; 5c risks, internal audits, readiness, management review, the §7.11 pack,
 D-134…D-137); phase 4 is done (slim-samples; signed reports, their PDF, the outbox). Phase 6 has begun: quote
-screens are in (D-139; early withdrawal waits on V5); next in phase 6: reference-data upkeep, accounts
+screens are in (D-139, D-140); next in phase 6: reference-data upkeep, accounts
 (`docs/ROADMAP.md`); slim-quality part 3 stays parked. Parked: an SMTP transport (D-124).
 
 ## How to run
@@ -194,7 +194,8 @@ scripts/seed_demo.py; tests/ (SQLite per test, or Postgres via TEST_DATABASE_URL
 - Quotes (D-139) are V5's, never edited; the host makes them (*pricing* capability), lists them by state,
   sends their PDF to the outbox and answers customers' requests. A request may name the customer's own
   quote in force (`tr_quotes`; the TR's JSON contract is unchanged); pricing still takes the cheapest valid
-  line. **Not built:** withdrawing a quote early (needs V5; a replaced quote stays in force to its expiry).
+  line. A quote is withdrawn early as a row added in V5 (D-140); Replace withdraws the old one from the new
+  one's first day.
 - Reports: "Sign and issue" needs the `signatory` capability (supervisors by default) and a name; the signatory may
   be the releaser (four-eyes stands at release). Its PDF is made at issue (WeasyPrint; needs Pango). Sending
   records a delivery in the outbox, never transmitted on the demo; it changes no status (D-122…D-124).

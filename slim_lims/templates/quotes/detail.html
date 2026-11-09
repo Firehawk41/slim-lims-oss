@@ -1,7 +1,33 @@
 {% extends "base.html" %}
 
-{% block title %}Quote {{ number }} — YourLab{% endblock %}
-{% block extra_head %}<link href="{{ url_for('static', path='css/quotes.css') }}" rel="stylesheet" />{% endblock %}
+{% block title %}Quote {{ number }} — YourLab  {% if can_price and not q.withdrawn_from and q.expire_date >= today %}
+    <form method="post" action="{{ url_for('withdraw_quote', quote_id=q.id) }}" class="form-section">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+      <h2>Withdraw before it expires</h2>
+      <p class="hint">The quote isn't changed: the withdrawal is kept beside it, and from that day it prices nothing
+        (a customer's work falls to their other quotes, then the default price list).</p>
+      <div class="choice-row">
+        <label class="field">From <input type="date" name="from" value="{{ [today, q.effective_date]|max }}" required></label>
+        <label class="field">Because <input type="text" name="reason" maxlength="2000" required></label>
+      </div>
+      <button type="submit" class="btn btn--small">Withdraw</button>
+    </form>
+  {% endif %}
+{% endblock %}
+{% block extra_head %}<link href="{{ url_for('static', path='css/quotes.css') }}" rel="stylesheet" />  {% if can_price and not q.withdrawn_from and q.expire_date >= today %}
+    <form method="post" action="{{ url_for('withdraw_quote', quote_id=q.id) }}" class="form-section">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+      <h2>Withdraw before it expires</h2>
+      <p class="hint">The quote isn't changed: the withdrawal is kept beside it, and from that day it prices nothing
+        (a customer's work falls to their other quotes, then the default price list).</p>
+      <div class="choice-row">
+        <label class="field">From <input type="date" name="from" value="{{ [today, q.effective_date]|max }}" required></label>
+        <label class="field">Because <input type="text" name="reason" maxlength="2000" required></label>
+      </div>
+      <button type="submit" class="btn btn--small">Withdraw</button>
+    </form>
+  {% endif %}
+{% endblock %}
 
 {% block content %}
   <div class="page-head">
@@ -14,6 +40,8 @@
   </p>
   {% if current_user.is_staff %}<p class="muted">Made by {{ q.created_by }}.{% if sent %} Sent {{ sent|length }} time{{ "" if sent|length == 1 else "s" }}, last {{ sent[-1].strftime("%Y-%m-%d") }}.{% endif %}</p>{% endif %}
 
+  {% if q.withdrawn_from %}<p class="flash flash--info" role="status">Withdrawn from {{ q.withdrawn_from.strftime("%d %b %Y") }}: it prices nothing from that day.</p>{% endif %}
+
   {{ document|safe }}
 
   {% if can_price and not q.is_default %}
@@ -23,6 +51,19 @@
       <label class="field">To <input type="text" name="to" value="{{ recipients }}" maxlength="2000" required></label>
       <p class="hint">The PDF goes with it. Kept in the outbox, not transmitted (demo).</p>
       <button type="submit" class="btn btn--primary">Send</button>
+    </form>
+  {% endif %}
+  {% if can_price and not q.withdrawn_from and q.expire_date >= today %}
+    <form method="post" action="{{ url_for('withdraw_quote', quote_id=q.id) }}" class="form-section">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+      <h2>Withdraw before it expires</h2>
+      <p class="hint">The quote isn't changed: the withdrawal is kept beside it, and from that day it prices nothing
+        (a customer's work falls to their other quotes, then the default price list).</p>
+      <div class="choice-row">
+        <label class="field">From <input type="date" name="from" value="{{ [today, q.effective_date]|max }}" required></label>
+        <label class="field">Because <input type="text" name="reason" maxlength="2000" required></label>
+      </div>
+      <button type="submit" class="btn btn--small">Withdraw</button>
     </form>
   {% endif %}
 {% endblock %}

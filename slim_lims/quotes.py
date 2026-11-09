@@ -79,6 +79,8 @@ def visible_to(q: slim_invoicing.Quote, user: User) -> bool:
 
 
 def state(q: slim_invoicing.Quote, today: date, warn_days: int) -> str:
+    if q.withdrawn_from is not None and q.withdrawn_from <= today:
+        return "withdrawn"
     if q.expire_date < today:
         return "expired"
     if q.effective_date > today:
@@ -91,6 +93,7 @@ STATE_LABELS = {
     "expiring": "Expiring soon",
     "not_yet": "Not yet in force",
     "expired": "Expired",
+    "withdrawn": "Withdrawn",
 }
 
 
@@ -256,8 +259,26 @@ def build(form: QuoteForm, reference: ReferenceData, by: str) -> slim_invoicing.
     )
 
 
-def save(session: Session, form: QuoteForm, reference: ReferenceData, user: User) -> slim_invoicing.Quote:
-    """Stores the quote in V5; answers the request it came from, if any. Flushes."""
+def withdraw(
+    session: Session, q: slim_invoicing.Quote, from_day: date, reason: str, user: User
+) -> slim_invoicing.Quote:
+    """Withdraws a quote before its expiry, in V5 (a row added): it prices nothing from `from_day`."""
+    if not reason.strip():
+        raise QuoteRefused(["Say why the quote is withdrawn."])
+    try:
+        return slim_invoicing.withdraw_quote(
+            session, q.id, from_day, user.initials or user.email, reason.strip()[:2000]
+        )
+    except slim_invoicing.WithdrawalRefused as refused:
+        raise QuoteRefused([str(refused)]) from refused
+
+
+def save(
+    session: Session, form: QuoteForm, reference: ReferenceData, user: User
+) -> tuple[slim_invoicing.Quote, date | None]:
+    """Stores the quote in V5; answers the request it came from, if any; withdraws the quote it replaces
+    from the day the new one takes effect (or the old one's start, if later). Returns the new quote and the
+    day the old one stops pricing (None: nothing replaced, or the old one had already stopped). Flushes."""
     request = None
     if form.request_id is not None:
         request = session.get(QuoteRequestRow, form.request_id)
@@ -265,13 +286,20 @@ def save(session: Session, form: QuoteForm, reference: ReferenceData, user: User
             raise QuoteRefused(["That quote request is not open any more."])
         if form.is_default or request.customer_id not in form.customers:
             raise QuoteRefused(["Customers: a quote answering a request is for the customer who asked"])
+    replaced = quote(session, form.replaces) if form.replaces is not None else None
     saved = save_quote(session, build(form, reference, user.initials or user.email))
     if request is not None:
         session.add(
             QuoteRequestEventRow(request_id=request.id, kind=ANSWERED, quote_id=saved.id, by=user.email)
         )
         session.flush()
-    return saved
+    stops = None
+    if replaced is not None and replaced.withdrawn_from is None:
+        day = max(saved.effective_date, replaced.effective_date)
+        if day <= replaced.expire_date:
+            withdraw(session, replaced, day, f"replaced by {number(saved.id)}", user)
+            stops = day
+    return saved, stops
 
 
 # ---------------------------------------------------------------- requests

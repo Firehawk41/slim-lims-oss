@@ -172,17 +172,14 @@ def create_quote(request: Request, user: RequireStaff, db: DB, reference: Refere
     _pricing(db, user)
     typed = _parse(form)
     try:
-        saved = quotes.save(db, typed, reference, user)
+        saved, stops = quotes.save(db, typed, reference, user)
     except quotes.QuoteRefused as refused:
         db.rollback()
         return _form_page(request, typed, reference, refused.problems, 422)
     db.commit()
     what = f"Quote {quotes.number(saved.id)} saved"
-    if typed.replaces:
-        what += (
-            f". {quotes.number(typed.replaces)} stays in force until it expires: withdrawing a quote early "
-            "isn't built yet"
-        )
+    if stops is not None:
+        what += f"; {quotes.number(typed.replaces)} is withdrawn from {stops:%d %b %Y}"
     flash(request, what + ".")
     return RedirectResponse(request.url_for("quote_detail", quote_id=saved.id).path, status_code=303)
 
@@ -276,8 +273,40 @@ def quote_detail(
             "can_price": can_price,
             "recipients": ", ".join(quotes.recipients(db, q)) if can_price and not q.is_default else "",
             "sent": quotes.sent_on(db, q.id) if user.is_staff else [],
+            "today": clock.today(),
         },
     )
+
+
+@router.post("/quotes/{quote_id}/withdraw", name="withdraw_quote")
+def withdraw_quote(
+    request: Request,
+    quote_id: int,
+    user: RequireStaff,
+    db: DB,
+    clock: Clock,
+    from_day: Annotated[str, Form(alias="from")] = "",
+    reason: Annotated[str, Form(max_length=2000)] = "",
+):
+    """Withdraws a quote before its expiry (V5 keeps it as a row added): it prices nothing from that day."""
+    _pricing(db, user)
+    q = _quote_or_404(db, quote_id, user)
+    try:
+        day = date.fromisoformat(from_day) if from_day.strip() else clock.today()
+    except ValueError:
+        flash(request, "From: give a date.", "error")
+        return RedirectResponse(request.url_for("quote_detail", quote_id=q.id).path, status_code=303)
+    try:
+        quotes.withdraw(db, q, day, reason, user)
+    except quotes.QuoteRefused as refused:
+        flash(request, " ".join(refused.problems), "error")
+    else:
+        db.commit()
+        flash(
+            request,
+            f"Quote {quotes.number(q.id)} is withdrawn from {day:%d %b %Y}: it prices nothing from then.",
+        )
+    return RedirectResponse(request.url_for("quote_detail", quote_id=q.id).path, status_code=303)
 
 
 @router.get("/quotes/{quote_id}/pdf", name="quote_pdf")

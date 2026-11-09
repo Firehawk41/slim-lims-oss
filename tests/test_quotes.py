@@ -191,16 +191,65 @@ def test_the_default_price_list_is_never_sent(client, db, staff_user):
     assert qs.deliveries(db) == []
 
 
-def test_replacing_says_the_old_quote_stays_in_force(client, db, staff_user):
-    old = a_quote(db)
+def test_replacing_withdraws_the_old_quote_from_the_new_ones_first_day(client, db, staff_user):
+    old = a_quote(db, start=TODAY - timedelta(days=30))
     db.commit()
     login(client, "staff@lab.example")
     page = client.get(f"/quotes/new?replaces={old.id}")
     assert f"replacing {qs.number(old.id)}" in page.text and 'value="100.00"' in page.text
+    starts = TODAY + timedelta(days=7)
     made = client.post(
+        "/quotes",
+        data=fields(replaces=str(old.id), effective=starts.isoformat(), csrf_token=csrf_from(page.text)),
+        follow_redirects=True,
+    )
+    assert f"{qs.number(old.id)} is withdrawn from {starts:%d %b %Y}" in made.text
+    db.rollback()
+    replaced = qs.quote(db, old.id)
+    assert replaced.withdrawn_from == starts and replaced.valid_on(TODAY) and not replaced.valid_on(starts)
+    assert qs.state(replaced, starts, 30) == "withdrawn" and qs.state(replaced, TODAY, 30) == "in_force"
+    db.rollback()
+    again = client.post(  # replacing it twice withdraws nothing more
         "/quotes", data=fields(replaces=str(old.id), csrf_token=csrf_from(page.text)), follow_redirects=True
     )
-    assert f"{qs.number(old.id)} stays in force until it expires" in made.text
+    assert "is withdrawn from" not in again.text and qs.quote(db, old.id).withdrawn_from == starts
+
+
+def test_a_quote_is_withdrawn_early_with_a_reason_and_then_prices_nothing(
+    client, db, staff_user, customer_user
+):
+    q = a_quote(db, (1,))
+    db.commit()
+    login(client, "staff@lab.example")
+    page = client.get(f"/quotes/{q.id}")
+    assert "Withdraw before it expires" in page.text
+    csrf = csrf_from(page.text)
+    client.post(
+        f"/quotes/{q.id}/withdraw", data={"from": TODAY.isoformat(), "reason": "", "csrf_token": csrf}
+    )
+    assert qs.quote(db, q.id).withdrawn_from is None
+    db.rollback()
+    early = (TODAY - timedelta(days=1)).isoformat()
+    refused = client.post(
+        f"/quotes/{q.id}/withdraw",
+        data={"from": early, "reason": "x", "csrf_token": csrf},
+        follow_redirects=True,
+    )
+    assert "takes effect on" in refused.text
+    done = client.post(
+        f"/quotes/{q.id}/withdraw",
+        data={"from": TODAY.isoformat(), "reason": "prices revised", "csrf_token": csrf},
+        follow_redirects=True,
+    )
+    assert f"withdrawn from {TODAY:%d %b %Y}" in done.text and "Withdraw before it expires" not in done.text
+    assert "Withdrawn" in client.get("/quotes").text
+    db.rollback()
+    assert qs.own_in_force(db, 1, TODAY) == []  # a request can't name it any more
+    db.rollback()
+    client.cookies.clear()
+    login_api(client, "jane@acme.example")
+    refused = client.post("/api/submissions", json=payload(quote_number=qs.number(q.id)))
+    assert refused.status_code == 422
 
 
 def test_only_pricing_staff_make_quotes_and_customers_see_only_theirs(client, db, analyst, customer_user):
