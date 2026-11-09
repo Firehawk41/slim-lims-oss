@@ -35,14 +35,16 @@ def slim_domain_tables(engine, db):
     import slim_domain.domain.element.element_repository  # noqa: F401
     from infrastructure.database import Base
 
+    if engine.dialect.name == "postgresql":  # slim-domain's unique names are CITEXT there (as the seed does)
+        with engine.begin() as conn:
+            conn.execute(text("CREATE EXTENSION IF NOT EXISTS citext"))
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
     with engine.begin() as conn:
-        conn.execute(
+        conn.execute(  # no explicit ID: on Postgres the SERIAL counter must stay in step
             text(
-                'INSERT INTO customers ("ID", customer_name, street_address, city, state, postal_code,'
-                " country,"
-                " additional_elements_prep, is_group) VALUES (1, 'A', '1 A Street', 'Anytown', 'TX', '75000',"
+                "INSERT INTO customers (customer_name, street_address, city, state, postal_code, country,"
+                " additional_elements_prep, is_group) VALUES ('A', '1 A Street', 'Anytown', 'TX', '75000',"
                 " 'USA', '', false)"
             )
         )
