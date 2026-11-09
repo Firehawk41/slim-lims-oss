@@ -1,0 +1,17 @@
+{# The app's record of reference-data changes (D-141). Needs `changes`. #}
+<table class="table">
+  <thead><tr><th scope="col">When</th><th scope="col">What</th><th scope="col">Change</th><th scope="col">Why</th><th scope="col">Who</th></tr></thead>
+  <tbody>
+    {% for ch in changes %}
+      <tr>
+        <td>{{ ch.at.strftime("%Y-%m-%d %H:%M") }}</td>
+        <td>{{ ch.kind }} {{ ch.ref_id }} {{ ch.action }}</td>
+        <td>{% if ch.before %}{% for k, v in ch.after.items() if ch.before.get(k) != v %}{{ k }}: {{ ch.before.get(k) }} → {{ v }}{{ "; " if not loop.last }}{% endfor %}{% else %}{{ ch.after.get("name", "") }}{% endif %}</td>
+        <td>{{ ch.reason }}</td>
+        <td>{{ ch.by }}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="5" class="muted">No changes made in the app yet.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>

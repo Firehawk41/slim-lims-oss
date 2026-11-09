@@ -493,6 +493,27 @@ class TRQuoteRow(Base):
     quote_id: Mapped[int] = mapped_column(Integer)
 
 
+# ---------------------------------------------------------------- reference data upkeep (D-141)
+
+
+class ReferenceChangeRow(Base):
+    """One change to the lab's reference data made in the app: a customer added or edited, a chemical
+    added (both written through slim-domain's services), or an analysis's catalog entry edited. What it
+    was and what it became, why, who and when. Append-only."""
+
+    __tablename__ = "reference_changes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    kind: Mapped[str] = mapped_column(String(20), index=True)  # "customer" | "chemical" | "analysis"
+    ref_id: Mapped[int] = mapped_column(Integer, index=True)  # the SLIM ID it changed
+    action: Mapped[str] = mapped_column(String(20))  # "added" | "edited"
+    before: Mapped[dict | None] = mapped_column(JSON)
+    after: Mapped[dict] = mapped_column(JSON)
+    reason: Mapped[str] = mapped_column(Text)
+    by: Mapped[str] = mapped_column(String(254))
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
 def _append_only_after_create(target, connection, **_kw) -> None:
     append_only(connection, target.name)
 
@@ -509,6 +530,7 @@ for _table in (
     QuotePdfRow.__table__,
     QuoteDeliveryRow.__table__,
     TRQuoteRow.__table__,
+    ReferenceChangeRow.__table__,
 ):
     event.listen(_table, "after_create", _append_only_after_create)
 

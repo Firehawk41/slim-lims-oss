@@ -214,6 +214,14 @@ Tally and themes are updated now and then at the bottom.
 | J | Attached the invoicing repo so the agreed withdrawal could be built where pricing reads quotes. | D-140. |
 | C✓ | A withdrawal row in V5 (never an edit), honoured by `valid_on`; Withdraw on the quote page; Replace withdraws the old quote from the new one's first day. | D-140; `test_a_withdrawn_quote_prices_nothing_from_its_day`, `test_replacing_withdraws_the_old_quote_from_the_new_ones_first_day`. |
 
+## 2026-11-09: reference data upkeep (roadmap phase 6)
+
+| Kind | What | Notes |
+|---|---|---|
+| F | Claude found slim-domain already writes customers and chemicals (validated, with initials), but not specs; so the batch needs no slim-domain change, and specs need one. | D-141. |
+| C✓ | Writes only through slim-domain's services; customers, chemicals, the app's catalog; a *reference data* capability; a reason per change, kept; no deletes; specs parked with change control. | D-141. |
+| F | Building it, Claude found the reference cache is one for the whole app: on the public demo a visitor's edit would not show, or would leak. Each lab got its own cache. Also: the catalog sync would have wiped edits made in the app; it keeps them now. | `test_each_visitors_lab_has_its_own_reference_cache`, `test_the_catalog_is_edited_with_a_reason_and_a_sync_keeps_it`. |
+
 ## Themes so far
 - **Domain facts are Jamie's, and they overrule Claude's defaults:** DF < 1, MDL averaging, standards as
   recipes, spike placement. Claude's "cautious" engineering defaults were wrong more than once where

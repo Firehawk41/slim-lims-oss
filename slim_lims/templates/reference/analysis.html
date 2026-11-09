@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}{{ analysis.name if analysis else row.code }} — YourLab{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <h1>{{ analysis.name if analysis else row.code }} <span class="muted">{{ row.code }}</span></h1>
+    <a href="{{ url_for('reference_home') }}">Reference data</a>
+  </div>
+  <form method="post" action="{{ url_for('save_analysis', analysis_id=row.analysis_id) }}" class="form-section">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+    <label class="field">Group <input type="text" name="group_name" value="{{ row.group_name }}" maxlength="60" required></label>
+    <fieldset class="choice-row"><legend>Request types that offer it</legend>
+      {% for t in types %}<label class="check"><input type="checkbox" name="request_types" value="{{ t.value }}" {% if t.value in chosen %}checked{% endif %}> {{ t.label }}</label>{% endfor %}
+    </fieldset>
+    <label class="check"><input type="checkbox" name="portal_selectable" value="1" {% if row.portal_selectable %}checked{% endif %}> The request form offers it</label>
+    <label class="field">Why <input type="text" name="reason" maxlength="2000" required></label>
+    <button type="submit" class="btn btn--primary">Save</button>
+  </form>
+  <h2>Changes made here</h2>
+  {% include "reference/_changes.html" %}
+{% endblock %}

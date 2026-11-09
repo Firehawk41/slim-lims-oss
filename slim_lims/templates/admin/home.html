@@ -50,6 +50,7 @@
     <form method="post" action="{{ url_for('refresh_reference') }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
       <button type="submit" class="btn btn--secondary">Reload now</button>
+      {% if "reference_data" in current_capabilities %}<a class="btn btn--secondary" href="{{ url_for('reference_home') }}">Edit reference data</a>{% endif %}
     </form>
   </section>
 {% endblock %}

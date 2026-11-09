@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from slim_lims import quotes
 from slim_lims.auth import RequireUser
-from slim_lims.db import get_db
+from slim_lims.db import LAB_SESSION_KEY, get_db
 from slim_lims.domain import (
     ALLOWED_PROCESSING_TIMES,
     PaymentMethod,
@@ -40,7 +40,23 @@ router = APIRouter(prefix="/api/submissions", tags=["submissions"], dependencies
 
 
 def get_reference(request: Request) -> ReferenceData:
+    """The lab's reference data: a visitor's own lab's when they have one (D-102, D-141), else the app's."""
+    labs = getattr(request.app.state, "labs", None)
+    if labs is not None and (schema := request.session.get(LAB_SESSION_KEY)):
+        own = labs.reference_for(schema, request.app.state.settings.reference_cache_ttl_seconds)
+        if own is not None:
+            return own
     return request.app.state.reference
+
+
+def slim_engine_for(request: Request):
+    """Where slim-domain writes the lab's reference data: a visitor's own lab, else SLIM's database."""
+    labs = getattr(request.app.state, "labs", None)
+    if labs is not None and (schema := request.session.get(LAB_SESSION_KEY)):
+        engine = labs.engine_for(schema)
+        if engine is not None:
+            return engine
+    return request.app.state.slim_engine
 
 
 def get_service(
