@@ -16,7 +16,7 @@ from slim_lims.db import get_db
 from slim_lims.models import SpecProposalRow, User
 from slim_lims.quotes_routes import FormLists, _one
 from slim_lims.reference import ReferenceData
-from slim_lims.results import actor_for, reference_lookup
+from slim_lims.results import actor_for
 from slim_lims.security import csrf_protect
 from slim_lims.web import flash, render
 
@@ -172,12 +172,10 @@ def specs_approve(request: Request, proposal_id: int, user: RequireStaff, db: DB
     row = db.get(SpecProposalRow, proposal_id)
     if row is None:
         raise HTTPException(status_code=404, detail="No such proposal.")
-    lookup = reference_lookup(db, reference, specs_for(request))
     try:
-        with refdata.slim_session(slim_engine_for(request)) as slim:
-            decision = spec_changes.approve(
-                db, slim, row, user, reference, lookup, actor_for(user), release_reads=db.commit
-            )
+        decision = spec_changes.approve(
+            db, slim_engine_for(request), row, user, reference, specs_for(request), actor_for(user)
+        )
     except spec_changes.SpecRefused as refused:
         db.rollback()
         flash(request, f"Not approved: {refused}", "error")

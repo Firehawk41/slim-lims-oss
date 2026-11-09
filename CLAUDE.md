@@ -212,7 +212,8 @@ scripts/seed_demo.py; tests/ (SQLite per test, or Postgres via TEST_DATABASE_URL
   a catalog sync keeps app edits; each demo lab has its own reference cache.
 - Spec limits (D-143): one set (customer or group × chemical × site × kind) at a time; quality staff or a quality
   manager proposes, a quality manager or a supervisor (never the proposer) approves; only approval writes, through
-  slim-domain's `set_limits`, if the set is unchanged since. Approval re-evaluates unreleased results; released ones
+  slim-domain's `set_limits`, if the set is unchanged since; in one transaction where SLIM shares the app's database.
+  Approval re-evaluates unreleased results (judged by the proposed limits); released ones
   keep their limits and are listed when they'd now pass/fail otherwise (one click to an NC). Demo labs read their own.
 - Accounts (D-142): reset links come from whoever manages users (shown once, in the outbox; 24 h, one use); a
   user changes their own password on `/account`; either signs older sessions out (`users.auth_version`). MFA is

@@ -246,39 +246,45 @@ def judged_otherwise(db: Session, wanted: set[tuple[str, int]], before: dict, af
     return out
 
 
+def _same_database(db: Session, slim_engine) -> bool:
+    """slim-domain's tables are in the app's own database (the demo, Render; a visitor's lab)."""
+    bind = db.get_bind()
+    return bind is slim_engine or str(bind.url) == str(slim_engine.url)
+
+
 def approve(
-    db: Session,
-    slim: Session,
-    proposal: SpecProposalRow,
-    user: User,
-    reference: ReferenceData,
-    lookup,
-    actor,
-    release_reads=lambda: None,
+    db: Session, slim_engine, proposal: SpecProposalRow, user: User, reference: ReferenceData, specs, actor
 ) -> SpecDecisionRow:
-    """Writes the set through slim-domain, re-evaluates what it bears on, records the decision.
-    `release_reads` ends the caller's read before slim-domain writes on its own connection (the route
-    passes its commit: SQLite lets a write through only while nobody else reads)."""
+    """Approves a proposal: re-evaluates what it bears on (judged by the proposed limits), records the
+    decision, and writes the set through slim-domain.
+
+    Where slim-domain's tables are in the app's database, all of it is one transaction (review 2026-11-09
+    R7): slim-domain writes on the app's own session and its commit commits the decision and the new
+    result versions with the set; anything refused or failing leaves nothing changed. With SLIM in a
+    database of its own, slim-domain commits the set first and the caller commits the rest."""
+    from slim_lims.results import reference_lookup
+
     _may_decide(db, proposal, user)
     key = SetKey(proposal.customer_id, proposal.chemical_id, proposal.location, proposal.kind)
-    on_file, _ = current_set(slim, key.customer_id, key.chemical_id, key.location, key.kind)
+    same = _same_database(db, slim_engine)
+    if same:
+        on_file, _ = current_set(db, key.customer_id, key.chemical_id, key.location, key.kind)
+    else:
+        with Session(slim_engine) as slim:
+            on_file, _ = current_set(slim, key.customer_id, key.chemical_id, key.location, key.kind)
     if on_file != proposal.before:
         raise SpecRefused("The set on file changed since this was proposed: reject it and propose again.")
-    customer, chemical = reference.customer(key.customer_id), reference.chemical(key.chemical_id)
     proposal_id, before, after, unit = proposal.id, dict(proposal.before), dict(proposal.after), proposal.unit
-    release_reads()
-    slim.rollback()  # and its own read of the set, for the same reason
-    try:
-        SpecificationService(slim).set_limits(
-            key.customer_id, key.chemical_id, key.location, key.kind,
-            {k: float(v) for k, v in after.items()}, unit,
-            customer.name if customer else str(key.customer_id),
-            chemical.name if chemical else str(key.chemical_id),
-        )  # fmt: skip
-    except ValueError as refused:
-        raise SpecRefused(str(refused)) from refused
+    new_limits = {k: float(v) for k, v in after.items()}
+
+    def judged_by_the_proposal(customer_id: int, chemical_id: int, location: str):
+        if (customer_id, chemical_id, location or "") == (key.customer_id, key.chemical_id, key.location):
+            return dict(new_limits)
+        return specs(customer_id, chemical_id, location)
+
     reevaluated, differ, skipped = [], [], []
     if key.kind == "specification":
+        lookup = reference_lookup(db, reference, judged_by_the_proposal)
         why = f"spec limits changed (proposal {proposal_id})"
         wanted = _matching_samples(db, reference, key)
         differ += judged_otherwise(db, wanted, before, after)
@@ -302,6 +308,23 @@ def approve(
     )  # fmt: skip
     db.add(row)
     db.flush()
+    customer, chemical = reference.customer(key.customer_id), reference.chemical(key.chemical_id)
+    names = (
+        customer.name if customer else str(key.customer_id),
+        chemical.name if chemical else str(key.chemical_id),
+    )
+    try:
+        if same:  # its commit is ours: the set, the decision and the new versions together
+            SpecificationService(db).set_limits(
+                key.customer_id, key.chemical_id, key.location, key.kind, new_limits, unit, *names
+            )
+        else:
+            with Session(slim_engine) as slim:
+                SpecificationService(slim).set_limits(
+                    key.customer_id, key.chemical_id, key.location, key.kind, new_limits, unit, *names
+                )
+    except ValueError as refused:
+        raise SpecRefused(str(refused)) from refused
     return row
 
 
