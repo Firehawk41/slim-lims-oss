@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Your account — YourLab{% endblock %}
+
+{% block content %}
+  <div class="page-head"><h1>Your account</h1></div>
+  <p class="muted">{{ current_user.email }}</p>
+  {% if current_user.is_persona %}
+    <p>Demo personas are chosen, not signed in: they have no password and no MFA.</p>
+  {% else %}
+    <section class="form-section" aria-labelledby="pw-heading">
+      <h2 id="pw-heading">Change your password</h2>
+      <form method="post" action="{{ url_for('account_password') }}" class="stack-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+        <label>Current password <input type="password" name="current" required autocomplete="current-password"></label>
+        <label>New password (12+ characters) <input type="password" name="new" minlength="12" required autocomplete="new-password"></label>
+        <label>New password again <input type="password" name="again" minlength="12" required autocomplete="new-password"></label>
+        <button type="submit" class="btn btn--primary">Change password</button>
+      </form>
+      <p class="hint">Changing it signs out any other session on this account.</p>
+    </section>
+
+    <section class="form-section" aria-labelledby="mfa-heading">
+      <h2 id="mfa-heading">Two-step sign-in (MFA)</h2>
+      {% if mfa %}
+        <p>On since {{ mfa.enabled_at.strftime("%Y-%m-%d") }}: after your password, you type a code from your authenticator app.
+          {{ left }} recovery code{{ "" if left == 1 else "s" }} left.</p>
+        {% if required %}
+          <p class="muted">Your role requires it. If you lose your phone, use a recovery code, or ask whoever manages users to reset it.</p>
+        {% else %}
+          <form method="post" action="{{ url_for('account_mfa_off') }}" class="stack-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+            <label>Password, to turn it off <input type="password" name="current" required autocomplete="current-password"></label>
+            <button type="submit" class="btn btn--secondary">Turn MFA off</button>
+          </form>
+        {% endif %}
+      {% else %}
+        <p>Off. {% if required %}<strong>Your role requires it.</strong>{% else %}Optional for you, and recommended.{% endif %}</p>
+        <a class="btn btn--primary" href="{{ url_for('account_mfa') }}">Set up MFA</a>
+      {% endif %}
+    </section>
+
+    {% if events %}
+      <h2>Recent</h2>
+      <ul>{% for e in events|reverse %}<li>{{ e.at.strftime("%Y-%m-%d %H:%M") }}: {{ e.kind.replace("_", " ") }}{% if e.by != current_user.email %} by {{ e.by }}{% endif %}{% if e.reason %} ({{ e.reason }}){% endif %}</li>{% endfor %}</ul>
+    {% endif %}
+  {% endif %}
+{% endblock %}

@@ -163,3 +163,7 @@ kbd { font-family: inherit; border: 1px solid var(--color-border); border-radius
 .trace-steps dt { font-weight: 600; margin-top: 0.8em; }
 .trace-steps dd { margin: 0.2em 0 0 0; }
 .trace-steps dd span { display: inline-block; margin-right: 1.2em; }
+
+/* Accounts (D-142): the MFA setup's QR code and the recovery codes. */
+.mfa-qr svg { display: block; margin: 0.5rem 0; background: #fff; padding: 8px; }
+.recovery-codes { columns: 2; font-size: 1.1rem; }

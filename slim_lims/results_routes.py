@@ -796,7 +796,7 @@ def api_send(tr_number: str, issue_id: int, user: RequireStaff, db: DB, service:
 @router.get("/outbox", name="outbox")
 def outbox(request: Request, user: RequireStaff, db: DB):
     """Every report and quote sent, newest first, as the customer would have received it (D-124, D-139)."""
-    from slim_lims import quotes
+    from slim_lims import accounts, quotes
 
     return render(
         request,
@@ -804,6 +804,7 @@ def outbox(request: Request, user: RequireStaff, db: DB):
         {
             "deliveries": delivery.deliveries(db),
             "quote_deliveries": quotes.deliveries(db),
+            "account_messages": accounts.messages(db),
             "number": quotes.number,
         },
     )

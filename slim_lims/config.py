@@ -32,6 +32,8 @@ class Settings:
     oss_report_engine_dir: str | None = None
     # Quotes expiring within this many days are listed as expiring soon (D-139).
     quote_expiry_warning_days: int = 30
+    # Supervisors and quality managers must set up MFA (D-142); off only in tests that aren't about it.
+    require_mfa: bool = True
 
     @property
     def is_production(self) -> bool:
@@ -92,4 +94,5 @@ def load_settings() -> Settings:
         demo_labs=_bool(os.environ.get("DEMO_LABS"), False),
         oss_report_engine_dir=os.environ.get("SLIM_REPORT_ENGINE_OSS_DIR") or None,
         quote_expiry_warning_days=int(os.environ.get("QUOTE_EXPIRY_WARNING_DAYS", 30)),
+        require_mfa=_bool(os.environ.get("REQUIRE_MFA"), True),
     )

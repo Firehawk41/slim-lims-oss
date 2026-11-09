@@ -56,7 +56,20 @@
             <form method="post" action="{{ url_for('toggle_user_active', user_id=u.id) }}">
               <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
               <button type="submit" class="btn btn--secondary btn--small">{{ "Deactivate" if u.is_active else "Reactivate" }}</button>
-            </form>{% endif %}</td>
+            </form>{% endif %}
+            {% if not u.is_persona and not outranks[u.id] %}
+              <form method="post" action="{{ url_for('make_reset_link', user_id=u.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+                <button type="submit" class="btn btn--secondary btn--small" title="A one-time link to set a new password (24 hours)">Reset link</button>
+              </form>
+              {% if u.id in with_mfa %}
+                <form method="post" action="{{ url_for('reset_user_mfa', user_id=u.id) }}" class="nav-form">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+                  <input type="text" name="reason" maxlength="2000" size="12" required placeholder="Why (lost phone…)" aria-label="Why reset MFA for {{ u.email }}">
+                  <button type="submit" class="btn btn--secondary btn--small">Reset MFA</button>
+                </form>
+              {% endif %}
+            {% endif %}</td>
         </tr>
       {% endfor %}
     </tbody>

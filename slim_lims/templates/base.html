@@ -42,6 +42,7 @@
               <a href="{{ url_for('about') }}">About</a>
               <a href="{{ url_for('demo_personas') }}">Switch persona</a>
             {% endif %}
+            {% if not current_user.is_persona %}<a href="{{ url_for('account_home') }}">Account</a>{% endif %}
             <form method="post" action="{{ url_for('logout') }}" class="nav-form">
               <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
               <button type="submit" class="nav-link-button">Logout</button>

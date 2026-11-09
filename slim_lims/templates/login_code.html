@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block title %}Your code — YourLab{% endblock %}
+
+{% block nav %}<a href="{{ url_for('login') }}">Login</a>{% endblock %}
+
+{% block content %}
+  <h1>Your code</h1>
+  <section class="form-section">
+    {% if error %}<div class="form-error" role="alert">{{ error }}</div>{% endif %}
+    <form method="post" action="{{ url_for('login_code_form') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+      <div class="form-row">
+        <label for="code">The six-digit code from your authenticator app, or a recovery code:</label>
+        <input type="text" name="code" id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="12" required autofocus>
+      </div>
+      <button type="submit" class="btn btn--primary">Sign in</button>
+    </form>
+  </section>
+{% endblock %}

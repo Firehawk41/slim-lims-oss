@@ -22,7 +22,15 @@ from slim_lims.api import Service, get_reference
 from slim_lims.auth import CurrentUser, RequireStaff, RequireUser
 from slim_lims.db import get_db
 from slim_lims.domain import ActorType, RequestType, TRStatus, TRSubmission, allowed_next_statuses
-from slim_lims.models import LAB_ROLE_ANALYST, LAB_ROLES, ROLE_CUSTOMER, ROLE_STAFF, User, UserCapability
+from slim_lims.models import (
+    LAB_ROLE_ANALYST,
+    LAB_ROLES,
+    ROLE_CUSTOMER,
+    ROLE_STAFF,
+    User,
+    UserCapability,
+    UserMfaRow,
+)
 from slim_lims.personas import persona_choices
 from slim_lims.reference import ReferenceData
 from slim_lims.results import issued_documents
@@ -592,6 +600,7 @@ def admin_users(request: Request, user: RequireStaff, db: DB, reference: Referen
             "role_defaults": capabilities.ROLE_DEFAULTS,
             "may_grant": {c: capabilities.may_grant(user, c) for c in capabilities.CAPABILITIES},
             "outranks": {u.id: capabilities.outranks(u, user) for u in users},
+            "with_mfa": set(db.scalars(select(UserMfaRow.user_id))),  # D-142
         },
     )
 
