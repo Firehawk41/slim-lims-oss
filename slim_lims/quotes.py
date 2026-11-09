@@ -208,9 +208,11 @@ def build(form: QuoteForm, reference: ReferenceData, by: str) -> slim_invoicing.
     known_analyses = {a.id for a in reference.catalog_analyses()}
     lines = []
     for n, line in enumerate(form.lines, 1):
-        if not line.analysis_ids:
-            continue
         where = f"Line {n}"
+        if not line.analysis_ids:
+            if any(r.strip() or b.strip() for r, b in line.prices.values()) or line.bulk_min.strip():
+                problems.append(f"{where}: choose the analyses these prices are for")  # never dropped (F1)
+            continue
         if any(a not in known_analyses for a in line.analysis_ids):
             problems.append(f"{where}: unknown analysis")
         bulk_min = line.bulk_min.strip()

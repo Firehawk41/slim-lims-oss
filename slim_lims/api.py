@@ -3,7 +3,7 @@ the shape the rest of the SLIM ecosystem will consume."""
 
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
@@ -39,11 +39,26 @@ from slim_lims.services import (
 router = APIRouter(prefix="/api/submissions", tags=["submissions"], dependencies=[Depends(csrf_protect)])
 
 
+def _visitors_lab(request: Request):
+    """(the visitor's lab schema or None, its engine or None). The lab is entered here if no dependency did
+    yet (review 2026-11-09 L2), so its engine never depends on the order dependencies resolve in."""
+    labs = getattr(request.app.state, "labs", None)
+    schema = request.session.get(LAB_SESSION_KEY) if labs is not None else None
+    if not schema:
+        return None, None
+    engine = labs.engine_for(schema)
+    if engine is None and labs.enter(schema) is not None:
+        engine = labs.engine_for(schema)
+    return schema, engine
+
+
 def get_reference(request: Request) -> ReferenceData:
     """The lab's reference data: a visitor's own lab's when they have one (D-102, D-141), else the app's."""
-    labs = getattr(request.app.state, "labs", None)
-    if labs is not None and (schema := request.session.get(LAB_SESSION_KEY)):
-        own = labs.reference_for(schema, request.app.state.settings.reference_cache_ttl_seconds)
+    schema, engine = _visitors_lab(request)
+    if engine is not None:
+        own = request.app.state.labs.reference_for(
+            schema, request.app.state.settings.reference_cache_ttl_seconds
+        )
         if own is not None:
             return own
     return request.app.state.reference
@@ -51,24 +66,25 @@ def get_reference(request: Request) -> ReferenceData:
 
 def specs_for(request: Request):
     """The spec limits evaluation reads: a visitor's own lab's (they may change them there, D-143), else
-    the app's reader."""
-    labs = getattr(request.app.state, "labs", None)
-    if labs is not None and (schema := request.session.get(LAB_SESSION_KEY)):
-        engine = labs.engine_for(schema)
-        if engine is not None:
-            from slim_lims.results import SpecReader
+    the app's reader. A visitor whose lab has gone gets no other lab's (fails closed, L2)."""
+    schema, engine = _visitors_lab(request)
+    if schema is not None:
+        if engine is None:
+            raise HTTPException(status_code=409, detail="Your demo lab has gone: choose a persona again.")
+        from slim_lims.results import SpecReader
 
-            return SpecReader(engine)
+        return SpecReader(engine)
     return request.app.state.specs
 
 
 def slim_engine_for(request: Request):
-    """Where slim-domain writes the lab's reference data: a visitor's own lab, else SLIM's database."""
-    labs = getattr(request.app.state, "labs", None)
-    if labs is not None and (schema := request.session.get(LAB_SESSION_KEY)):
-        engine = labs.engine_for(schema)
-        if engine is not None:
-            return engine
+    """Where slim-domain writes the lab's reference data: a visitor's own lab, else SLIM's database. Never
+    the shared lab for a visitor (fails closed, L2)."""
+    schema, engine = _visitors_lab(request)
+    if schema is not None:
+        if engine is None:
+            raise HTTPException(status_code=409, detail="Your demo lab has gone: choose a persona again.")
+        return engine
     return request.app.state.slim_engine
 
 

@@ -373,3 +373,10 @@ def test_supervisors_price_and_the_demo_has_an_open_request(db, staff_user, cust
     reference = demo_reference()
     assert qs.seed_demo_quote_request(db, reference) == 1 and qs.seed_demo_quote_request(db, reference) == 0
     assert [r.state for r in qs.requests(db, open_only=True)] == ["open"]
+
+
+def test_f1_prices_typed_without_analyses_are_refused_never_dropped(db):
+    reference = demo_reference()
+    stray = form(lines=[*form().lines, qs.LineIn(prices={FIVE: ("80", "")})])
+    with pytest.raises(qs.QuoteRefused, match="Line 2: choose the analyses these prices are for"):
+        qs.build(stray, reference, "JM")

@@ -101,13 +101,16 @@ def make_reset(db: Session, target: User, by: User, link_for) -> str:
         )
     )
     url = link_for(token)
+    # The copy kept in the outbox never holds the link: every staff member reads the outbox, and the link
+    # is the account (review 2026-11-09 A2). It is shown once, to whoever made it.
+    hidden = url.rsplit("/", 1)[0] + "/[the link, shown once to " + by.email + "; not kept]"
     db.add(
         AccountMessageRow(
             to_address=target.email,
             subject="Set a new password for SlimLIMS",
             body=(
                 "Hello,\n\nA new password was asked for on your account. Open this link to set one "
-                f"(it works once, for {RESET_HOURS} hours):\n\n{url}\n\n"
+                f"(it works once, for {RESET_HOURS} hours):\n\n{hidden}\n\n"
                 "If you didn't expect this, tell the lab."
             ),
             sent_by=by.email,
@@ -211,7 +214,11 @@ def check_code(db: Session, user: User, code: str, secret_key: str, now: float) 
     mfa = mfa_of(db, user)
     if mfa is None:
         return False
-    step = totp.verify(totp.unseal(secret_key, mfa.secret_sealed), code, now, mfa.last_step)
+    try:
+        secret = totp.unseal(secret_key, mfa.secret_sealed)
+    except ValueError:  # sealed under another SECRET_KEY: only a recovery code (or an MFA reset) helps (A1)
+        secret = None
+    step = totp.verify(secret, code, now, mfa.last_step) if secret is not None else None
     if step is not None:
         mfa.last_step = step
         db.flush()
