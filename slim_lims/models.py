@@ -586,6 +586,46 @@ class AccountMessageRow(Base):
     sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
 
+# ---------------------------------------------------------------- spec limit changes (D-143)
+
+
+class SpecProposalRow(Base):
+    """A proposed change to one limit set (customer × chemical × site × kind): the set as it stood and
+    as proposed, why, who. Proposed by quality or a quality manager. Append-only."""
+
+    __tablename__ = "spec_proposals"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    customer_id: Mapped[int] = mapped_column(Integer, index=True)  # SLIM IDs, no FKs
+    chemical_id: Mapped[int] = mapped_column(Integer)
+    location: Mapped[str] = mapped_column(String(20), default="")
+    kind: Mapped[str] = mapped_column(String(20))  # "specification" | "warning_limit"
+    unit: Mapped[str] = mapped_column(String(20))
+    before: Mapped[dict] = mapped_column(JSON)  # element -> value (strings), as it stood
+    after: Mapped[dict] = mapped_column(JSON)  # element -> value (strings), as proposed
+    reason: Mapped[str] = mapped_column(Text)
+    proposed_by: Mapped[str] = mapped_column(String(254))
+    proposed_by_id: Mapped[str] = mapped_column(String(64))
+    proposed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class SpecDecisionRow(Base):
+    """A proposal approved (written through slim-domain) or rejected, by a quality manager or a lab
+    supervisor who didn't propose it; what was re-evaluated and which released results would now judge
+    differently. Append-only; one per proposal."""
+
+    __tablename__ = "spec_decisions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    proposal_id: Mapped[int] = mapped_column(ForeignKey("spec_proposals.id"), unique=True)
+    outcome: Mapped[str] = mapped_column(String(20))  # "approved" | "rejected"
+    reason: Mapped[str] = mapped_column(Text, default="")
+    by: Mapped[str] = mapped_column(String(254))
+    reevaluated: Mapped[list] = mapped_column(JSON, default=list)  # batch codes
+    now_differ: Mapped[list] = mapped_column(JSON, default=list)  # released results, judged otherwise now
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
 def _append_only_after_create(target, connection, **_kw) -> None:
     append_only(connection, target.name)
 
@@ -605,6 +645,8 @@ for _table in (
     ReferenceChangeRow.__table__,
     AccountEventRow.__table__,
     AccountMessageRow.__table__,
+    SpecProposalRow.__table__,
+    SpecDecisionRow.__table__,
 ):
     event.listen(_table, "after_create", _append_only_after_create)
 

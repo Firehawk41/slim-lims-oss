@@ -48,7 +48,7 @@ from slim_quality.persistence import store as quality_store
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from slim_lims.api import get_reference
+from slim_lims.api import get_reference, specs_for
 from slim_lims.auth import RequireStaff
 from slim_lims.db import get_db
 from slim_lims.labtime import LabClock, lab_clock
@@ -558,7 +558,7 @@ def _expected(values: dict[str, str]) -> int:
 @router.post("/prep/batches/{code}/send", name="prep_send")
 def prep_send(request: Request, code: str, user: RequireStaff, db: DB, reference: Reference):
     try:
-        body = _guard(db, lambda: send(db, code, user, reference, request.app.state.specs))
+        body = _guard(db, lambda: send(db, code, user, reference, specs_for(request)))
     except Refused as refused:
         flash(request, "Not sent: " + "; ".join(refused.problems), "error")
     else:
@@ -718,7 +718,7 @@ def api_save_batch(data: BatchIn, user: RequireStaff, db: DB, clock: Clock, refe
 
 @api_router.post("/batches/{code}/send")
 def api_send(request: Request, code: str, user: RequireStaff, db: DB, reference: Reference):
-    return _api(db, lambda: send(db, code, user, reference, request.app.state.specs))
+    return _api(db, lambda: send(db, code, user, reference, specs_for(request)))
 
 
 class MoveIn(BaseModel):

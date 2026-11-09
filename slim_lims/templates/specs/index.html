@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}Spec limits — YourLab{% endblock %}
+
+{% block content %}
+  <div class="page-head"><h1>Spec limits</h1></div>
+  <p class="hint">A limit set is one customer (or customer group) × chemical × site × kind. A change is proposed by quality
+    staff or a quality manager and decided by a quality manager or a lab supervisor who didn't propose it. Released results
+    keep the limits they were judged by; unreleased ones are re-evaluated when a change is approved (D-143).</p>
+
+  {% if may_propose %}
+    <form method="get" action="{{ url_for('specs_edit') }}" class="filters" aria-label="Choose a limit set">
+      <label>Customer <select name="customer" required>{% for c in customers %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}</select></label>
+      <label>Chemical <select name="chemical" required>{% for c in chemicals %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}</select></label>
+      <label>Site <input type="text" name="location" maxlength="20" size="6" placeholder="(none)"></label>
+      <label>Kind <select name="kind">{% for k, label in kinds.items() %}<option value="{{ k }}">{{ label }}</option>{% endfor %}</select></label>
+      <button type="submit" class="btn btn--secondary">Open the set</button>
+    </form>
+  {% endif %}
+
+  <h2>Proposals</h2>
+  <table class="table">
+    <thead><tr><th scope="col">#</th><th scope="col">Set</th><th scope="col">By</th><th scope="col">Why</th><th scope="col">State</th></tr></thead>
+    <tbody>
+      {% for p, d in proposals %}
+        <tr><td><a href="{{ url_for('specs_proposal', proposal_id=p.id) }}">{{ p.id }}</a></td>
+          <td>{{ reference.customer(p.customer_id).name if reference.customer(p.customer_id) else p.customer_id }} ·
+            {{ reference.chemical(p.chemical_id).name if reference.chemical(p.chemical_id) else p.chemical_id }}{% if p.location %} · {{ p.location }}{% endif %} · {{ kinds[p.kind] }}</td>
+          <td>{{ p.proposed_by }}</td><td>{{ p.reason }}</td>
+          <td>{% if d %}{{ d.outcome|capitalize }} by {{ d.by }}{% else %}<strong>Waiting</strong>{% endif %}</td></tr>
+      {% else %}<tr><td colspan="5" class="muted">No proposals yet.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+
+  <h2>Sets on file</h2>
+  <table class="table">
+    <thead><tr><th scope="col">Customer</th><th scope="col">Chemical</th><th scope="col">Site</th><th scope="col">Kind</th><th scope="col">Elements</th><th scope="col"></th></tr></thead>
+    <tbody>
+      {% for cust, chem, loc, kind, n in on_file %}
+        <tr><td>{{ reference.customer(cust).name if reference.customer(cust) else cust }}</td>
+          <td>{{ reference.chemical(chem).name if reference.chemical(chem) else chem }}</td><td>{{ loc or "—" }}</td>
+          <td>{{ kinds.get(kind, kind) }}</td><td>{{ n }}</td>
+          <td>{% if may_propose %}<a href="{{ url_for('specs_edit') }}?customer={{ cust }}&amp;chemical={{ chem }}&amp;location={{ loc }}&amp;kind={{ kind }}">Propose a change</a>{% endif %}</td></tr>
+      {% else %}<tr><td colspan="6" class="muted">No limits on file.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+{% endblock %}

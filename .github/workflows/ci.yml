@@ -52,6 +52,6 @@ jobs:
       # editable install's git URL.
       - run: >-
           pip install -e ".[dev]"
-          "slim-domain @ git+https://github.com/Firehawk41/slim-domain-oss@7b97dada57eb27440a4d63be4263d84263c1647d"
+          "slim-domain @ git+https://github.com/Firehawk41/slim-domain-oss@cca95013df73f44a520d72f7edd3ca03b1fa1a51"
           "slim-report-engine @ git+https://github.com/Firehawk41/slim-report-engine-oss@d9546ea5fe051bd5a7ea117aa47ceef7c52ced21"
       - run: pytest -q

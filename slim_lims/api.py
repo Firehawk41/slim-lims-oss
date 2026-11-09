@@ -49,6 +49,19 @@ def get_reference(request: Request) -> ReferenceData:
     return request.app.state.reference
 
 
+def specs_for(request: Request):
+    """The spec limits evaluation reads: a visitor's own lab's (they may change them there, D-143), else
+    the app's reader."""
+    labs = getattr(request.app.state, "labs", None)
+    if labs is not None and (schema := request.session.get(LAB_SESSION_KEY)):
+        engine = labs.engine_for(schema)
+        if engine is not None:
+            from slim_lims.results import SpecReader
+
+            return SpecReader(engine)
+    return request.app.state.specs
+
+
 def slim_engine_for(request: Request):
     """Where slim-domain writes the lab's reference data: a visitor's own lab, else SLIM's database."""
     labs = getattr(request.app.state, "labs", None)
