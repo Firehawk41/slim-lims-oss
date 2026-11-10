@@ -241,3 +241,41 @@ def test_s1_a_batch_that_cant_be_re_evaluated_doesnt_undo_the_approval(
         and decision.reevaluated == []
         and "no published ruleset" in decision.reason
     )
+
+
+def test_r7_the_set_the_decision_and_the_new_versions_commit_together(
+    client, db, seeded, spec_table, people, monkeypatch
+):
+    """slim-domain's tables in the app's database: approval is one transaction. A write slim-domain
+    refuses leaves no decision and no new result version behind (and the proposal still waiting)."""
+    from slim_data.persistence.results import results_for_tr
+    from slim_domain.domain.specification.specification_service import SpecificationService
+
+    def versions():
+        return sorted(
+            (str(r.sample), r.analyte.code, r.current.version) for r in results_for_tr(db, "TR00002")
+        )
+
+    before = versions()
+    db.rollback()
+
+    def refuse(*_args, **_kwargs):
+        raise ValueError("refused by slim-domain")
+
+    monkeypatch.setattr(SpecificationService, "set_limits", refuse)
+    login(client, "uma@lab.example")
+    propose(client, Fe="0.29", Zn="0.2")
+    client.cookies.clear()
+    login(client, "staff@lab.example")
+    page = client.get("/specs/proposals/1")
+    done = client.post(
+        "/specs/proposals/1/approve", data={"csrf_token": csrf_from(page.text)}, follow_redirects=True
+    )
+    assert (
+        "Not approved: refused by slim-domain" in done.text
+        and "Approve: put these limits on file" in done.text
+    )
+    db.rollback()
+    assert db.scalars(select(SpecDecisionRow)).all() == [] and versions() == before
+    with sc_session(spec_table) as slim:
+        assert sc.current_set(slim, B, IPA, "", "specification")[0] == {"Fe": "0.3", "Zn": "0.2"}

@@ -23,8 +23,7 @@ from html import escape
 from pathlib import Path
 
 import slim_invoicing
-from slim_invoicing.persistence import tables as inv_tables
-from slim_invoicing.persistence.repositories import default_quotes, quotes_for_customer, save_quote
+from slim_invoicing.persistence.repositories import quotes_for_customer, save_quote
 from slim_report_engine.lab_identity import LAB_HEADER_LINES
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -62,15 +61,12 @@ def number(quote_id: int) -> str:
 
 
 def all_quotes(session: Session) -> list[slim_invoicing.Quote]:
-    """Every quote, newest first. V5 reads quotes per customer, so ask it for every customer one names."""
-    found = {q.id: q for q in default_quotes(session)}
-    for customer_id in set(session.scalars(select(inv_tables.quote_customers.c.customer_id))):
-        found.update((q.id, q) for q in quotes_for_customer(session, customer_id))
-    return sorted(found.values(), key=lambda q: q.id, reverse=True)
+    """Every quote, newest first: V5's own API, not its tables (review 2026-11-09 R5)."""
+    return slim_invoicing.all_quotes(session)
 
 
 def quote(session: Session, quote_id: int) -> slim_invoicing.Quote | None:
-    return next((q for q in all_quotes(session) if q.id == quote_id), None)
+    return slim_invoicing.get_quote(session, quote_id)
 
 
 def visible_to(q: slim_invoicing.Quote, user: User) -> bool:

@@ -247,6 +247,13 @@ Tally and themes are updated now and then at the bottom.
 | F | A2: reset links readable by every staff member in the outbox (an account takeover); L2: a visitor's writes could fall back to the shared lab; S1: a spec approval half-done by one batch that couldn't be evaluated; A1: MFA a 500 after a key change; F1: quote prices silently dropped. All fixed, each with its guard. | `test_a2_…`, `test_l2_…`, `test_s1_…`, `test_a1_…`, `test_f1_…`. |
 | F | For decision: R5 (the host reads V5's tables), R6 (slim-domain's private sync would drop `set_limits`), R7 (the spec write and its decision commit apart). | Raised with Jamie. |
 
+## 2026-11-09: review findings R5 and R7
+
+| Kind | What | Notes |
+|---|---|---|
+| J | "Do R5 and R7." | |
+| C✓ | R5: V5's own `all_quotes` / `get_quote` instead of the host reading its tables; R7: a spec approval as one transaction where slim-domain shares the app's database, judged by the proposed limits before they're on file. | `test_r7_the_set_the_decision_and_the_new_versions_commit_together`. |
+
 ## Themes so far
 - **Domain facts are Jamie's, and they overrule Claude's defaults:** DF < 1, MDL averaging, standards as
   recipes, spike placement. Claude's "cautious" engineering defaults were wrong more than once where
