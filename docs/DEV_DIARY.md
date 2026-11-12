@@ -268,6 +268,9 @@ Tally and themes are updated now and then at the bottom.
 |---|---|---|
 | J | "Review the Lab department per the plan." | `REVIEW_2026-11-12_lab.md`. Nothing fixed. |
 | F | Bugs L-1…L-5: a clean rerun batch can't be released on screen (the release reads every batch's QC flags, the page its own); one cancelled or invoiced request freezes a shared prep batch's corrections; a blocking bottle stops the prep book but not an instrument file; a refused release loses what was typed. For decision L-6…L-12. | Raised with Jamie. |
+| J | "Fix L-1 through L-4." | |
+| C✓ | L-1: the release and the batch page ask one function, by the batch each result was made from; L-3: a file can't put a blocked sample on a batch; L-4: a refused review or release shows the form again as posted. Each with its guard test. | Host only. |
+| C→J | L-2 built in the host (`prep.AlreadyHeld`: a correction's samples stay taken), not in slim-prep as the review proposed: no module change or pin bump, and a first send of a cancelled request's batch is still refused (P-23). | Say if it should move into slim-prep. |
 
 ## Themes so far
 - **Domain facts are Jamie's, and they overrule Claude's defaults:** DF < 1, MDL averaging, standards as

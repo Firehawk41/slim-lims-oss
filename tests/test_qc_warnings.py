@@ -112,3 +112,43 @@ def test_no_runs_or_no_history_means_no_panel(app, lab):  # noqa: F811
         page = rv.get("/results/batches/PB-1").text
         assert "QC trends on these runs" not in page
         assert rv.post(f"{SAMPLE_1}/release", json={}).json()["released"] == ["Fe"]
+
+
+def only_on(batch_code):
+    """ACTION flags on one batch's runs only."""
+    flagged = fake(Severity.ACTION)
+    return lambda db, batch, analytes, charts=None: (
+        flagged(db, batch, analytes) if batch == batch_code else {}
+    )
+
+
+def test_l1_a_clean_rerun_batch_releases_without_a_reason(app, lab, monkeypatch):  # noqa: F811
+    """Review L-1: the flags that bear on a release are those of the batch its result was made from, and
+    the page asks for a reason exactly when the release would."""
+    monkeypatch.setattr(qc_warnings, "batch_warnings", only_on("PB-1"))
+    with staff_api(app, "AN") as an:
+        upload(an, csv())
+        again = upload(an, csv(batch="PB-2", run="RUN-2", spike="30.10"), name="run2.csv")
+        assert again.json()["evaluated"]["PB-2"]["new_versions"] == 2  # the results now come from PB-2
+    with staff_api(app, "RV") as rv:
+        assert rv.post("/api/results/batches/PB-2/review", json={}).json() == {"reviewed": 2}
+        assert 'name="qc_ack"' not in rv.get("/results/batches/PB-2").text
+        assert 'name="qc_ack"' not in rv.get("/results/batches/PB-1").text  # the same release
+        assert rv.post(f"{SAMPLE_1}/release", json={}).json()["released"] == ["Fe"]
+    lab.rollback()
+    assert lab.scalars(select(QcAcknowledgementRow)).all() == []
+
+
+def test_l1_the_flagged_batch_asks_wherever_the_release_is_made(app, lab, monkeypatch):  # noqa: F811
+    monkeypatch.setattr(qc_warnings, "batch_warnings", only_on("PB-2"))
+    with staff_api(app, "AN") as an:
+        upload(an, csv())
+        upload(an, csv(batch="PB-2", run="RUN-2", spike="30.10"), name="run2.csv")
+    with staff_api(app, "RV") as rv:
+        # nothing reviewed: nothing to release, nothing to answer for
+        assert 'name="qc_ack"' not in rv.get("/results/batches/PB-2").text
+        rv.post("/api/results/batches/PB-2/review", json={})
+        for code in ("PB-1", "PB-2"):  # the older batch's page releases the same results
+            page = rv.get(f"/results/batches/{code}").text
+            assert 'name="qc_ack"' in page and "ICP-MS 1 · Fe CCV: WG_1_3S" in page
+        assert rv.post(f"{SAMPLE_1}/release", json={}).status_code == 409

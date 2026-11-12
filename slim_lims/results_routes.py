@@ -34,12 +34,11 @@ from slim_data.domain.workflow import UnknownCategory, WorkflowError
 from slim_data.engine.ruleset import RulesetError
 from slim_data.persistence._rows import NotFound
 from slim_data.persistence.observations import get_run, run_file
-from slim_data.persistence.results import issues_for_tr, load_result
+from slim_data.persistence.results import issues_for_tr, load_result, results_for_tr
 from slim_data.persistence.rulesets import current_policy
 from slim_data.service import workflow as wf
 from slim_data.service.imports import ImportPlan, ImportRefused, preview_import
-from slim_data.service.views import batch_view, batches, report_view
-from slim_quality.domain.enums import Severity
+from slim_data.service.views import batch_view, batches, report_view, samples_by_batch
 from sqlalchemy.orm import Session
 
 from slim_lims import capabilities, delivery, qc_warnings, reports
@@ -56,6 +55,7 @@ from slim_lims.results import (
     StaffDirectory,
     act_on_result,
     actor_for,
+    blocked_samples,
     import_analyses,
     import_and_evaluate,
     issue_report,
@@ -119,11 +119,15 @@ def _with_equipment(request: Request, db: Session, plan: ImportPlan) -> dict[str
 def _import(request, db, reference, service, user, content: bytes, filename: str, reader=None):
     """(status, body): 201 with the receipt, or 422 with the reason; commits only on success."""
     lookup = _lookup(request, db, reference)
+    held_before = samples_by_batch(db)
     try:
         receipt, evaluations, trs = import_and_evaluate(
             db, content, filename, actor_for(user), lookup, StaffDirectory(db), reader
         )
         started = start_work(service, trs, user)
+        if blocked := blocked_samples(db, reference, evaluations, held_before):  # S-04, review L-3
+            db.rollback()
+            return 422, {"detail": f"The file was not imported: {'; '.join(blocked)}."}
         blocks, warnings = run_equipment(db, receipt.run_id, lab_clock(request).zone)  # D-126
         if blocks:
             db.rollback()
@@ -414,6 +418,14 @@ def results_upload(
 
 @router.get("/results/batches/{code}", name="results_batch")
 def results_batch(request: Request, code: str, user: RequireStaff, db: DB, reference: Reference):
+    return _batch_page(request, db, reference, code)
+
+
+def _batch_page(
+    request: Request, db: Session, reference: ReferenceData, code: str, typed=None, status: int = 200
+):
+    """The batch page. `typed`: a review or release form that was refused, shown again as it was posted
+    (review L-4: {"form": "review" | "release", "sample", "analysis_id", "note", "solo", "qc_ack"})."""
     try:
         view = batch_view(db, code)
     except NotFound:
@@ -426,12 +438,17 @@ def results_batch(request: Request, code: str, user: RequireStaff, db: DB, refer
         },
         key=lambda k: (k[0].tr_number, k[0].position, k[1]),
     )
-    warnings = qc_warnings.batch_warnings(db, code, {r.analyte.code for r in view.results})  # D-144
-    action_groups = {
-        (r.sample, r.analyte.analysis_id)
-        for r in view.results
-        if any(w.severity == Severity.ACTION for w in warnings.get(r.analyte.code, ()))
-    }
+    charts = qc_warnings.Charts(db)
+    warnings = qc_warnings.batch_warnings(db, code, {r.analyte.code for r in view.results}, charts)  # D-144
+    # What each release would have to answer for: asked where the release asks (review L-1).
+    by_tr: dict[str, list] = {}
+    action_groups = {}
+    for sample, analysis_id in release_groups:
+        if sample.tr_number not in by_tr:
+            by_tr[sample.tr_number] = results_for_tr(db, sample.tr_number)
+        found = qc_warnings.for_release(db, sample, analysis_id, charts, by_tr[sample.tr_number])
+        if action := qc_warnings.action_flags(found):
+            action_groups[(sample, analysis_id)] = action
     return render(
         request,
         "results/batch.html",
@@ -446,7 +463,9 @@ def results_batch(request: Request, code: str, user: RequireStaff, db: DB, refer
             "worst": {a: qc_warnings.worst(ws) for a, ws in warnings.items()},
             "actions": ResultAction,
             "categories": _categories(db),
+            "typed": typed or {},
         },
+        status,
     )
 
 
@@ -493,16 +512,29 @@ def _back(request: Request, code: str, outcome: tuple[int, dict[str, Any]], done
     return RedirectResponse(request.url_for("results_batch", code=code).path, status_code=303)
 
 
+def _refused(request: Request, db: Session, reference: ReferenceData, code: str, outcome, typed: dict):
+    """A refused review or release: the batch page again, with the reason and the form as it was posted,
+    so nothing typed is lost (review L-4)."""
+    status, body = outcome
+    details = body.get("problems") or body.get("waiting") or []
+    flash(request, " ".join([str(body["detail"]), *details]), "error")
+    return _batch_page(request, db, reference, code, typed, status)
+
+
 @router.post("/results/batches/{code}/review", name="results_review")
 def results_review(
     request: Request,
     code: str,
     user: RequireStaff,
     db: DB,
+    reference: Reference,
     note: Annotated[str, Form(max_length=2000)] = "",
     solo: Annotated[bool, Form()] = False,
 ):
     outcome = _review(db, user, code, SignOffIn(note=note, solo=solo))
+    if outcome[0] != 200:
+        typed = {"form": "review", "note": note, "solo": solo}
+        return _refused(request, db, reference, code, outcome, typed)
     return _back(request, code, outcome, "Reviewed {reviewed} result(s).")
 
 
@@ -545,6 +577,7 @@ def results_release(
     code: str,
     user: RequireStaff,
     db: DB,
+    reference: Reference,
     sample: Annotated[str, Form()],
     analysis_id: Annotated[int, Form()],
     note: Annotated[str, Form(max_length=2000)] = "",
@@ -553,6 +586,10 @@ def results_release(
 ):
     sample_ref, _ = _result_key(sample, analysis_id, "X")
     outcome = _release(db, user, sample_ref, analysis_id, SignOffIn(note=note, solo=solo, qc_ack=qc_ack))
+    if outcome[0] != 200:
+        typed = {"form": "release", "sample": str(sample_ref), "analysis_id": analysis_id, "note": note,
+                 "solo": solo, "qc_ack": qc_ack}  # fmt: skip
+        return _refused(request, db, reference, code, outcome, typed)
     return _back(request, code, outcome, "Released {sample}: {released}.")
 
 

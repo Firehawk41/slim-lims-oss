@@ -53,7 +53,15 @@ from slim_lims.auth import RequireStaff
 from slim_lims.db import get_db
 from slim_lims.labtime import LabClock, lab_clock
 from slim_lims.models import ROLE_STAFF, User
-from slim_lims.prep import PREP_ANALYSES, TrSamples, prep_actor_for, refuse_blocked, rules, send
+from slim_lims.prep import (
+    PREP_ANALYSES,
+    TrSamples,
+    correction_samples,
+    prep_actor_for,
+    refuse_blocked,
+    rules,
+    send,
+)
 from slim_lims.quality_records import RegisterStocks, refuse_equipment, standard_equipment
 from slim_lims.reference import ReferenceData
 from slim_lims.security import csrf_protect
@@ -500,11 +508,12 @@ def prep_save_batch(
 
     def save():
         batch = _batch_from_grid(values, db, user, clock)
-        refuse_blocked(db, batch)
+        if not expected:  # a correction is not new work (review L-2)
+            refuse_blocked(db, batch)
         warnings.extend(refuse_equipment(db, batch))  # the equipment register (D-126)
         reason = values.get("reason") or None
         rules_id = None if expected else rules(db).id  # a correction keeps its own (P-24)
-        samples = TrSamples(db, reference)
+        samples = correction_samples(db, reference, batch.code) if expected else TrSamples(db, reference)
         return record_batch(db, batch, rules_id, prep_actor_for(user), samples, clock.now(), expected, reason)
 
     try:
@@ -575,7 +584,7 @@ def _move(
     """The batch, rechecked and recorded under the lab's current rules (P-24; review B9)."""
     if not reason.strip():
         raise ValueError("moving a batch to new rules needs a reason")
-    samples = TrSamples(db, reference)
+    samples = correction_samples(db, reference, code)
     recorded, _ = move_to_rules(
         db, code, rules(db).id, prep_actor_for(user), samples, clock.now(), version, reason.strip()
     )
@@ -700,11 +709,14 @@ def api_batch(code: str, user: RequireStaff, db: DB):
 def api_save_batch(data: BatchIn, user: RequireStaff, db: DB, clock: Clock, reference: Reference):
     def save():
         batch = _in_lab_time(data.batch, clock)
-        refuse_blocked(db, batch)
+        correction = bool(data.expected_version)
+        if not correction:  # a correction is not new work (review L-2)
+            refuse_blocked(db, batch)
         refuse_equipment(db, batch)  # the equipment register (D-126): blocks raise
-        rules_id = None if data.expected_version else rules(db).id  # a correction keeps its own (P-24)
+        rules_id = None if correction else rules(db).id  # a correction keeps its own (P-24)
+        samples = correction_samples(db, reference, batch.code) if correction else TrSamples(db, reference)
         record_batch(
-            db, batch, rules_id, prep_actor_for(user), TrSamples(db, reference), clock.now(),
+            db, batch, rules_id, prep_actor_for(user), samples, clock.now(),
             data.expected_version, data.reason,
         )  # fmt: skip
         return batch.code

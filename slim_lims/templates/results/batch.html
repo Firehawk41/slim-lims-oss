@@ -12,8 +12,8 @@
     {% for s in view.samples %}{{ s }}{{ ", " if not loop.last }}{% endfor %}</p>
 
   {% macro csrf() %}<input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">{% endmacro %}
-  {% macro solo_box() %}
-    <label class="check"><input type="checkbox" name="solo" value="true"> Solo: I entered these readings
+  {% macro solo_box(ticked=false) %}
+    <label class="check"><input type="checkbox" name="solo" value="true"{% if ticked %} checked{% endif %}> Solo: I entered these readings
       and am signing off alone after the policy's wait; the note is the reason</label>
   {% endmacro %}
 
@@ -21,8 +21,9 @@
     <h2 id="batch-actions-heading">Batch</h2>
     <form method="post" action="{{ url_for('results_review', code=view.code) }}" class="action-form">
       {{ csrf() }}
-      <label>Review note <input name="note" maxlength="2000"></label>
-      {{ solo_box() }}
+      {% set was = typed if typed.form == "review" else {} %}
+      <label>Review note <input name="note" maxlength="2000" value="{{ was.note or '' }}"></label>
+      {{ solo_box(was.solo) }}
       <button type="submit" class="btn btn--primary">Review every draft</button>
     </form>
     <form method="post" action="{{ url_for('results_re_evaluate', code=view.code) }}" class="action-form">
@@ -66,12 +67,14 @@
           <input type="hidden" name="sample" value="{{ sample }}">
           <input type="hidden" name="analysis_id" value="{{ analysis_id }}">
           <strong>{{ sample }} · {{ analysis.name if analysis else analysis_id }}</strong>
-          <label>Note <input name="note" maxlength="2000"></label>
+          {% set was = typed if typed.form == "release" and typed.sample == sample|string and typed.analysis_id == analysis_id else {} %}
+          <label>Note <input name="note" maxlength="2000" value="{{ was.note or '' }}"></label>
           {% if (sample, analysis_id) in action_groups %}
             <label class="qc-ack">QC trend at action level: why the result still stands
-              <input name="qc_ack" maxlength="2000" required placeholder="e.g. check standard within limits on this run"></label>
+              <input name="qc_ack" maxlength="2000" required value="{{ was.qc_ack or '' }}" placeholder="e.g. check standard within limits on this run">
+              <span class="muted">{% for w in action_groups[(sample, analysis_id)] %}{{ w.series }}: {{ w.code }}{{ "; " if not loop.last }}{% endfor %}</span></label>
           {% endif %}
-          {{ solo_box() }}
+          {{ solo_box(was.solo) }}
           <button type="submit" class="btn btn--primary btn--small">Release</button>
         </form>
       {% endfor %}

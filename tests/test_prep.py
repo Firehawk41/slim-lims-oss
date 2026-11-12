@@ -17,7 +17,7 @@ from slim_lims.models import User
 from slim_lims.prep import publish_demo_prep
 from slim_lims.quality_records import DEMO_INSTRUMENTS, seed_demo_register
 from tests.conftest import csrf_from, login, login_api
-from tests.test_results import HEADER, lab, reference, upload  # noqa: F401 (fixtures)
+from tests.test_results import HEADER, csv, lab, reference, upload  # noqa: F401 (fixtures)
 
 TODAY = date.today()
 
@@ -401,3 +401,86 @@ def test_b6_the_next_code_in_the_labs_series_is_offered(client, prep):
     off_series = _grid(csrf_from(page.text), client, _staff_id(prep)) | {"code": "PB-1"}
     refused = client.post("/prep/batches", data=off_series)
     assert refused.status_code == 422 and "prep batch codes are PREP-0001" in refused.text
+
+
+def _receive(session, tr_number):
+    from datetime import date as day
+
+    from slim_lims.domain import TRStatus, transition
+    from slim_lims.repositories import TRSubmissionRepository
+    from tests.factories import NOW, STAFF_ACTOR
+
+    repo = TRSubmissionRepository(session)
+    tr = repo.get_by_tr_number(tr_number)
+    received = transition(
+        tr, TRStatus.RECEIVED, actor=STAFF_ACTOR, at=NOW, date_received=day(2026, 10, 9), received_by="JM"
+    )
+    repo.record_transition(tr, received)
+    session.commit()
+
+
+def test_l2_a_shared_batch_is_corrected_after_one_request_is_cancelled(client, prep):
+    """Review L-2: a correction is not new work. One request cancelled since doesn't stop the correction
+    of a batch it shares, nor its sending; a new batch still refuses the cancelled sample."""
+    from fastapi.testclient import TestClient
+
+    _receive(prep, "TR00002")
+    login(client, "staff@lab.example")
+    token = csrf_from(client.get("/prep").text)
+    _standards(client, token)
+    samples = ("TR00001-01", "TR00002-01")
+    client.post("/prep/batches", data=_grid(token, client, _staff_id(prep), samples=samples))
+    client.post("/prep/batches/PREP-0001/send", data={"csrf_token": token})
+    with TestClient(client.app) as other:
+        login_api(other, "staff@lab.example")
+        assert other.post("/api/submissions/TR00002/status", json={"to_status": 7}).status_code == 200
+
+    fixed = _grid(token, client, _staff_id(prep), samples=samples) | {
+        "expected_version": "1", "c_0_2_final": "2.7000", "reason": "cup 2 final misread"}  # fmt: skip
+    done = client.post("/prep/batches", data=fixed)
+    assert done.status_code == 200 and "PREP-0001 corrected (version 2)" in done.text
+    sent = client.post("/prep/batches/PREP-0001/send", data={"csrf_token": token})
+    assert "PREP-0001 correction sent (1 changed)." in sent.text
+
+    new = _grid(token, client, _staff_id(prep), samples=samples) | {"code": "PREP-0002"}
+    refused = client.post("/prep/batches", data=new)
+    assert refused.status_code == 422 and "TR00002-01: its request was cancelled" in refused.text
+
+
+def test_l3_a_file_cant_register_a_batch_for_a_blocked_sample(client, prep):
+    """Review L-3 (slim-samples S-04): the prep book refuses a sample whose bottle blocks the analysis;
+    a file that registers its own batch is refused too, and nothing of it is kept."""
+    from slim_data.service.views import batches
+    from slim_samples.domain.containers import ContainerIn, SampleInfo
+    from slim_samples.service import custody
+
+    from slim_lims.samples import SEED_SAMPLES_ACTOR, publish_demo_samples
+
+    class Lookup:
+        def sample(self, sample_id):
+            return SampleInfo(sample=sample_id, analyses=frozenset({"10_elements_icpms"}), customer="1")
+
+    unsafe = ContainerIn(
+        container_type="pfa",
+        location="receiving",
+        conditions=frozenset({"unsafe"}),
+        analyses=frozenset({"10_elements_icpms"}),
+    )
+    (bottle,) = custody.receive(
+        prep, Lookup(), "TR00001-01", [unsafe], actor=SEED_SAMPLES_ACTOR, rules=publish_demo_samples(prep),
+        received_on=TODAY,
+    )  # fmt: skip
+    prep.commit()
+    login_api(client, "staff@lab.example")
+    refused = upload(client, csv(analyst="JM"))
+    assert refused.status_code == 422
+    assert "TR00001-01: Unsafe to handle" in refused.json()["detail"] and "blocks" in refused.json()["detail"]
+    assert batches(prep) == ()
+    prep.rollback()
+
+    custody.dispose(
+        prep, bottle.id, actor=SEED_SAMPLES_ACTOR, rules=publish_demo_samples(prep), method="Vendor pickup",
+        today=bottle.retention_due,
+    )  # fmt: skip
+    prep.commit()
+    assert upload(client, csv(analyst="JM")).status_code == 201  # the lab acted: nothing blocks
