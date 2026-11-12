@@ -259,6 +259,7 @@ Tally and themes are updated now and then at the bottom.
 | Kind | What | Notes |
 |---|---|---|
 | C✓ | A QC trends panel on the results batch page (each chart once, worst first) and a marker per row: slim-quality's flags on the run's instrument × analyte and its internal standard, 7 days before the run through it, the forecast included. Never a block; releasing over an ACTION flag needs a reason, kept host-side with a frozen copy of the flags (`qc_acknowledgements`), shown in the vertical audit. All reviewers see it. | D-144. |
+| J | Before the walkthrough, review each department on its own (boundaries first, big picture then edge bugs), one fresh chat each, frugal with tokens. | `docs/REVIEW_PLAN_2026-11-12.md`. |
 | F | An internal standard's flags bear on every analyte, so a per-analyte panel repeated them ten times; the panel groups by chart instead. | `test_an_action_flag_needs_a_reason_to_release_and_keeps_the_flags`. |
 
 ## Themes so far
