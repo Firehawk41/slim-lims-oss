@@ -34,6 +34,26 @@
       Accepting a NEEDS SUPERVISOR result and recording an exception need a supervisor.</p>
   </section>
 
+  {% if qc %}
+    <section class="form-section qc-trends" aria-labelledby="qc-heading">
+      <h2 id="qc-heading">QC trends on these runs</h2>
+      <p class="hint">slim-quality's flags on each run's instrument and analyte (and its internal standard), from 7 days
+        before the run through it, as known now. Advice: the results' own rules decide validity; releasing with an
+        <strong>action</strong> flag asks for a reason.</p>
+      {% for g in qc_series %}
+        <h3><span class="qc-level qc-level--{{ g.level }}">{{ g.level }}</span>
+          <a href="{{ url_for('quality_series') }}?id={{ g.slug|urlencode }}">{{ g.label }}</a>
+          <span class="muted">· bears on {{ g.analytes|join(", ") }}</span></h3>
+        <ul>
+          {% for w in g.warnings %}
+            <li><span class="qc-level qc-level--{{ w.level }}">{{ w.level }}</span> {{ w.code }} ({{ w.tool }}) — {{ w.message }}
+              <span class="muted">{{ w.at.astimezone(zone).strftime("%Y-%m-%d %H:%M") }}</span></li>
+          {% endfor %}
+        </ul>
+      {% endfor %}
+    </section>
+  {% endif %}
+
   {% if release_groups %}
     <section class="form-section" aria-labelledby="release-heading">
       <h2 id="release-heading">Release</h2>
@@ -47,6 +67,10 @@
           <input type="hidden" name="analysis_id" value="{{ analysis_id }}">
           <strong>{{ sample }} · {{ analysis.name if analysis else analysis_id }}</strong>
           <label>Note <input name="note" maxlength="2000"></label>
+          {% if (sample, analysis_id) in action_groups %}
+            <label class="qc-ack">QC trend at action level: why the result still stands
+              <input name="qc_ack" maxlength="2000" required placeholder="e.g. check standard within limits on this run"></label>
+          {% endif %}
           {{ solo_box() }}
           <button type="submit" class="btn btn--primary btn--small">Release</button>
         </form>
@@ -83,7 +107,8 @@
             <td>{{ r.verdict.name.replace("_", " ").lower() }}</td>
             <td>{{ r.status.name.lower() }}{% if r.rerun_requested %} · rerun requested{% endif %}{% if r.correction_started %} · correcting{% endif %}</td>
             <td>v{{ r.version }}</td>
-            <td>{% for f in r.flags %}<span title="{{ f.message }}">{{ f.code }}</span> ({{ f.severity.name.lower() }}){{ "; " if not loop.last }}{% endfor %}</td>
+            <td>{% for f in r.flags %}<span title="{{ f.message }}">{{ f.code }}</span> ({{ f.severity.name.lower() }}){{ "; " if not loop.last }}{% endfor %}
+              {% if worst.get(r.analyte.code) %}{% set lv = qc[r.analyte.code][0].level %}<a href="#qc-heading" class="qc-level qc-level--{{ lv }}" title="QC trend flags on this run's instrument">QC {{ lv }}</a>{% endif %}</td>
             <td>
               {% if r.status.name != "REJECTED" %}
                 <details>

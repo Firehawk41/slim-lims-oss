@@ -39,7 +39,7 @@ from slim_quality.service import quality as q
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
-from slim_lims import capabilities, reports
+from slim_lims import capabilities, qc_warnings, reports
 from slim_lims.audit import chain_check
 from slim_lims.models import User
 from slim_lims.quality_records import released_from_prep, seed_demo_records
@@ -261,6 +261,7 @@ class AuditLine:
     prep: object | None  # slim-prep's Recorded[PrepBatch] as it stood, or None (registered by a file)
     prep_sample: object | None  # that batch's entry for this sample
     qc: list  # slim-quality ContextLines, per run: (run, lines)
+    qc_acks: list = ()  # the host's acknowledgements of QC trend flags at release (D-144)
 
 
 @dataclass(frozen=True)
@@ -271,6 +272,10 @@ class AuditPage:
     lines: list[AuditLine]
     checks: list[Check]
     chain_broken: tuple[int, ...] | None  # None: not checked (SQLite, or no audit log)
+
+
+def _aware(at: datetime) -> datetime:
+    return at if at.tzinfo else at.replace(tzinfo=UTC)  # SQLite: naive UTC
 
 
 def audit_page(db: Session, issue_id: int) -> AuditPage:
@@ -301,7 +306,12 @@ def audit_page(db: Session, issue_id: int) -> AuditPage:
             (run, q.context_at(charts_then[r.made_at], run.instrument, r.analyte.code, run.analyzed_at))
             for run in r.runs
         ]
-        lines.append(AuditLine(result=r, prep=prep, prep_sample=prep_sample, qc=qc))
+        acks = [
+            a
+            for a in qc_warnings.acknowledgements(db, r.sample, r.analyte.analysis_id)
+            if _aware(a.at) <= issue.created_at
+        ]
+        lines.append(AuditLine(result=r, prep=prep, prep_sample=prep_sample, qc=qc, qc_acks=acks))
     checker = chain_check(db.get_bind())
     broken = None if checker is None else tuple(checker(db.connection()))
     return AuditPage(

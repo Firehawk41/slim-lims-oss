@@ -54,8 +54,9 @@ placeholders; Jamie writes its words in `templates/about/_copy.html`. slim-quali
 (phases 3 and 5: vertical audit, NCs; 5a equipment, lots, PT, complaints, D-125…D-130; 5b uncertainty,
 competence, trends, D-131…D-133; 5c risks, internal audits, readiness, management review, the §7.11 pack,
 D-134…D-137); phase 4 is done (slim-samples; signed reports, their PDF, the outbox). Phase 6 is done: quote
-screens (D-139, D-140), reference data upkeep (D-141), accounts (D-142); spec limit changes since (D-143). Next: phase 7
-(`docs/ROADMAP.md`, the VPS: deferred, do not start). slim-quality part 3 stays parked. Parked: an SMTP
+screens (D-139, D-140), reference data upkeep (D-141), accounts (D-142); spec limit changes since (D-143);
+slim-quality part 3, QC trend warnings at release (D-144). Next: phase 7
+(`docs/ROADMAP.md`, the VPS: deferred, do not start). Parked: an SMTP
 transport (D-124); report settings (assay spec text, report note, display label).
 
 ## How to run
@@ -91,7 +92,7 @@ slim_lims/
 ├── models.py        # User (full_name, job_title: how they sign), TR tables, tr_versions (D-104), invoices + payments (D-119),
 │                    #   report_pdfs, report_deliveries, display_modes, quote_requests (+ events), quote_pdfs,
 │                    #   quote_deliveries, tr_quotes, reference_changes, account_events, account_messages,
-│                    #   spec_proposals, spec_decisions (all append-only), user_capabilities, report_files,
+│                    #   spec_proposals, spec_decisions, qc_acknowledgements (all append-only), user_capabilities, report_files,
 │                    #   user_mfa, mfa_recovery_codes, password_resets, lab_sections (+ lab_section_analyses),
 │                    #   display_links
 ├── repositories.py  # TRSubmissionRepository: the only TR writer; gapless numbers; versions / as_of (D-104)
@@ -130,6 +131,8 @@ slim_lims/
 ├── invoices.py, demo_prices.py    # invoicing V5; /invoices; the accounting CSV (V5 writes formula cells as text, D-118)
 ├── quotes.py, quotes_routes.py    # quote screens over V5's quotes (D-139): list by state, make / replace, the document
 │                                  #   and its PDF, sending (outbox), customers' requests; a TR's quote (tr_quotes)
+├── qc_warnings.py   # D-144: slim-quality's flags on a batch's runs (7 days before, through the run); an
+│                    #   ACTION flag needs a reason at release (qc_acknowledgements)
 ├── spec_changes.py, specs_routes.py  # spec limits (D-143): proposed (quality), approved (QM or supervisor, not the
 │                                  #   proposer) through slim-domain's set_limits; re-evaluation; /specs
 ├── refdata.py, refdata_routes.py  # reference data upkeep (D-141): customers, chemicals via slim-domain's services;
@@ -222,3 +225,6 @@ scripts/seed_demo.py; tests/ (SQLite per test, or Postgres via TEST_DATABASE_URL
 - Reports: "Sign and issue" needs the `signatory` capability (supervisors by default) and a name; the signatory may
   be the releaser (four-eyes stands at release). Its PDF is made at issue (WeasyPrint; needs Pango). Sending
   records a delivery in the outbox, never transmitted on the demo; it changes no status (D-122…D-124).
+- QC trends (D-144): the results batch page shows slim-quality's flags on each run's instrument × analyte and
+  internal standard, 7 days before the run through it. Never a block; releasing over an ACTION flag needs a
+  reason, kept with the flags as shown (`qc_acknowledgements`) and shown in the vertical audit.

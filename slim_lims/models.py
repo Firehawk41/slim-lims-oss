@@ -626,6 +626,24 @@ class SpecDecisionRow(Base):
     at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
 
+# ---------------------------------------------------------------- QC warnings at release (D-144)
+
+
+class QcAcknowledgementRow(Base):
+    """A release of a sample + analysis despite an ACTION-severity QC trend flag: the flags as shown then
+    (frozen: later points can change a chart), why the result still stands, who, when. Append-only."""
+
+    __tablename__ = "qc_acknowledgements"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    sample: Mapped[str] = mapped_column(String(20), index=True)  # "TR00002-01"
+    analysis_id: Mapped[int] = mapped_column(Integer)
+    flags: Mapped[list] = mapped_column(JSON)
+    note: Mapped[str] = mapped_column(Text)
+    by: Mapped[str] = mapped_column(String(254))
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
 def _append_only_after_create(target, connection, **_kw) -> None:
     append_only(connection, target.name)
 
@@ -647,6 +665,7 @@ for _table in (
     AccountMessageRow.__table__,
     SpecProposalRow.__table__,
     SpecDecisionRow.__table__,
+    QcAcknowledgementRow.__table__,
 ):
     event.listen(_table, "after_create", _append_only_after_create)
 

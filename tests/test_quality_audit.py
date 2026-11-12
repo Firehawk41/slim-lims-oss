@@ -252,3 +252,26 @@ def test_q7_cli_verify_catches_a_nonconformity_written_around_the_rules(
     monkeypatch.setenv("DATABASE_URL", engine.url.render_as_string(hide_password=False))
     assert cli.main(["verify"]) == 1
     assert "NC-0001 entry 1 (closed)" in capsys.readouterr().out
+
+
+def test_the_audit_shows_a_release_over_qc_trend_flags(visitor, db):  # D-144
+    from datetime import UTC, datetime
+
+    from slim_data.service.audit import report_audit
+
+    from slim_lims.models import QcAcknowledgementRow
+
+    continue_as(visitor, db, "uma@demo.example")
+    issue = first_issue(visitor)
+    line = report_audit(db, int(issue)).lines[0]
+    db.add(
+        QcAcknowledgementRow(
+            sample=str(line.sample), analysis_id=line.analyte.analysis_id, note="CCV re-run in limits",
+            by="rob@demo.example", at=datetime(2000, 1, 1, tzinfo=UTC),
+            flags=[{"severity": "action", "code": "WG_1_3S", "tool": "westgard", "series": "ICP-MS 1 · Fe",
+                    "message": "beyond 3 SD", "instrument": "ICP-MS 1", "at": "2000-01-01T00:00:00+00:00"}],
+        )
+    )  # fmt: skip
+    db.commit()
+    page = visitor.get(f"/quality/audit/{issue}").text
+    assert "Released over QC trend flags" in page and "CCV re-run in limits" in page and "WG_1_3S" in page

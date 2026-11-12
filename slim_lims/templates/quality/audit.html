@@ -74,6 +74,10 @@
         {% if c.flags %}{% for f in c.flags %}<span class="sev sev--{{ f.severity.name }}">{{ f.code }}</span> {{ f.at.astimezone(zone).date() }}{% if not loop.last %}, {% endif %}{% endfor %}{% else %}no flags that week{% endif %}</li>
       {% else %}<li class="muted">No QC series for this instrument and analyte.</li>{% endfor %}</ul>
     {% endfor %}
+    {% for a in line.qc_acks %}
+      <p><strong>Released over QC trend flags</strong> by {{ a.by }}, {{ a.at.date() }}: {{ a.note }}</p>
+      <ul>{% for f in a.flags %}<li>{{ f.severity }} {{ f.code }} ({{ f.tool }}) on {{ f.series }}: {{ f.message }}</li>{% endfor %}</ul>
+    {% endfor %}
   </section>
   {% endfor %}
 

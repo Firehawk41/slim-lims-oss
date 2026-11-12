@@ -92,6 +92,8 @@ class SignOffIn(_Input):
 
     note: Annotated[Text, StringConstraints(max_length=2000)] = ""
     solo: bool = False
+    # Releasing despite an ACTION-severity QC trend flag (D-144): why the result still stands.
+    qc_ack: Annotated[Text, StringConstraints(max_length=2000)] = ""
 
 
 class ResultActionIn(_Input):

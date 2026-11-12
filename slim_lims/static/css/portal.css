@@ -167,3 +167,11 @@ kbd { font-family: inherit; border: 1px solid var(--color-border); border-radius
 /* Accounts (D-142): the MFA setup's QR code and the recovery codes. */
 .mfa-qr svg { display: block; margin: 0.5rem 0; background: #fff; padding: 8px; }
 .recovery-codes { columns: 2; font-size: 1.1rem; }
+
+/* QC trends at review and release (D-144). */
+.qc-level { font-size: 0.75rem; font-weight: 700; padding: 0 0.35em; border: 1px solid currentColor; border-radius: 3px; }
+.qc-level--action { color: #C53030; }
+.admin-theme .qc-level--action { color: #FC8181; }
+.qc-level--warn { color: #D69E2E; }
+.qc-level--info { color: var(--color-text-muted); }
+.qc-trends ul { margin: 0.25rem 0 0.75rem; }
