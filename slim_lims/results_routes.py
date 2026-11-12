@@ -39,9 +39,10 @@ from slim_data.persistence.rulesets import current_policy
 from slim_data.service import workflow as wf
 from slim_data.service.imports import ImportPlan, ImportRefused, preview_import
 from slim_data.service.views import batch_view, batches, report_view
+from slim_quality.domain.enums import Severity
 from sqlalchemy.orm import Session
 
-from slim_lims import capabilities, delivery, reports
+from slim_lims import capabilities, delivery, qc_warnings, reports
 from slim_lims.api import Service, get_reference, specs_for
 from slim_lims.auth import RequireStaff
 from slim_lims.db import get_db
@@ -169,6 +170,9 @@ def _decide(db: Session, action) -> tuple[int, dict[str, Any]]:
     except wf.BatchReviewRefused as error:
         db.rollback()
         return 409, {"detail": "Nothing was reviewed.", "problems": error.problems}
+    except qc_warnings.AcknowledgementNeeded as error:  # D-144
+        db.rollback()
+        return 409, {"detail": str(error)}
     except wf.NothingReleased as error:
         db.rollback()
         return 409, {
@@ -298,6 +302,7 @@ def _act(db, user, sample: SampleRef, analyte: AnalyteRef, action: ResultAction,
 def _release(db, user, sample: SampleRef, analysis_id: int, data: SignOffIn):
     def run():
         require_open_tr(db, sample)
+        qc_warnings.acknowledge_if_needed(db, sample, analysis_id, data.qc_ack, user)  # D-144
         released = wf.release(db, sample, analysis_id, actor_for(user), data.note, data.solo)
         return {
             "sample": str(sample),
@@ -421,6 +426,12 @@ def results_batch(request: Request, code: str, user: RequireStaff, db: DB, refer
         },
         key=lambda k: (k[0].tr_number, k[0].position, k[1]),
     )
+    warnings = qc_warnings.batch_warnings(db, code, {r.analyte.code for r in view.results})  # D-144
+    action_groups = {
+        (r.sample, r.analyte.analysis_id)
+        for r in view.results
+        if any(w.severity == Severity.ACTION for w in warnings.get(r.analyte.code, ()))
+    }
     return render(
         request,
         "results/batch.html",
@@ -428,6 +439,11 @@ def results_batch(request: Request, code: str, user: RequireStaff, db: DB, refer
             "view": view,
             "reference": reference,
             "release_groups": release_groups,
+            "qc": warnings,
+            "qc_series": qc_warnings.by_series(warnings),
+            "zone": lab_clock(request).zone,
+            "action_groups": action_groups,
+            "worst": {a: qc_warnings.worst(ws) for a, ws in warnings.items()},
             "actions": ResultAction,
             "categories": _categories(db),
         },
@@ -533,9 +549,10 @@ def results_release(
     analysis_id: Annotated[int, Form()],
     note: Annotated[str, Form(max_length=2000)] = "",
     solo: Annotated[bool, Form()] = False,
+    qc_ack: Annotated[str, Form(max_length=2000)] = "",
 ):
     sample_ref, _ = _result_key(sample, analysis_id, "X")
-    outcome = _release(db, user, sample_ref, analysis_id, SignOffIn(note=note, solo=solo))
+    outcome = _release(db, user, sample_ref, analysis_id, SignOffIn(note=note, solo=solo, qc_ack=qc_ack))
     return _back(request, code, outcome, "Released {sample}: {released}.")
 
 

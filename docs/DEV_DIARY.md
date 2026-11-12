@@ -254,6 +254,13 @@ Tally and themes are updated now and then at the bottom.
 | J | "Do R5 and R7." | |
 | C✓ | R5: V5's own `all_quotes` / `get_quote` instead of the host reading its tables; R7: a spec approval as one transaction where slim-domain shares the app's database, judged by the proposed limits before they're on file. | `test_r7_the_set_the_decision_and_the_new_versions_commit_together`. |
 
+## 2026-11-12: QC trend warnings at review and release (slim-quality part 3)
+
+| Kind | What | Notes |
+|---|---|---|
+| C✓ | A QC trends panel on the results batch page (each chart once, worst first) and a marker per row: slim-quality's flags on the run's instrument × analyte and its internal standard, 7 days before the run through it, the forecast included. Never a block; releasing over an ACTION flag needs a reason, kept host-side with a frozen copy of the flags (`qc_acknowledgements`), shown in the vertical audit. All reviewers see it. | D-144. |
+| F | An internal standard's flags bear on every analyte, so a per-analyte panel repeated them ten times; the panel groups by chart instead. | `test_an_action_flag_needs_a_reason_to_release_and_keeps_the_flags`. |
+
 ## Themes so far
 - **Domain facts are Jamie's, and they overrule Claude's defaults:** DF < 1, MDL averaging, standards as
   recipes, spike placement. Claude's "cautious" engineering defaults were wrong more than once where
