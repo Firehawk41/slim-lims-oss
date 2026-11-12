@@ -262,6 +262,13 @@ Tally and themes are updated now and then at the bottom.
 | J | Before the walkthrough, review each department on its own (boundaries first, big picture then edge bugs), one fresh chat each, frugal with tokens. | `docs/REVIEW_PLAN_2026-11-12.md`. |
 | F | An internal standard's flags bear on every analyte, so a per-analyte panel repeated them ten times; the panel groups by chart instead. | `test_an_action_flag_needs_a_reason_to_release_and_keeps_the_flags`. |
 
+## 2026-11-12: department review, Lab
+
+| Kind | What | Notes |
+|---|---|---|
+| J | "Review the Lab department per the plan." | `REVIEW_2026-11-12_lab.md`. Nothing fixed. |
+| F | Bugs L-1…L-5: a clean rerun batch can't be released on screen (the release reads every batch's QC flags, the page its own); one cancelled or invoiced request freezes a shared prep batch's corrections; a blocking bottle stops the prep book but not an instrument file; a refused release loses what was typed. For decision L-6…L-12. | Raised with Jamie. |
+
 ## Themes so far
 - **Domain facts are Jamie's, and they overrule Claude's defaults:** DF < 1, MDL averaging, standards as
   recipes, spike placement. Claude's "cautious" engineering defaults were wrong more than once where
