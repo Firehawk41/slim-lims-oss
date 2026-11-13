@@ -210,3 +210,35 @@ def test_a1_the_invoice_page_says_what_priced_it(engine, db, seeded, reference):
         page = client.get(f"/requests/{tr}/invoice").text
     assert "Priced by" in page and quotes.number(own.id) in page
     assert f"The request named {quotes.number(default.id)}, which priced no line" in page
+
+
+def test_x3_a_pt_sample_is_closed_as_no_charge_never_invoiced(db, seeded, reference):
+    """Review X-3: a request a PT round names is the scheme's sample; the lab pays the scheme, never bills
+    it. Invoicing is refused; closing it as no charge moves it to invoiced with the reason, and the board
+    shows it under No charge. A request no round names can't be closed that way."""
+    from datetime import timedelta
+
+    from slim_quality.service import pt
+
+    from slim_lims import board
+    from slim_lims.quality_records import SEED_QUALITY_ACTOR
+
+    service = SubmissionService(TRSubmissionRepository(db), reference)
+    tr = seeded["amended"]  # complete, not invoiced
+    sample = f"{tr}-01"
+    due = service.lab_today() + timedelta(days=30)
+    pt.register_round(db, "Demo PT scheme", "R-2026-11", tr, sample, ("Fe",), due, SEED_QUALITY_ACTOR)
+    db.commit()
+    with pytest.raises(Conflict, match="proficiency testing sample"):
+        invoices.mark_sent(db, service, tr, sue(db), reference)
+    with pytest.raises(Conflict, match="no PT sample"):
+        invoices.close_no_charge(db, service, seeded["clean_pass"], sue(db))
+    row = invoices.close_no_charge(db, service, tr, sue(db))
+    db.commit()
+    assert row.no_charge_reason == "proficiency testing: Demo PT scheme R-2026-11"
+    assert (
+        service.get(tr, sue(db)).status is TRStatus.INVOICED
+        and slim_invoicing.sales_order_for(db, tr) is None
+    )
+    columns = {key: [c.tr.tr_number for c in cards] for key, _, cards in board.board(db, sue(db), reference)}
+    assert tr in columns["no_charge"] and tr not in columns["invoice_sent"]

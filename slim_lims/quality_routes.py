@@ -781,6 +781,36 @@ def quality_nc(request: Request, nc_id: int, user: RequireStaff, db: DB, clock: 
     )
 
 
+@router.post("/quality/ncs/{nc_id}/hold-bottles", name="quality_nc_hold_bottles")
+def quality_nc_hold_bottles(request: Request, nc_id: int, user: RequireStaff, db: DB):
+    """Puts on hold every bottle still in the lab that served a result the NC's window touched, the NC as the
+    reason (review X-4), so none is disposed of while it is open. Holds are lifted one by one, as ever."""
+    from slim_samples.service import custody
+
+    from slim_lims.api import get_reference
+    from slim_lims.samples import samples_actor_for
+
+    _actor(db, user)
+    try:
+        nc = store.get_nc(db, nc_id)
+    except store.NotFound:
+        raise HTTPException(status_code=404, detail="No such nonconformity.") from None
+    if nc.state.name == "CLOSED":
+        raise HTTPException(status_code=409, detail="A closed nonconformity holds nothing.")
+    codes = {a.id: a.code for a in get_reference(request).catalog_analyses()}
+    wanted = {(str(r.sample), codes.get(r.analyte.analysis_id)) for r in touched(db, nc)}
+    actor, reason, held = samples_actor_for(user), f"{nc.number}: {nc.title}"[:500], 0
+    for sample in sorted({s for s, _ in wanted}):
+        for bottle in custody.containers_of(db, sample):
+            serves = {a for s, a in wanted if s == sample} & bottle.current_analyses
+            if bottle.active and not bottle.held and serves:
+                custody.hold(db, bottle.id, actor=actor, reason=reason)
+                held += 1
+    db.commit()
+    flash(request, f"{held} bottle(s) put on hold for {nc.number}." if held else "No bottle to hold.")
+    return RedirectResponse(str(request.url_for("quality_nc", nc_id=nc_id)), status_code=303)
+
+
 @router.post("/quality/ncs/{nc_id}/entries", name="quality_nc_entry")
 def quality_nc_entry(
     request: Request,

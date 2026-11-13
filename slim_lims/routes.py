@@ -145,6 +145,17 @@ def invoice_sent(
     )
 
 
+@router.post("/requests/{tr_number}/no-charge", name="close_no_charge")
+def close_no_charge(request: Request, tr_number: str, user: RequireStaff, service: Service, db: DB):
+    """A PT sample's request, closed without an invoice (review X-3)."""
+    return _invoice(
+        request,
+        db,
+        lambda: invoices.close_no_charge(db, service, tr_number, user),
+        f"{tr_number}: no charge.",
+    )
+
+
 @router.post("/requests/{tr_number}/invoice/paid", name="invoice_paid")
 def invoice_paid(request: Request, tr_number: str, user: RequireStaff, service: Service, db: DB):
     return _invoice(

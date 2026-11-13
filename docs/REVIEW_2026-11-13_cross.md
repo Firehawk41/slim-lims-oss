@@ -13,17 +13,37 @@ around all of it. Ids X-1….
 
 ## Bugs (confirmed; each with the fix and its guard test)
 
+**X-1, X-3 and X-4 built the same day** (Jamie: "fix x1 but for x2, what if someone accidentally disposes of
+a bottle? Fix x3-4, too"). X-2 is not built: Jamie asked what happens after an accidental disposal (answered
+below, under X-2). X-3 is built as recommended, with the *no charge* fact.
+
 | # | Seam · lens | Finding | Fix | Guard |
 |---|---|---|---|---|
-| X-1 | Admin A-1 × quote withdrawal (D-140) · 3 | **A quote can be withdrawn from a day in the past, and that now re-prices requests already received under it.** Since A-1 an invoice is priced by the quotes in force on the day the request was received. `withdraw_quote` takes any "from" day the form gives, down to the quote's start date (V5 checks only start and expiry). A withdrawal dated last month makes every request received since then, not yet invoiced, price at the default list or another quote. Replace does the same when the new quote's first day is typed in the past (it withdraws the old one from `max(new start, old start)`). Read, not run. | The host refuses a withdrawal from before the lab's today ("a withdrawal can't reach back: requests received under it keep its prices"); Replace withdraws the old quote from the later of the new one's first day and today. | `test_quotes.py::test_x1_a_withdrawal_never_reaches_back_over_requests_received` |
-| X-2 | Lab bottles × Quality complaints, Lab reruns · 3 | **A bottle can be disposed of while a complaint on its request is open, or while one of its results waits for a rerun.** `custody.dispose` refuses only a bottle on hold, and a hold is placed by hand: the hold form even suggests "complaint, open nonconformity" as a reason. Nothing places one when a customer raises a complaint (D-130) or a reviewer requests a rerun. Past the retention date no reason is needed, so the item a complaint is about can go in the bin the day the complaint arrives. Read, not run. | The host refuses a disposal while the request has an open complaint, or while a result of the sample + analysis the bottle serves has a rerun requested; the refusal names it. The hand-placed hold stays for everything else. | `test_samples.py::test_x2_a_bottle_isnt_disposed_while_its_request_has_an_open_complaint_or_a_rerun` |
+| X-1 | Admin A-1 × quote withdrawal (D-140) · 3 | **A quote can be withdrawn from a day in the past, and that now re-prices requests already received under it.** Since A-1 an invoice is priced by the quotes in force on the day the request was received. `withdraw_quote` takes any "from" day the form gives, down to the quote's start date (V5 checks only start and expiry). A withdrawal dated last month makes every request received since then, not yet invoiced, price at the default list or another quote. Replace does the same when the new quote's first day is typed in the past (it withdraws the old one from `max(new start, old start)`). Read, not run. | **Built:** `quotes.withdraw` refuses a day before the lab's today ("requests received under it keep its prices"); Replace withdraws the old quote from the latest of the new one's first day, the old one's and today. | `test_quotes.py::test_x1_a_withdrawal_never_reaches_back_over_requests_received` (also an older withdrawal test now expects this refusal for a day before today) |
+| X-2 | Lab bottles × Quality complaints, Lab reruns · 3 | **A bottle can be disposed of while a complaint on its request is open, or while one of its results waits for a rerun.** `custody.dispose` refuses only a bottle on hold, and a hold is placed by hand: the hold form even suggests "complaint, open nonconformity" as a reason. Nothing places one when a customer raises a complaint (D-130) or a reviewer requests a rerun. Past the retention date no reason is needed, so the item a complaint is about can go in the bin the day the complaint arrives. Read, not run. | The host refuses a disposal while the request has an open complaint, or while a result of the sample + analysis the bottle serves has a rerun requested; the refusal names it. The hand-placed hold stays for everything else. | Not built (see below). |
+
+**X-2 and an accidental disposal** (Jamie's question). A disposal is final in slim-samples: it is an event in
+the bottle's append-only history, and a finished bottle takes no more events (S-05), so a disposal recorded
+by mistake can't be undone, nor corrected (`custody.correct` changes kind, count and analyses only, on an open
+bottle). Two different accidents:
+
+- *The bottle really went.* Nothing in software brings it back; only preventing it helps. X-2's refusal is
+  that prevention for the two cases where the bottle is evidence (an open complaint, a rerun requested).
+- *The click was wrong; the bottle is still on the shelf.* Today the record says "disposed" for good: the lab
+  can only note it on another bottle, and the bottle no longer appears anywhere. That is a gap of its own.
+
+Recommendation: build X-2 as proposed, and add to slim-samples an "undo a disposal" event (S-05 amended): a
+supervisor, with a reason, within a few days (lab data, e.g. 7), only for a bottle whose disposal was
+recorded and that is still physically there; the bottle is active again and both events stay in its
+history. A slim-samples change and a pin bump.
+
 
 ## For decision (ideas, each with a recommendation; not built)
 
 | # | Question | What is there now | Recommendation |
 |---|---|---|---|
-| X-3 | A PT sample at invoicing (Quality × Admin) | A PT sample comes in as an ordinary request from the scheme (the demo's customer Z, D-128) and a PT round points at it. Invoicing knows nothing of PT: once its report is complete it waits in *to invoice* on the board, and sending the invoice bills the scheme at the default list. The lab pays the scheme, not the reverse. | A request a PT round names is "not billed": the board shows it under *complete*, and the invoice button says why instead of invoicing. Closing it needs a status decision: either a *no charge* fact that moves it to *invoiced* (D-99: statuses follow facts), or leaving it at *complete report* for good. Recommend the *no charge* fact, recorded like an invoice row. |
-| X-4 | Open nonconformities and bottles | An NC's impact lists released results, not requests, so X-2's rule can't reach it directly. | When an NC's impact assessment names results, offer "hold their bottles" on the NC page. |
+| X-3 **Built** | A PT sample at invoicing (Quality × Admin) | A PT sample comes in as an ordinary request from the scheme (the demo's customer Z, D-128) and a PT round points at it. Invoicing knows nothing of PT: once its report is complete it waits in *to invoice* on the board, and sending the invoice bills the scheme at the default list. The lab pays the scheme, not the reverse. | A request a PT round names is "not billed": the board shows it under *complete*, and the invoice button says why instead of invoicing. Closing it needs a status decision: either a *no charge* fact that moves it to *invoiced* (D-99: statuses follow facts), or leaving it at *complete report* for good. Recommend the *no charge* fact, recorded like an invoice row. **Built:** `invoices.close_no_charge` (staff; only a complete request a PT round names): it moves to *invoiced* with the reason on the invoice row (`tr_invoices.no_charge_reason`, migration 0019); invoicing such a request is refused; the board offers "PT sample: close, no charge" and shows it under *No charge*. Guard: `test_invoicing.py::test_x3_a_pt_sample_is_closed_as_no_charge_never_invoiced`. |
+| X-4 **Built** | Open nonconformities and bottles | An NC's impact lists released results, not requests, so X-2's rule can't reach it directly. | When an NC's impact assessment names results, offer "hold their bottles" on the NC page. **Built:** a quality manager's "Hold their bottles" on an open NC holds every bottle still in the lab that served a touched result, the NC as the reason; lifted one by one as ever. Guard: `test_quality_audit.py::test_x4_an_ncs_touched_results_bottles_go_on_hold`. |
 
 ## Refuted / checked sound
 

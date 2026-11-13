@@ -17,7 +17,7 @@ Payment is invoice data (invoices.py), never a TR status. Until the invoicing mo
 read SLIM, staff record "Invoice sent" and "Paid" on the card.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from slim_data.domain.enums import ResultStatus, Verdict
 from slim_data.domain.results import Result
@@ -27,7 +27,7 @@ from slim_data.service.views import batches, samples_by_batch
 from sqlalchemy.orm import Session
 
 from slim_lims.domain import TRStatus, TRSubmission
-from slim_lims.invoices import latest_invoices
+from slim_lims.invoices import latest_invoices, pt_requests
 from slim_lims.models import LAB_ROLE_ANALYST, LAB_ROLE_REVIEWER, LAB_ROLE_SUPERVISOR, TRInvoiceRow, User
 from slim_lims.reference import ReferenceData
 from slim_lims.repositories import TRSubmissionRepository
@@ -42,12 +42,13 @@ COLUMNS = (
     ("to_invoice", "To invoice"),
     ("invoice_sent", "Invoice sent"),
     ("paid", "Paid"),
+    ("no_charge", "No charge"),
 )
 # Customers see where their request is, not the lab's internal stages.
 CUSTOMER_COLUMNS = (
     ("expected", "Not arrived yet", ("expected",)),
     ("at_lab", "At the lab", ("received", "in_analysis", "ready_to_report")),
-    ("published", "Results published", ("partial_report", "to_invoice")),
+    ("published", "Results published", ("partial_report", "to_invoice", "no_charge")),
     ("invoice_sent", "Invoice sent", ("invoice_sent",)),
     ("paid", "Paid", ("paid",)),
 )
@@ -98,6 +99,7 @@ class Card:
     chips: list[Chip] = field(default_factory=list)
     issued: bool = False  # a report exists to open
     invoice: TRInvoiceRow | None = None
+    pt: bool = False  # a PT sample: closed as no charge, never invoiced (review X-3)
 
     @property
     def batches(self) -> list[str]:
@@ -189,6 +191,8 @@ def _column(tr: TRSubmission, chips: list[Chip], invoice: TRInvoiceRow | None) -
             return "received"
         case TRStatus.COMPLETE_REPORT:
             return "to_invoice"
+        case TRStatus.INVOICED if invoice is not None and invoice.no_charge_reason:
+            return "no_charge"
         case TRStatus.INVOICED:  # invoiced by hand before invoices were recorded counts as sent
             return "paid" if invoice is not None and invoice.paid_on is not None else "invoice_sent"
     if any(c.state == "released" for c in chips):
@@ -211,6 +215,7 @@ def board(
     scope = Scope.for_user(user, customer_id)  # a customer's own, whatever was asked (review A6)
     mine = mine and user.is_staff
     repo, batch_of = TRSubmissionRepository(session), batch_index(session)
+    pt = pt_requests(session) if user.is_staff else set()  # review X-3
     columns: dict[str, list[Card]] = {key: [] for key, _ in COLUMNS}
     for status in TRStatus:
         if status == TRStatus.CANCELLED:
@@ -223,6 +228,8 @@ def board(
             if rush and not tr.is_rush:
                 continue
             card = card_for(session, tr, reference, batch_of, invoices.get(tr.id))
+            if tr.tr_number in pt:
+                card = replace(card, pt=True)
             if mine and not card.needs(user.lab_role):
                 continue
             columns[card.column].append(card)

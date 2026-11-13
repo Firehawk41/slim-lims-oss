@@ -303,6 +303,8 @@ class TRInvoiceRow(Base):
     sent_on: Mapped[date] = mapped_column(Date)
     sent_by: Mapped[str] = mapped_column(String(254))
     recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+    # Closed as no charge instead of invoiced (review X-3): why; None for an invoice sent.
+    no_charge_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     payments: Mapped[list["TRInvoicePaymentRow"]] = relationship(
         lazy="selectin", order_by="TRInvoicePaymentRow.id", viewonly=True
     )

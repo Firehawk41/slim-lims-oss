@@ -308,6 +308,9 @@ Tally and themes are updated now and then at the bottom.
 |---|---|---|
 | J | "Do the cross-department pass per the plan." | `REVIEW_2026-11-13_cross.md`. Before Jamie's walkthrough, which the plan puts first. Nothing fixed. |
 | F | Bugs X-1, X-2: a quote withdrawal may be dated in the past, and since A-1 that re-prices requests already received; a bottle can be disposed of while its request has an open complaint or a rerun is requested. For decision X-3 (a PT request is invoiced to the scheme), X-4. | Raised with Jamie. |
+| J | "Fix x1 but for x2, what if someone accidentally disposes of a bottle? Fix x3-4, too." | X-2 held for Jamie's answer. |
+| C✓ | X-1: no withdrawal or Replace reaches back before the lab's today. X-3: a PT request is closed as no charge (a fact, to invoiced; migration 0019), never invoiced. X-4: an open NC's "Hold their bottles". Each with its guard test. | Host only. |
+| C→J | X-2: a disposal is final in slim-samples (S-05), so an accidental one can't be undone. Recommend X-2's refusal (for a bottle that is evidence) plus an "undo a disposal" event in slim-samples for a wrong click. | For Jamie. |
 
 ## Themes so far
 - **Domain facts are Jamie's, and they overrule Claude's defaults:** DF < 1, MDL averaging, standards as

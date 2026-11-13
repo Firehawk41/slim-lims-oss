@@ -245,3 +245,7 @@ scripts/seed_demo.py; tests/ (SQLite per test, or Postgres via TEST_DATABASE_URL
 - IT review 2026-11-13 (`docs/REVIEW_2026-11-13_it.md`): the login throttle counts the address the lab's own
   proxy appended to `X-Forwarded-For` (`TRUSTED_PROXY_HOPS`: 1 on Render, 0 without a proxy), never one the
   client wrote (T-1). T-2…T-6 await Jamie.
+- Cross-department pass 2026-11-13 (`docs/REVIEW_2026-11-13_cross.md`): a quote is never withdrawn from a day
+  already past (X-1); a PT sample's request is closed as no charge, never invoiced (`invoices.close_no_charge`,
+  `tr_invoices.no_charge_reason`, the board's *No charge* column; X-3); an open NC can hold the bottles of the
+  results it touched (X-4). X-2 (disposal refused while a request has an open complaint or a rerun) awaits Jamie.
