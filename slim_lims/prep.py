@@ -12,7 +12,6 @@ slim-prep's prep methods too.
 """
 
 import json
-from collections.abc import Iterable
 from datetime import date, timedelta
 
 from slim_data.domain.values import AnalyteRef, SampleRef
@@ -168,33 +167,6 @@ class TrSamples:
         return out
 
 
-class AlreadyHeld:
-    """slim-prep's `SampleLookup` for a correction (review L-2). slim-prep checks every sample against its
-    request on each save and send (P-23), so one request cancelled or invoiced since would stop the
-    correction of a batch it shares with others, and their results would keep the wrong figures. The
-    samples the batch already held are answered as they were when it took them: open. A sample new to the
-    batch is checked as ever, and a cancelled request's results still can't be released
-    (`results.require_open_tr`)."""
-
-    def __init__(self, lookup: TrSamples, held: Iterable[str]) -> None:
-        self._lookup, self._held = lookup, frozenset(held)
-
-    def sample(self, sample_id: str) -> SampleInfo | None:
-        info = self._lookup.sample(sample_id)
-        if info is not None and sample_id in self._held and info.state != SampleState.NOT_RECEIVED:
-            return info.model_copy(update={"state": SampleState.OPEN})
-        return info
-
-    def open_samples(self, analysis: str) -> tuple[SampleInfo, ...]:
-        return self._lookup.open_samples(analysis)
-
-
-def correction_samples(session: Session, reference: ReferenceData, code: str) -> AlreadyHeld:
-    """The lookup for correcting prep batch `code`: the samples its latest version holds stay taken."""
-    held = [s.sample for s in books.get_batch(session, code).item.samples]
-    return AlreadyHeld(TrSamples(session, reference), held)
-
-
 def refuse_blocked(session: Session, batch: PrepBatch) -> None:
     """A bottle that serves this analysis carries a blocking condition (e.g. unsafe to handle) and is
     still in the lab: no prep batch takes the sample until the lab acts (slim-samples S-04). The host
@@ -213,7 +185,7 @@ def send(session: Session, code: str, user: User, reference: ReferenceData, spec
     there if it has readings. Raises slim-prep's PrepRefused / NotFound, or LookupError."""
     batch = books.get_batch(session, code).item
     first = sent_version(session, code) is None
-    if first:  # a correction is not new work: the batch already took its samples (review L-2)
+    if first:  # a correction is not new work: the batch already took its samples (review L-2, P-29)
         refuse_blocked(session, batch)
     analysis = next((a for a in reference.catalog_analyses() if a.code == batch.analysis), None)
     if analysis is None or batch.analysis not in PREP_ANALYSES:
@@ -226,7 +198,7 @@ def send(session: Session, code: str, user: User, reference: ReferenceData, spec
     }
     actor = actor_for(user)
     # slim-prep checks every sample against its TR again: a cancelled one takes no new work (D-99, P-23)
-    samples = TrSamples(session, reference) if first else correction_samples(session, reference, code)
+    samples = TrSamples(session, reference)  # a correction asks only about samples new to it (P-29)
     args = (session, code, actor, samples, analysis.id, analytes, PREP_ANALYSES[batch.analysis])
     if first:
         send_to_results(*args)

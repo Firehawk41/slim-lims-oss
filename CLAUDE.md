@@ -231,6 +231,6 @@ scripts/seed_demo.py; tests/ (SQLite per test, or Postgres via TEST_DATABASE_URL
   bear on a release are those of the batch each result was made from (`qc_warnings.for_release`: the page and
   the release ask it alike; Lab review L-1).
 - Lab review 2026-11-12 (`docs/REVIEW_2026-11-12_lab.md`): a prep correction keeps the samples its batch
-  already held, whatever became of their request (`prep.AlreadyHeld`, L-2); a blocking bottle refuses a file
+  already held, whatever became of their request (slim-prep P-29, L-2); a blocking bottle refuses a file
   that puts the sample on a batch, as it refuses the prep book (`results.blocked_samples`, L-3); a refused
   review or release shows the batch page again with the form as posted (L-4). L-6…L-12 await Jamie.

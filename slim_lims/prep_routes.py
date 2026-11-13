@@ -56,7 +56,6 @@ from slim_lims.models import ROLE_STAFF, User
 from slim_lims.prep import (
     PREP_ANALYSES,
     TrSamples,
-    correction_samples,
     prep_actor_for,
     refuse_blocked,
     rules,
@@ -508,12 +507,12 @@ def prep_save_batch(
 
     def save():
         batch = _batch_from_grid(values, db, user, clock)
-        if not expected:  # a correction is not new work (review L-2)
+        if not expected:  # a correction is not new work (review L-2, P-29)
             refuse_blocked(db, batch)
         warnings.extend(refuse_equipment(db, batch))  # the equipment register (D-126)
         reason = values.get("reason") or None
         rules_id = None if expected else rules(db).id  # a correction keeps its own (P-24)
-        samples = correction_samples(db, reference, batch.code) if expected else TrSamples(db, reference)
+        samples = TrSamples(db, reference)  # a correction asks only about samples new to it (P-29)
         return record_batch(db, batch, rules_id, prep_actor_for(user), samples, clock.now(), expected, reason)
 
     try:
@@ -584,7 +583,7 @@ def _move(
     """The batch, rechecked and recorded under the lab's current rules (P-24; review B9)."""
     if not reason.strip():
         raise ValueError("moving a batch to new rules needs a reason")
-    samples = correction_samples(db, reference, code)
+    samples = TrSamples(db, reference)
     recorded, _ = move_to_rules(
         db, code, rules(db).id, prep_actor_for(user), samples, clock.now(), version, reason.strip()
     )
@@ -710,11 +709,11 @@ def api_save_batch(data: BatchIn, user: RequireStaff, db: DB, clock: Clock, refe
     def save():
         batch = _in_lab_time(data.batch, clock)
         correction = bool(data.expected_version)
-        if not correction:  # a correction is not new work (review L-2)
+        if not correction:  # a correction is not new work (review L-2, P-29)
             refuse_blocked(db, batch)
         refuse_equipment(db, batch)  # the equipment register (D-126): blocks raise
         rules_id = None if correction else rules(db).id  # a correction keeps its own (P-24)
-        samples = correction_samples(db, reference, batch.code) if correction else TrSamples(db, reference)
+        samples = TrSamples(db, reference)  # a correction asks only about samples new to it (P-29)
         record_batch(
             db, batch, rules_id, prep_actor_for(user), samples, clock.now(),
             data.expected_version, data.reason,
