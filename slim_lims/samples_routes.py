@@ -17,13 +17,14 @@ Errors: the rules refuse -> 422 with every problem; not allowed -> 403; unknown 
 """
 
 import json
+from datetime import timedelta
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel, Field, ValidationError
 from slim_samples.domain.containers import Container, ContainerIn, EventKind, flags, label_for
-from slim_samples.domain.problems import Refused
+from slim_samples.domain.problems import Problem, Refused
 from slim_samples.domain.rules import SamplesRules
 from slim_samples.persistence._rows import NotAllowed, NotFound
 from slim_samples.persistence.rules import publish_rules
@@ -41,6 +42,8 @@ from slim_lims.samples import (
     TrSampleLookup,
     bottle_field,
     date_received,
+    disposal_nc,
+    needed_as_evidence,
     parse_bottles,
     receive_bottles,
     rules,
@@ -62,7 +65,7 @@ SHOWS = {
     "held": "On hold",
     "finished": "Disposed or returned",
 }
-ACTIONS = ("move", "condition", "correct", "hold", "release", "dispose", "return")
+ACTIONS = ("move", "condition", "correct", "hold", "release", "dispose", "return", "undo")
 
 
 class Failed(Exception):
@@ -132,9 +135,17 @@ def _flag(name: str, value: Any) -> bool:
 
 
 def _act(
-    db: Session, user, container_id: int, action: str, values: dict[str, Any], reference, clock: LabClock
+    db: Session,
+    user,
+    container_id: int,
+    action: str,
+    values: dict[str, Any],
+    reference,
+    clock: LabClock,
+    notes: list | None = None,
 ):
-    """One action on one bottle. `values` is the posted form or the JSON body."""
+    """One action on one bottle. `values` is the posted form or the JSON body. `notes` collects what the
+    person should be told besides (a nonconformity raised)."""
     if action not in ACTIONS:
         raise NotFound(f"no action {action!r}")
     published = rules(db)
@@ -172,7 +183,11 @@ def _act(
     if action == "release":
         return custody.release_hold(db, container_id, actor=actor, reason=reason)
     if action == "dispose":
-        return custody.dispose(
+        bottle = custody.get_container(db, container_id)
+        why = needed_as_evidence(db, reference, bottle) if bottle.active else []
+        if why and not reason.strip():  # review X-2: allowed, as it happened, but never without a word
+            raise Refused(Problem(where="reason", message="say why: it was needed (" + "; ".join(why) + ")"))
+        done = custody.dispose(
             db,
             container_id,
             actor=actor,
@@ -180,6 +195,22 @@ def _act(
             method=str(values.get("method") or ""),
             today=clock.today(),
             reason=reason,
+            despite_hold=bottle.held and _flag("despite_hold", values.get("despite_hold")),
+        )
+        if why:
+            nc = disposal_nc(db, user, done, why, reason)
+            if notes is not None:
+                notes.append(f"{nc.number} raised: the bottle was needed ({'; '.join(why)}).")
+        return done
+    if action == "undo":  # recorded as disposed or returned, but still here (slim-samples S-12)
+        return custody.undo_finish(
+            db,
+            container_id,
+            actor=actor,
+            rules=published,
+            reason=reason,
+            location=str(values.get("location") or ""),
+            now=clock.now(),
         )
     return custody.return_to_customer(db, container_id, actor=actor, note=reason)
 
@@ -221,12 +252,20 @@ def samples_home(request: Request, user: RequireStaff, db: DB, clock: Clock, sho
 
 
 @router.get("/samples/containers/{container_id}", name="samples_container")
-def samples_container(request: Request, container_id: int, user: RequireStaff, db: DB, clock: Clock):
+def samples_container(
+    request: Request, container_id: int, user: RequireStaff, db: DB, clock: Clock, reference: Reference
+):
     try:
         container = custody.get_container(db, container_id)
     except NotFound:
         return render(request, "error.html", {"status": 404, "message": "No such bottle."}, 404)
     siblings = custody.containers_of(db, container.sample)
+    lab_rules = rules(db).rules
+    undo_until = (
+        None
+        if container.active or container.finished_on is None
+        else container.finished_on + timedelta(days=lab_rules.undo_days)
+    )
     return render(
         request,
         "samples/container.html",
@@ -235,9 +274,12 @@ def samples_container(request: Request, container_id: int, user: RequireStaff, d
             "label": label_for(container, len(siblings)),
             "siblings": siblings,
             "flags": flags(siblings),
-            "rules": rules(db).rules,
+            "rules": lab_rules,
             "today": clock.today(),
             "EventKind": EventKind,
+            "needed": needed_as_evidence(db, reference, container) if container.active else [],  # X-2
+            "undo_until": undo_until if undo_until is not None and clock.now() <= undo_until else None,
+            "zone": clock.zone,
         },
     )
 
@@ -260,12 +302,15 @@ def samples_action(
     clock: Clock,
     form: Form_,
 ):
+    notes: list[str] = []
     try:
-        done = _guard(db, lambda: _act(db, user, container_id, action, form, reference, clock))
+        done = _guard(db, lambda: _act(db, user, container_id, action, form, reference, clock, notes))
     except Failed as failed:
         flash(request, "Not done: " + "; ".join(failed.problems), "error")
     else:
         flash(request, f"{done.sample} {done.title}: {action} recorded.", "success")
+        for note in notes:
+            flash(request, note, "warning")
     return RedirectResponse(request.url_for("samples_container", container_id=container_id), status_code=303)
 
 

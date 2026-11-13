@@ -14,29 +14,29 @@ around all of it. Ids X-1….
 ## Bugs (confirmed; each with the fix and its guard test)
 
 **X-1, X-3 and X-4 built the same day** (Jamie: "fix x1 but for x2, what if someone accidentally disposes of
-a bottle? Fix x3-4, too"). X-2 is not built: Jamie asked what happens after an accidental disposal (answered
-below, under X-2). X-3 is built as recommended, with the *no charge* fact.
+a bottle? Fix x3-4, too"). X-2 was then built as Jamie redirected it (below, under X-2). X-3 is built as recommended, with the *no charge* fact.
 
 | # | Seam · lens | Finding | Fix | Guard |
 |---|---|---|---|---|
 | X-1 | Admin A-1 × quote withdrawal (D-140) · 3 | **A quote can be withdrawn from a day in the past, and that now re-prices requests already received under it.** Since A-1 an invoice is priced by the quotes in force on the day the request was received. `withdraw_quote` takes any "from" day the form gives, down to the quote's start date (V5 checks only start and expiry). A withdrawal dated last month makes every request received since then, not yet invoiced, price at the default list or another quote. Replace does the same when the new quote's first day is typed in the past (it withdraws the old one from `max(new start, old start)`). Read, not run. | **Built:** `quotes.withdraw` refuses a day before the lab's today ("requests received under it keep its prices"); Replace withdraws the old quote from the latest of the new one's first day, the old one's and today. | `test_quotes.py::test_x1_a_withdrawal_never_reaches_back_over_requests_received` (also an older withdrawal test now expects this refusal for a day before today) |
 | X-2 | Lab bottles × Quality complaints, Lab reruns · 3 | **A bottle can be disposed of while a complaint on its request is open, or while one of its results waits for a rerun.** `custody.dispose` refuses only a bottle on hold, and a hold is placed by hand: the hold form even suggests "complaint, open nonconformity" as a reason. Nothing places one when a customer raises a complaint (D-130) or a reviewer requests a rerun. Past the retention date no reason is needed, so the item a complaint is about can go in the bin the day the complaint arrives. Read, not run. | The host refuses a disposal while the request has an open complaint, or while a result of the sample + analysis the bottle serves has a rerun requested; the refusal names it. The hand-placed hold stays for everything else. | Not built (see below). |
 
-**X-2 and an accidental disposal** (Jamie's question). A disposal is final in slim-samples: it is an event in
-the bottle's append-only history, and a finished bottle takes no more events (S-05), so a disposal recorded
-by mistake can't be undone, nor corrected (`custody.correct` changes kind, count and analyses only, on an open
-bottle). Two different accidents:
+**X-2, built differently** (Jamie, after the first answer: "what if a bottle was supposed to be held and
+someone accidentally disposed of it irl … if someone 'disposed' of the bottle in software but not irl, then
+that's a problem. There needs to be an undo button to reflect reality"). The record follows what happened,
+both ways, so the refusal proposed above was the wrong fix:
 
-- *The bottle really went.* Nothing in software brings it back; only preventing it helps. X-2's refusal is
-  that prevention for the two cases where the bottle is evidence (an open complaint, a rerun requested).
-- *The click was wrong; the bottle is still on the shelf.* Today the record says "disposed" for good: the lab
-  can only note it on another bottle, and the bottle no longer appears anywhere. That is a gap of its own.
+- *Needed, and really gone.* A bottle is needed while it is on hold, its request has an open complaint, or a
+  rerun is requested on a result of an analysis it serves (`samples.needed_as_evidence`). Its page says so.
+  Disposing of it is allowed, but only with a reason, and it raises a nonconformity in the same transaction
+  (`samples.disposal_nc`, by whoever recorded it, the reasons and their words in it). A held bottle is
+  recorded as gone *despite the hold*: a supervisor or quality, with a reason (slim-samples S-13).
+- *Recorded as gone, but still here.* "Undo: it is still here" on a disposed or returned bottle's page: a
+  supervisor or quality, a reason and where it is, within the lab's `undo_days` (demo 7). The bottle is active
+  again; the disposal and the undo stay in its history (slim-samples S-12).
 
-Recommendation: build X-2 as proposed, and add to slim-samples an "undo a disposal" event (S-05 amended): a
-supervisor, with a reason, within a few days (lab data, e.g. 7), only for a bottle whose disposal was
-recorded and that is still physically there; the bottle is active again and both events stay in its
-history. A slim-samples change and a pin bump.
-
+Guards: slim-samples `test_s12_…`, `test_s13_…`; host `test_samples.py::test_x2_a_needed_bottle_gone_all_the_same_is_recorded_with_a_reason_and_raises_an_nc`,
+`…::test_s12_a_disposal_recorded_by_mistake_is_undone_from_the_bottle_page`. slim-samples is pinned at `88f25b8`.
 
 ## For decision (ideas, each with a recommendation; not built)
 

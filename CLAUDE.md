@@ -248,4 +248,6 @@ scripts/seed_demo.py; tests/ (SQLite per test, or Postgres via TEST_DATABASE_URL
 - Cross-department pass 2026-11-13 (`docs/REVIEW_2026-11-13_cross.md`): a quote is never withdrawn from a day
   already past (X-1); a PT sample's request is closed as no charge, never invoiced (`invoices.close_no_charge`,
   `tr_invoices.no_charge_reason`, the board's *No charge* column; X-3); an open NC can hold the bottles of the
-  results it touched (X-4). X-2 (disposal refused while a request has an open complaint or a rerun) awaits Jamie.
+  results it touched (X-4). A bottle that is needed (held, an open complaint, a rerun requested) is disposed of
+  only with a reason, and that raises an NC; a held one is recorded as gone despite the hold (slim-samples
+  S-13); a disposal or return recorded by mistake is undone from the bottle's page (S-12; X-2).

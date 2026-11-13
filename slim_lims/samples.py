@@ -277,3 +277,48 @@ def condition_notes(
             if analysis in ids:
                 notes[(position, ids[analysis])] = tuple(dict.fromkeys(f.text for f in items))
     return notes
+
+
+# ---------------------------------------------------------------- a bottle that is evidence (review X-2)
+
+
+def needed_as_evidence(db: Session, reference: ReferenceData, container: Container) -> list[str]:
+    """Why this bottle should stay: on hold, an open complaint on its request, or a rerun requested on a
+    result of an analysis it serves. Disposing of it all the same needs a reason and raises a nonconformity
+    (review X-2): the record follows what happened, and quality hears of it."""
+    from slim_data.persistence.results import results_for_tr
+    from slim_quality.domain.complaints import ComplaintState
+    from slim_quality.persistence import store
+
+    tr_number = container.sample.rsplit("-", 1)[0]
+    why = [f"on hold: {container.hold_reason}"] if container.held else []
+    why += [
+        f"complaint {c.number} is open"
+        for c in store.list_complaints(db, tr_number=tr_number)
+        if c.state != ComplaintState.CLOSED
+    ]
+    ids = {a.code: a.id for a in reference.catalog_analyses()}
+    serves = {ids[a] for a in container.current_analyses if a in ids}
+    why += [
+        f"a rerun is requested for {r.analyte.code}"
+        for r in results_for_tr(db, tr_number)
+        if str(r.sample) == container.sample and r.analyte.analysis_id in serves and r.rerun_requested
+    ]
+    return why
+
+
+def disposal_nc(db: Session, user: User, container: Container, why: list[str], reason: str):
+    """The nonconformity for a bottle disposed of while it was needed (review X-2), raised in the disposal's
+    transaction, by whoever recorded it."""
+    from slim_quality.domain.actor import QualityActor
+    from slim_quality.domain.enums import QualityRole
+    from slim_quality.service import quality as q
+
+    by = QualityActor(id=str(user.id), display=user.initials or user.email, role=QualityRole.USER)
+    return q.raise_nc(
+        db,
+        f"{container.sample} bottle {container.position} disposed of while needed",
+        "It was needed: " + "; ".join(why) + f".\n\nRecorded by {by.display}: {reason.strip()}",
+        by,
+        source_ref=f"samples:container:{container.id}",
+    )

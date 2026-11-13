@@ -311,6 +311,8 @@ Tally and themes are updated now and then at the bottom.
 | J | "Fix x1 but for x2, what if someone accidentally disposes of a bottle? Fix x3-4, too." | X-2 held for Jamie's answer. |
 | C✓ | X-1: no withdrawal or Replace reaches back before the lab's today. X-3: a PT request is closed as no charge (a fact, to invoiced; migration 0019), never invoiced. X-4: an open NC's "Hold their bottles". Each with its guard test. | Host only. |
 | C→J | X-2: a disposal is final in slim-samples (S-05), so an accidental one can't be undone. Recommend X-2's refusal (for a bottle that is evidence) plus an "undo a disposal" event in slim-samples for a wrong click. | For Jamie. |
+| J | "What if a bottle was supposed to be held and someone accidentally disposed of it irl … if someone 'disposed' of the bottle in software but not irl, then that's a problem. There needs to be an undo button to reflect reality." | Jamie corrected the frame: the record must follow reality. |
+| C✓ | X-2 rebuilt: a needed bottle (held, open complaint, rerun requested) may be disposed of only with a reason, and that raises an NC; a held one is recorded as gone despite the hold (slim-samples S-13); "Undo: it is still here" within the lab's days (S-12). slim-samples pinned at `88f25b8`. | Guards in both repos. |
 
 ## Themes so far
 - **Domain facts are Jamie's, and they overrule Claude's defaults:** DF < 1, MDL averaging, standards as

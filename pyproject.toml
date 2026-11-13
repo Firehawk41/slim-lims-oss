@@ -31,7 +31,7 @@ dependencies = [
     # The prep book (slim-prep P6). Co-developing: pip install -e ../slim-prep-oss
     "slim-prep @ git+https://github.com/Firehawk41/slim-prep-oss@6ee244c2bdb63dbe6842c64fff43bc3bdf956c95",
     # The sample module (slim-samples S-01). Co-developing: pip install -e ../slim-samples-oss
-    "slim-samples @ git+https://github.com/Firehawk41/slim-samples-oss@fc1be70ce8dbaa1f70c8d31185f760c3557dc5e7",
+    "slim-samples @ git+https://github.com/Firehawk41/slim-samples-oss@88f25b8a4b07d1812c21948fb949b33fa75238aa",
     # The quality module (slim-data D-109). Co-developing: pip install -e ../slim-quality-oss
     "slim-quality @ git+https://github.com/Firehawk41/slim-quality-oss@7bbf48830aa6e27675343e0787fb4e1d2fe8d3f3",
     # slim-domain: its hash-chained audit log over the shared database (slim-data D-77), and the bridge.
