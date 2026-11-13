@@ -284,6 +284,13 @@ Tally and themes are updated now and then at the bottom.
 | J | "Fix Q-1 through Q-3." | |
 | C✓ | Q-1: spec limits follow slim-domain's owner rule (a site's own, else its group's) in evaluation and in approval; Q-2: spec proposers and approvers are involved in §7.8; Q-3: a line's QC acknowledgements are its own version's release's. Each with its guard test. | Host only; Q-3 corrected an older test that relied on the bug. |
 
+## 2026-11-13: department review, Admin
+
+| Kind | What | Notes |
+|---|---|---|
+| J | "Review the Admin department per the plan." | `REVIEW_2026-11-13_admin.md`. Nothing fixed. |
+| F | No confirmed bug; the plan's A1…A7 refuted. For decision A-1…A-5, first A-1: an invoice is priced on the day it is sent, so a request submitted under a quote that expires or is replaced before the report is complete is billed at the invoicing day's price, and nothing says so. | Raised with Jamie. |
+
 ## Themes so far
 - **Domain facts are Jamie's, and they overrule Claude's defaults:** DF < 1, MDL averaging, standards as
   recipes, spike placement. Claude's "cautious" engineering defaults were wrong more than once where

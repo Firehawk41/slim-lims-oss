@@ -5,7 +5,7 @@ review, list findings ranked, stop. **Every fixed finding ends in a guard test**
 reviews look for new holes, not old ones. First full review: `REVIEW_2026-10-28.md`; slim-quality:
 `REVIEW_2026-10-30.md`;
 seams between modules: `REVIEW_2026-10-30b.md`; after slim-quality 5c: `REVIEW_2026-11-09.md`; by department (plan:
-`REVIEW_PLAN_2026-11-12.md`): Lab `REVIEW_2026-11-12_lab.md`, Quality `REVIEW_2026-11-13_quality.md`.
+`REVIEW_PLAN_2026-11-12.md`): Lab `REVIEW_2026-11-12_lab.md`, Quality `REVIEW_2026-11-13_quality.md`, Admin `REVIEW_2026-11-13_admin.md`.
 
 **When:** a module review when a module is wired in; an app review (the seams between modules) every
 two or three modules. **Output:** `docs/REVIEW_<date>.md`, findings only, each with the fix and its test.
