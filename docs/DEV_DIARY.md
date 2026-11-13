@@ -314,6 +314,14 @@ Tally and themes are updated now and then at the bottom.
 | J | "What if a bottle was supposed to be held and someone accidentally disposed of it irl … if someone 'disposed' of the bottle in software but not irl, then that's a problem. There needs to be an undo button to reflect reality." | Jamie corrected the frame: the record must follow reality. |
 | C✓ | X-2 rebuilt: a needed bottle (held, open complaint, rerun requested) may be disposed of only with a reason, and that raises an NC; a held one is recorded as gone despite the hold (slim-samples S-13); "Undo: it is still here" within the lab's days (S-12). slim-samples pinned at `88f25b8`. | Guards in both repos. |
 
+## 2026-11-13: review items T-4 and T-5
+
+| Kind | What | Notes |
+|---|---|---|
+| J | "Do T-4 and T-5." | |
+| C✓ | T-4: "Bumping a pin" in `CLAUDE.md`, five steps, merge commit first. T-5: how long a demo lab is kept, from its setting, on the personas page and in the demo banner. | |
+| F | T-5 was partly wrong: the personas page already said "cleared after an hour idle". Corrected in the IT review. | |
+
 ## Themes so far
 - **Domain facts are Jamie's, and they overrule Claude's defaults:** DF < 1, MDL averaging, standards as
   recipes, spike placement. Claude's "cautious" engineering defaults were wrong more than once where

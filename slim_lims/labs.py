@@ -107,6 +107,15 @@ class Labs:
         self.upgrade = upgrade  # brings a claimed lab up to the code now running (D-115)
         self.spares, self.cap, self.idle, self.clock = spares, cap, idle, clock
         self.background = background  # False: spares are made only by calling refill (tests)
+
+    @property
+    def kept_for(self) -> str:
+        """How long a lab is kept after its visitor's last click, in words (the pages say so, review T-5)."""
+        minutes = int(self.idle.total_seconds() // 60)
+        if minutes % 60 == 0:
+            hours = minutes // 60
+            return "an hour" if hours == 1 else f"{hours} hours"
+        return f"{minutes} minutes"
         self.base = make_engine(self.url, poolclass=NullPool)
         self._factories: dict[str, sessionmaker[Session]] = {}
         self._engines: dict[str, Engine] = {}

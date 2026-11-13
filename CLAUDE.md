@@ -73,6 +73,16 @@ pytest -q -p no:warnings                 # TEST_DATABASE_URL=postgresql+psycopg2
 ruff check . && ruff format --check .
 ```
 
+**Bumping a pin** (D-117; review T-4), in this order:
+1. Merge the module's PR with a **merge commit, never a squash**: the pin names the branch's commit, which must
+   stay on the module's `main`.
+2. Set the new commit in every file that pins it (`pyproject.toml`; the CI workflow and `render.yaml` where they
+   name the module): `tests/test_pins.py` checks they agree.
+3. Run the module's own tests, then the host's full suite against it (`pip install -e ../<module>` or the pin).
+   A new module migration needs nothing more: `cli migrate`, the seed and `upgrade_lab` run every module's.
+4. Merge the host PR on green; the deploy upgrades every claimed lab (D-115).
+5. Re-sign the validation pack (`/quality/validation`): a bump makes its signature stale (D-137).
+
 `docker compose up --build`: Postgres 16 + a one-shot seed + the app with personas. **Render**
 (`render.yaml`): a lab per visitor (`DEMO_LABS`, D-102): public is emptied once (`cli empty-public --yes
 --if-needed`), the shared lab is `DATABASE_SCHEMA=lab_shared`, each visitor's first persona claims a

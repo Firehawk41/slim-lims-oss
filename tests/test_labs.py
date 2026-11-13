@@ -186,6 +186,8 @@ def test_each_visitor_gets_a_seeded_lab_of_their_own(demo):
         assert _continue_as(one).status_code == 303 and _continue_as(two).status_code == 303
         board = one.get("/")
         assert board.status_code == 200 and "TR00001" in board.text  # the seeded scenarios
+        assert "Your lab is kept for an hour after your last click." in board.text  # review T-5
+        assert "an hour after your last click (sooner if the demo is full" in one.get("/demo/personas").text
         lab_one = _lab_of(labs, one.get("/api/me").json()["id"])
         lab_two = _lab_of(labs, two.get("/api/me").json()["id"])
         assert len({lab_one, lab_two, "lab_shared"}) == 3
@@ -235,3 +237,18 @@ def test_empty_public_only_when_needed(url, monkeypatch, capsys):
     assert main(["empty-public", "--yes", "--if-needed"]) == 0
     assert "nothing to empty" in capsys.readouterr().out
     engine.dispose()
+
+
+def test_t5_how_long_a_lab_is_kept_is_said_from_its_setting():
+    from datetime import timedelta
+
+    from slim_lims.labs import Labs
+
+    def kept(idle):
+        labs = Labs.__new__(Labs)  # the words only: no database
+        labs.idle = idle
+        return labs.kept_for
+
+    assert kept(timedelta(hours=1)) == "an hour"
+    assert kept(timedelta(hours=3)) == "3 hours"
+    assert kept(timedelta(minutes=45)) == "45 minutes"

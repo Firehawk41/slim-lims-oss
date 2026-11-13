@@ -14,7 +14,9 @@
     <p class="muted">No personas are set up (run the demo seed).</p>
   {% endif %}
   {% if request.app.state.labs %}
-    <p>This lab is yours alone: nobody else sees what you do here, and it is cleared after an hour idle.</p>
+    <p>This lab is yours alone: nobody else sees what you do here. It is kept for
+      {{ request.app.state.labs.kept_for }} after your last click (sooner if the demo is full: the least
+      recently used goes first), then cleared; choosing a persona again gives you a fresh one.</p>
     {% if request.session.get("lab") %}
       <form method="post" action="{{ url_for('fresh_lab') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
