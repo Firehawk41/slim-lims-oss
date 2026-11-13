@@ -302,6 +302,13 @@ Tally and themes are updated now and then at the bottom.
 | J | "Fix T-1." | |
 | C✓ | The login throttle takes the `X-Forwarded-For` entry the lab's own proxy appended (`TRUSTED_PROXY_HOPS`, 1 on Render), never one the client wrote. Guard runs behind uvicorn's proxy middleware as Render does. | Check the hop count on Render once. |
 
+## 2026-11-13: cross-department pass
+
+| Kind | What | Notes |
+|---|---|---|
+| J | "Do the cross-department pass per the plan." | `REVIEW_2026-11-13_cross.md`. Before Jamie's walkthrough, which the plan puts first. Nothing fixed. |
+| F | Bugs X-1, X-2: a quote withdrawal may be dated in the past, and since A-1 that re-prices requests already received; a bottle can be disposed of while its request has an open complaint or a rerun is requested. For decision X-3 (a PT request is invoiced to the scheme), X-4. | Raised with Jamie. |
+
 ## Themes so far
 - **Domain facts are Jamie's, and they overrule Claude's defaults:** DF < 1, MDL averaging, standards as
   recipes, spike placement. Claude's "cautious" engineering defaults were wrong more than once where
