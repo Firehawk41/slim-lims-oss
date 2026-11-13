@@ -19,7 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from slim_lims import reports
-from slim_lims.domain import TRSubmission
+from slim_lims.domain import TRStatus, TRSubmission
 from slim_lims.models import ReportDeliveryRow, User
 
 OUTBOX = "outbox"  # stored, not transmitted
@@ -51,6 +51,8 @@ def message_for(submission: TRSubmission, issue_id: int, amends: int | None, sig
     ]
     if amends:
         lines.append(f"It replaces report issue {amends}, which should no longer be used.")
+        if submission.status is TRStatus.INVOICED:  # review A-2
+            lines.append("Your invoice for this request is unchanged.")
     lines += ["", f"The report is signed by {signatory}.", "", f"Kind regards,\n{lab}"]
     return Message(
         to=tuple(str(a) for a in submission.results_to),

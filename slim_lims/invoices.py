@@ -7,6 +7,8 @@ a TR status.
 """
 
 import io
+from dataclasses import dataclass
+from datetime import date
 
 import slim_invoicing
 from slim_data.persistence.results import issues_for_tr
@@ -63,6 +65,27 @@ def billable(
     )
 
 
+def priced_on(submission: TRSubmission, today: date) -> date:
+    """The day whose quotes price a request: the day it was received (review A-1), else today."""
+    return submission.receipt.date_received if submission.receipt else today
+
+
+@dataclass(frozen=True)
+class PricedBy:
+    """What priced each line of a sales order, and whether the quote the request named priced any."""
+
+    lines: list  # per line: the quote that priced it (V5's Quote), or None if V5 no longer has it
+    named: int | None  # the quote the request named (D-139), or None
+    named_priced: bool
+
+
+def priced_by(session: Session, order, named: int | None) -> PricedBy:
+    """Each line's quote, from its price's id (review A-1)."""
+    by_price = {p.id: q for q in slim_invoicing.all_quotes(session) for li in q.line_items for p in li.prices}
+    lines = [by_price.get(li.quote_price_id) for li in order.line_items]
+    return PricedBy(lines, named, any(q is not None and q.id == named for q in lines))
+
+
 def latest_invoices(session: Session, submission_ids) -> dict[int, TRInvoiceRow]:
     """submission ID -> its newest invoice."""
     rows = session.scalars(
@@ -78,7 +101,8 @@ def mark_sent(
 ) -> TRInvoiceRow:
     """Invoices a complete TR (V5 prices it into a sales order), moves it to invoiced and records the
     invoice as sent. Staff only. Refused (Conflict) when V5 refuses: already invoiced, nothing
-    reported, or an analysis no quote prices."""
+    reported, or an analysis no quote prices. Priced by the quotes in force on the day the request was
+    received, the price the customer agreed to when the lab took the work (review A-1)."""
     if not user.is_staff:
         raise Forbidden("only lab staff record invoices")
     submission = service.get(tr_number, user)
@@ -89,7 +113,7 @@ def mark_sent(
             session,
             billable(session, submission, reference, service.lab_today()),
             created_by=user.initials or user.email,
-            on=service.lab_today(),
+            on=priced_on(submission, service.lab_today()),
         )
     except slim_invoicing.InvoiceRefused as e:
         raise Conflict(str(e)) from e

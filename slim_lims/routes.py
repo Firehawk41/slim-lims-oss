@@ -229,7 +229,9 @@ def invoice_page(request: Request, tr_number: str, user: RequireUser, service: S
             request, "error.html", {"status": 404, "message": f"{tr_number} has not been invoiced."}, 404
         )
     paid = invoices.latest_invoices(db, [submission.id]).get(submission.id)
-    return render(request, "requests/invoice.html", {"s": submission, "order": order, "invoice": paid})
+    priced = invoices.priced_by(db, order, quotes.named_by(db, submission.id))  # review A-1
+    context = {"s": submission, "order": order, "invoice": paid, "priced": priced, "number": quotes.number}
+    return render(request, "requests/invoice.html", context)
 
 
 @router.get("/invoices", name="invoices_home")

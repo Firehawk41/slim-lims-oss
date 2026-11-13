@@ -279,3 +279,56 @@ def test_r7_the_set_the_decision_and_the_new_versions_commit_together(
     assert db.scalars(select(SpecDecisionRow)).all() == [] and versions() == before
     with sc_session(spec_table) as slim:
         assert sc.current_set(slim, B, IPA, "", "specification")[0] == {"Fe": "0.3", "Zn": "0.2"}
+
+
+GROUP = 30  # B's group, for Q-1
+
+
+def test_q1_a_groups_limits_judge_its_sites_results(engine, db, seeded, spec_table, people):
+    """Review Q-1: a site with no limits of its own for a chemical is judged by its group's (slim-domain's
+    `limits_owner`); a change to the group's set re-evaluates the site's results by the new limits and
+    lists the site's released results it would judge otherwise."""
+    from fastapi.testclient import TestClient
+
+    from slim_lims.reference import CustomerRef, StaticReferenceData
+    from slim_lims.results import SpecReader
+    from tests.test_demo_scenarios import reference as demo_reference
+
+    base = demo_reference.__wrapped__()
+    customers = [
+        CustomerRef(c.id, c.name, c.street_address, parent_customer_id=GROUP if c.id == B else None)
+        for c in base.customers.values()
+    ] + [CustomerRef(GROUP, "B group", is_group=True)]
+    grouped = StaticReferenceData.of(
+        customers=customers, chemicals=list(base.chemicals.values()), elements=list(base.elements.values()),
+        analyses=list(base.analyses.values()),
+    )  # fmt: skip
+    with engine.begin() as conn:  # B's set moves to its group: B has none of its own now
+        conn.execute(
+            text("UPDATE specifications SET customer_id = :g WHERE customer_id = :b"), {"g": GROUP, "b": B}
+        )
+    assert SpecReader(engine, grouped)(B, IPA, "") == {"Fe": 0.3, "Zn": 0.2}
+    assert SpecReader(engine)(B, IPA, "") == {}  # no reference data: its own only, as before
+
+    app = create_app(make_settings(str(engine.url)), engine=engine, reference=grouped)
+    with TestClient(app) as client:
+        login(client, "uma@lab.example")
+        page = client.get(f"/specs/edit?customer={GROUP}&chemical={IPA}&location=&kind=specification")
+        body = {
+            "customer": str(GROUP), "chemical": str(IPA), "location": "", "kind": "specification",
+            "unit": "ppb", "element": ["Fe", "Zn"], "value": ["0.29", "0.2"], "reason": "group sheet rev. D",
+            "csrf_token": csrf_from(page.text),
+        }  # fmt: skip
+        assert "Proposal 1 made" in client.post("/specs/proposals", data=body, follow_redirects=True).text
+        client.cookies.clear()
+        login(client, "staff@lab.example")
+        page = client.get("/specs/proposals/1")
+        done = client.post(
+            "/specs/proposals/1/approve", data={"csrf_token": csrf_from(page.text)}, follow_redirects=True
+        )
+        assert "Approved: the limits are on file" in done.text
+    db.rollback()
+    decision = db.scalars(select(SpecDecisionRow)).one()
+    assert decision.reevaluated and decision.now_differ == ["TR00002-01 Fe 0.295 ppb: passes → fails"]
+    db.rollback()
+    assert SpecReader(engine, grouped)(B, IPA, "") == {"Fe": 0.29, "Zn": 0.2}  # the site reads its group's

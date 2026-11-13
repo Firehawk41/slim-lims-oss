@@ -274,6 +274,32 @@ Tally and themes are updated now and then at the bottom.
 | J | "Yes, move it into the module." (2026-11-13) | |
 | C✓ | L-2 moved into slim-prep as P-29: a correction, a move to new rules and a correction's send check only samples new to the batch; the host's `AlreadyHeld` is gone and slim-prep is pinned at `6ee244c`. | slim-prep `test_p29_…`; host `test_l2_…` unchanged. |
 
+## 2026-11-13: department review, Quality
+
+| Kind | What | Notes |
+|---|---|---|
+| J | "Yes, open both PRs and merge on green." | slim-prep-oss #6 (P-29), slim-lims-oss #37 (Lab review and L-1…L-4): merged. |
+| J | "Review the Quality department per the plan." | `REVIEW_2026-11-13_quality.md`. Nothing fixed. |
+| F | Bugs Q-1…Q-3: a group's spec limits never judge a result (the host reads the exact customer, slim-domain falls back to the group); a spec proposer or approver can audit §7.8; an amended report's audit shows an earlier version's QC acknowledgement. For decision Q-4…Q-10. | Raised with Jamie. |
+| J | "Fix Q-1 through Q-3." | |
+| C✓ | Q-1: spec limits follow slim-domain's owner rule (a site's own, else its group's) in evaluation and in approval; Q-2: spec proposers and approvers are involved in §7.8; Q-3: a line's QC acknowledgements are its own version's release's. Each with its guard test. | Host only; Q-3 corrected an older test that relied on the bug. |
+
+## 2026-11-13: department review, Admin
+
+| Kind | What | Notes |
+|---|---|---|
+| J | "Review the Admin department per the plan." | `REVIEW_2026-11-13_admin.md`. Nothing fixed. |
+| F | No confirmed bug; the plan's A1…A7 refuted. For decision A-1…A-5, first A-1: an invoice is priced on the day it is sent, so a request submitted under a quote that expires or is replaced before the report is complete is billed at the invoicing day's price, and nothing says so. | Raised with Jamie. |
+| J | "Build A1 and 2." | |
+| C✓ | A-1: an invoice is priced by the quotes in force the day the request was received; the invoice page says what priced each line and when the named quote priced none. A-2: an amended report to an invoiced request says the invoice is unchanged. | Host only; V5 unchanged. |
+
+## 2026-11-13: department review, IT
+
+| Kind | What | Notes |
+|---|---|---|
+| J | "Review the IT department per the plan." | `REVIEW_2026-11-13_it.md`. Nothing fixed. |
+| F | Bug T-1: the login throttle's per-address limit takes the leftmost `X-Forwarded-For` entry (uvicorn with every proxy trusted), which the client writes: it can be dodged, or aimed at someone else's address. For decision T-2…T-6: an admin page, capability grants as events, a pin bump list, the demo lab's hour said up front, backups with the VPS. | Raised with Jamie. |
+
 ## Themes so far
 - **Domain facts are Jamie's, and they overrule Claude's defaults:** DF < 1, MDL averaging, standards as
   recipes, spike placement. Claude's "cautious" engineering defaults were wrong more than once where

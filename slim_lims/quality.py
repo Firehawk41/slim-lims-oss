@@ -21,6 +21,7 @@ from zoneinfo import ZoneInfo
 from slim_data.demo.qtegra_export import export, measurement
 from slim_data.domain.enums import EventKind
 from slim_data.domain.results import ReportIssue
+from slim_data.persistence.results import load_result
 from slim_data.service.audit import ResultAudit, issues_between, released_in_window, report_audit
 from slim_data.service.quality import qc_history
 from slim_data.service.views import batches
@@ -278,6 +279,26 @@ def _aware(at: datetime) -> datetime:
     return at if at.tzinfo else at.replace(tzinfo=UTC)  # SQLite: naive UTC
 
 
+def _acknowledgements_of(db: Session, line, issued_at: datetime) -> list:
+    """The QC acknowledgements made when the version on the report was released (review Q-3). One is
+    written in its release's transaction, so it belongs to the release nearest it in time; an earlier
+    version's stays with that version, never shown under a correction released clean."""
+    result = load_result(db, line.sample, line.analyte)
+    releases = [e for e in (result.events if result else ()) if e.kind == EventKind.RELEASED]
+    if not releases:
+        return []
+
+    def release_of(ack) -> int:
+        at = _aware(ack.at)
+        return min(releases, key=lambda e: abs((_aware(e.at) - at).total_seconds())).version
+
+    return [
+        a
+        for a in qc_warnings.acknowledgements(db, line.sample, line.analyte.analysis_id)
+        if _aware(a.at) <= issued_at and release_of(a) == line.version
+    ]
+
+
 def audit_page(db: Session, issue_id: int) -> AuditPage:
     """A released report, end to end, from every module's read API (slim-data D-112, D-113)."""
     found = report_audit(db, issue_id)
@@ -306,11 +327,7 @@ def audit_page(db: Session, issue_id: int) -> AuditPage:
             (run, q.context_at(charts_then[r.made_at], run.instrument, r.analyte.code, run.analyzed_at))
             for run in r.runs
         ]
-        acks = [
-            a
-            for a in qc_warnings.acknowledgements(db, r.sample, r.analyte.analysis_id)
-            if _aware(a.at) <= issue.created_at
-        ]
+        acks = _acknowledgements_of(db, r, issue.created_at)
         lines.append(AuditLine(result=r, prep=prep, prep_sample=prep_sample, qc=qc, qc_acks=acks))
     checker = chain_check(db.get_bind())
     broken = None if checker is None else tuple(checker(db.connection()))

@@ -11,7 +11,7 @@
 """
 
 import json
-from datetime import date, timedelta
+from datetime import UTC, date, timedelta
 from importlib import metadata
 
 from slim_data.engine.registry import default_registry
@@ -70,9 +70,26 @@ def involved_in_clause(
     if not acts:
         return frozenset()
     start = on - timedelta(days=365)
-    return frozenset(
+    found = {
         a.person.id for a in lab_acts(session, reference, clock) if a.act in acts and start <= a.on <= on
-    )
+    }
+    if clause == "7.8":  # spec limits decide the report's statements of conformity, §7.8.6 (review Q-2)
+        found |= spec_changers(session, clock, start, on)
+    return frozenset(found)
+
+
+def spec_changers(session: Session, clock: LabClock, start: date, end: date) -> set[str]:
+    """Who proposed or decided a spec limit change between two of the lab's days (D-143), by user id."""
+    from slim_lims.models import SpecDecisionRow, SpecProposalRow, User
+
+    def within(at) -> bool:
+        return start <= clock.local(at if at.tzinfo else at.replace(tzinfo=UTC)).date() <= end
+
+    ids = {p.proposed_by_id for p in session.scalars(select(SpecProposalRow)) if within(p.proposed_at)}
+    emails = {d.by for d in session.scalars(select(SpecDecisionRow)) if within(d.at)}
+    if emails:
+        ids |= {str(i) for i in session.scalars(select(User.id).where(User.email.in_(emails)))}
+    return ids
 
 
 # --- the validation pack (D-137) ----------------------------------------------------------------------

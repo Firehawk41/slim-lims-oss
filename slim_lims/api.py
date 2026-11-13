@@ -73,7 +73,7 @@ def specs_for(request: Request):
             raise HTTPException(status_code=409, detail="Your demo lab has gone: choose a persona again.")
         from slim_lims.results import SpecReader
 
-        return SpecReader(engine)
+        return SpecReader(engine, get_reference(request))
     return request.app.state.specs
 
 

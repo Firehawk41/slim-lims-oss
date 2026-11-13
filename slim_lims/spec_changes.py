@@ -189,13 +189,24 @@ def proposals(db: Session) -> list[tuple[SpecProposalRow, SpecDecisionRow | None
 # ---------------------------------------------------------------- deciding
 
 
-def _matching_samples(db: Session, reference: ReferenceData, key: SetKey) -> set[tuple[str, int]]:
-    """(TR number, position) of every sample of this customer (or a site of this group) × chemical × site."""
-    customers = {key.customer_id} | {
+def _judged_by(slim, reference: ReferenceData, key: SetKey) -> set[int]:
+    """The customers whose samples this set judges: the set's customer, and each site of a group that has
+    no limits of its own for the chemical (review Q-1, slim-domain's `limits_owner`)."""
+    from slim_lims.results import owns_limits
+
+    conn = slim.connection()
+    return {key.customer_id} | {
         c.id
         for c in reference.customer_choices()
         if getattr(c, "parent_customer_id", None) == key.customer_id
+        and not owns_limits(conn, c.id, key.chemical_id, key.location)
     }
+
+
+def _matching_samples(
+    db: Session, reference: ReferenceData, key: SetKey, customers: set[int]
+) -> set[tuple[str, int]]:
+    """(TR number, position) of every sample of these customers × chemical × site."""
     return {
         (row.tr_number, row.position)
         for row in db.execute(
@@ -269,24 +280,26 @@ def approve(
     same = _same_database(db, slim_engine)
     if same:
         on_file, _ = current_set(db, key.customer_id, key.chemical_id, key.location, key.kind)
+        judged = _judged_by(db, reference, key)
     else:
         with Session(slim_engine) as slim:
             on_file, _ = current_set(slim, key.customer_id, key.chemical_id, key.location, key.kind)
+            judged = _judged_by(slim, reference, key)
     if on_file != proposal.before:
         raise SpecRefused("The set on file changed since this was proposed: reject it and propose again.")
     proposal_id, before, after, unit = proposal.id, dict(proposal.before), dict(proposal.after), proposal.unit
     new_limits = {k: float(v) for k, v in after.items()}
 
     def judged_by_the_proposal(customer_id: int, chemical_id: int, location: str):
-        if (customer_id, chemical_id, location or "") == (key.customer_id, key.chemical_id, key.location):
-            return dict(new_limits)
+        if customer_id in judged and (chemical_id, location or "") == (key.chemical_id, key.location):
+            return dict(new_limits)  # the set's customer, or a site of its group with none of its own
         return specs(customer_id, chemical_id, location)
 
     reevaluated, differ, skipped = [], [], []
     if key.kind == "specification":
         lookup = reference_lookup(db, reference, judged_by_the_proposal)
         why = f"spec limits changed (proposal {proposal_id})"
-        wanted = _matching_samples(db, reference, key)
+        wanted = _matching_samples(db, reference, key, judged)
         differ += judged_otherwise(db, wanted, before, after)
         for code in _matching_batches(db, wanted):
             if not batch_readings(db, results_batch(db, code).id):
