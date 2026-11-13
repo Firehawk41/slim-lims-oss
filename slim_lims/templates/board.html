@@ -74,7 +74,12 @@
                 {% if card.issued %}
                   <a class="btn btn--small" href="{{ url_for('issued_reports', tr_number=s.tr_number) }}">Reports</a>
                 {% endif %}
-                {% if key == "to_invoice" and can_invoice %}
+                {% if key == "to_invoice" and can_invoice and card.pt %}
+                  <form method="post" action="{{ url_for('close_no_charge', tr_number=s.tr_number) }}" class="inline-form">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+                    <button type="submit" class="btn btn--small btn--primary">PT sample: close, no charge</button>
+                  </form>
+                {% elif key == "to_invoice" and can_invoice %}
                   <form method="post" action="{{ url_for('invoice_sent', tr_number=s.tr_number) }}" class="inline-form">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
                     <button type="submit" class="btn btn--small btn--primary">Invoice sent</button>

@@ -80,14 +80,15 @@ def _sync_capabilities(session: Session, user: User, wanted: frozenset[str]) -> 
     unknown = wanted - PERSONA_GRANTABLE
     if unknown:
         raise ValueError(f"a persona can't hold {', '.join(sorted(unknown))}")
+    from slim_lims.capabilities import record_change
+
     held = {
-        c.capability: c
-        for c in session.scalars(select(UserCapability).where(UserCapability.user_id == user.id))
+        c.capability for c in session.scalars(select(UserCapability).where(UserCapability.user_id == user.id))
     }
-    for capability in wanted - held.keys():
-        session.add(UserCapability(user_id=user.id, capability=capability, granted_by=user.id))
-    for capability in held.keys() - wanted:
-        session.delete(held[capability])
+    for capability in sorted(wanted - held):  # with its history (review T-3), by the data file
+        record_change(session, user, capability, True, "demo personas file")
+    for capability in sorted(held - wanted):
+        record_change(session, user, capability, False, "demo personas file")
 
 
 def persona_choices(session: Session) -> list[tuple[User, str]]:

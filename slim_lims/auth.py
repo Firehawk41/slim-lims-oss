@@ -22,7 +22,7 @@ from slim_lims import capabilities
 from slim_lims.db import LAB_SESSION_KEY, get_db
 from slim_lims.models import User
 from slim_lims.personas import persona_choices
-from slim_lims.security import csrf_protect, verify_password
+from slim_lims.security import client_address, csrf_protect, verify_password
 from slim_lims.web import flash, render
 
 SESSION_USER_KEY = "user_id"
@@ -166,7 +166,7 @@ def login(
     next: Annotated[str, Form()] = "/",
 ):
     account = email.strip().lower()
-    address = request.client.host if request.client else "unknown"
+    address = client_address(request, request.app.state.settings.trusted_proxy_hops)  # T-1
     throttle = request.app.state.login_throttle
     if wait := throttle.wait_seconds(account, address):  # the password isn't even checked
         minutes = -(-wait // 60)
@@ -238,7 +238,7 @@ def login_code(request: Request, db: Annotated[Session, Depends(get_db)], code: 
         request.session.pop(MFA_PENDING_KEY, None)
         flash(request, "Sign in again: the code wasn't entered in time.", "error")
         return RedirectResponse(request.url_for("login").path, status_code=303)
-    address = request.client.host if request.client else "unknown"
+    address = client_address(request, request.app.state.settings.trusted_proxy_hops)  # T-1
     throttle = request.app.state.login_throttle
     if wait := throttle.wait_seconds(user.email, address):
         minutes = -(-wait // 60)

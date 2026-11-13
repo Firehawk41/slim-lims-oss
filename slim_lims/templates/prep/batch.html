@@ -4,6 +4,7 @@
 
 {% block content %}
   <h1>Prep batch {{ b.code }}</h1>
+  {% if b.sent_version %}<p><a href="{{ url_for('results_batch', code=b.code) }}">Its results batch</a> (sent as version {{ b.sent_version }})</p>{% endif %}
   <dl class="kv">
     <dt>Method</dt><dd>{{ b.batch.method }}</dd>
     <dt>Analysis</dt><dd>{{ b.batch.analysis }}</dd>

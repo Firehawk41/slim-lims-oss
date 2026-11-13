@@ -46,9 +46,16 @@ def _limit(value: Decimal | None) -> str:
     return "" if value is None else str(value)
 
 
-def _title(submission: TRSubmission, view: ReportView) -> str:
-    amended = " (amended)" if any(line.amended for line in view.lines) else ""
-    return f"Results report {submission.tr_number}{amended}"
+def _amended(session: Session, submission: TRSubmission, view: ReportView) -> dict[tuple, str]:
+    """What changed since the latest issue, line by line (review L-8); nothing without a database."""
+    from slim_lims.results import amendments
+
+    return amendments(session, submission.tr_number, view) if session is not None else {}
+
+
+def _title(submission: TRSubmission, view: ReportView, amended: dict | None = None) -> str:
+    """'(amended)' only when a line changed since the latest issue (review L-8)."""
+    return f"Results report {submission.tr_number}{' (amended)' if amended else ''}"
 
 
 def _conditions(session: Session, reference: ReferenceData, tr_number: str):
@@ -65,9 +72,10 @@ def _notes(
     view: ReportView,
     reference: ReferenceData,
     conditions: dict[tuple[int, int], tuple[str, ...]] | None = None,
+    amended: dict[tuple, str] | None = None,
 ) -> str:
-    """The Notes section: what the lines carry, then what was wrong with the bottles that served an
-    analysis on receipt (slim-samples S-04): the lab says so on the report."""
+    """The Notes section: what the lines carry (an amendment: the value it replaces and why, L-8), then what
+    was wrong with the bottles that served an analysis on receipt (slim-samples S-04)."""
     rows = []
     for line in view.lines:
         texts = [*line.notes, *(_FLAG_TEXT.get(f, f) for f in line.shown_flags)]
@@ -75,8 +83,8 @@ def _notes(
             if not line.shown_flags:  # in spec, but within half delta of a limit
                 texts.append("close to the customer's specification")
             texts.append(f"half delta {line.half_delta}")
-        if line.amended:
-            texts.append("Amended: corrects a result reported before")
+        if amended and (line.sample, line.analyte) in amended:
+            texts.append(amended[(line.sample, line.analyte)])
         if texts:
             analysis = reference.analysis(line.analyte.analysis_id)
             name = analysis.name if analysis else line.analyte.analysis_id
@@ -178,9 +186,10 @@ def engine_renderer(
             recovery=_recovery(line.recovery),
             below_mdl=line.qualifier == Qualifier.BELOW_MDL,
         )
+    amended = _amended(session, submission, view)
     return (
-        render_html(sheets, by_sample, title=_title(submission, view))
-        + _notes(view, reference, _conditions(session, reference, submission.tr_number))
+        render_html(sheets, by_sample, title=_title(submission, view, amended))
+        + _notes(view, reference, _conditions(session, reference, submission.tr_number), amended)
         + _key(view, _template_columns(sheets))
     )
 
@@ -206,12 +215,14 @@ def plain_renderer(
     head = "".join(
         f"<th>{h}</th>" for h in ("Sample", "Analysis", "Analyte", "Result", "Unit", "Recovery", "MDL")
     )
+    amended = _amended(session, submission, view)
+    title = escape(_title(submission, view, amended))
     return (
-        f'<div class="slim-report"><h1 class="slim-report__title">{escape(_title(submission, view))}</h1>'
+        f'<div class="slim-report"><h1 class="slim-report__title">{title}</h1>'
         f'<table class="slim-report__table"><thead><tr>{head}</tr></thead><tbody>'
         + "".join(row(line) for line in view.lines)
         + "</tbody></table></div>"
-        + _notes(view, reference, _conditions(session, reference, submission.tr_number))
+        + _notes(view, reference, _conditions(session, reference, submission.tr_number), amended)
         + _key(view, {"MDL"})
     )
 

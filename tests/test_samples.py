@@ -350,3 +350,66 @@ def test_r4_a_condition_label_typed_by_the_lab_is_escaped_in_the_report(referenc
     view = SimpleNamespace(lines=[line(1, 5)])
     html = reports._notes(view, reference, {(1, 5): ('<img src=x onerror=alert(1)> "Leaking"',)})
     assert "<img" not in html and "&lt;img" in html
+
+
+def _actions(client, url):
+    return lambda name, **data: client.post(
+        f"{url}/{name}", data={"csrf_token": csrf_from(client.get(url).text), **data}
+    )
+
+
+def test_x2_a_needed_bottle_gone_all_the_same_is_recorded_with_a_reason_and_raises_an_nc(submitted, db):
+    """Review X-2: the record follows what happened. A bottle whose request has an open complaint is disposed
+    of only with a reason, and that raises a nonconformity; a held one is recorded as gone despite the hold
+    (a supervisor or quality, slim-samples S-13), and that raises one too."""
+    from slim_quality.domain.complaints import Party
+    from slim_quality.persistence import store
+    from slim_quality.service import complaints
+
+    received(submitted)
+    first, second = custody.all_containers(db)[:2]
+    complaints.raise_complaint(
+        db, "TR00001", "1", "Fe looks high", Party(id="c1", display="Jane"), False, None
+    )
+    db.commit()
+    url = f"/samples/containers/{first.id}"
+    page = submitted.get(url).text
+    assert "This bottle is needed: complaint" in page
+    act = _actions(submitted, url)
+    refused = act("dispose", method="Vendor pickup").text
+    assert "Not done" in refused and "it was needed (complaint" in refused
+    done = act("dispose", method="Vendor pickup", reason="put out with the waste by mistake").text
+    assert "dispose recorded" in done and "raised: the bottle was needed" in done
+    db.rollback()
+    (nc,) = store.list_ncs(db)
+    assert nc.source_ref == f"samples:container:{first.id}" and "complaint" in nc.description
+    assert "put out with the waste by mistake" in nc.description
+    db.rollback()  # end the read: SQLite would lock the app's next write
+
+    url = f"/samples/containers/{second.id}"
+    act = _actions(submitted, url)
+    act("hold", reason="customer query")
+    assert "Record it as gone despite the hold" in submitted.get(url).text
+    done = act("dispose", method="Vendor pickup", reason="thrown out by mistake", despite_hold="1").text
+    assert "dispose recorded" in done
+    db.rollback()
+    assert len(store.list_ncs(db)) == 2 and _custody.get_container(db, second.id).outcome is not None
+    db.rollback()
+
+
+def test_s12_a_disposal_recorded_by_mistake_is_undone_from_the_bottle_page(submitted, db):
+    """slim-samples S-12 in the app: the bottle is still on the shelf; a supervisor undoes the disposal, says
+    where it is, and it is in the lab again, both events in its history."""
+    received(submitted)
+    bottle = custody.all_containers(db)[0]
+    url = f"/samples/containers/{bottle.id}"
+    act = _actions(submitted, url)
+    assert "dispose recorded" in act("dispose", method="Vendor pickup", reason="customer asked").text
+    page = submitted.get(url).text
+    assert "Undo: it is still here" in page
+    assert "Not done" in act("undo", location="shelf-a").text  # a reason is asked for
+    assert "undo recorded" in act("undo", location="shelf-a", reason="found on shelf A").text
+    page = submitted.get(url).text
+    assert "Undone: still here" in page and "Disposed of" in page and "Undo: it is still here" not in page
+    assert _custody.get_container(db, bottle.id).active
+    db.rollback()

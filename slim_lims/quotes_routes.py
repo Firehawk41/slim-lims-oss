@@ -168,11 +168,13 @@ def _parse(form: dict[str, list[str]]) -> quotes.QuoteForm:
 
 
 @router.post("/quotes", name="create_quote")
-def create_quote(request: Request, user: RequireStaff, db: DB, reference: Reference, form: FormLists):
+def create_quote(
+    request: Request, user: RequireStaff, db: DB, reference: Reference, form: FormLists, clock: Clock
+):
     _pricing(db, user)
     typed = _parse(form)
     try:
-        saved, stops = quotes.save(db, typed, reference, user)
+        saved, stops = quotes.save(db, typed, reference, user, clock.today())
     except quotes.QuoteRefused as refused:
         db.rollback()
         return _form_page(request, typed, reference, refused.problems, 422)
@@ -297,7 +299,7 @@ def withdraw_quote(
         flash(request, "From: give a date.", "error")
         return RedirectResponse(request.url_for("quote_detail", quote_id=q.id).path, status_code=303)
     try:
-        quotes.withdraw(db, q, day, reason, user)
+        quotes.withdraw(db, q, day, reason, user, clock.today())
     except quotes.QuoteRefused as refused:
         flash(request, " ".join(refused.problems), "error")
     else:

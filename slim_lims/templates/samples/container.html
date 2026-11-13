@@ -38,6 +38,7 @@
               {% elif e.kind == EventKind.HOLD %}Put on hold
               {% elif e.kind == EventKind.RELEASE %}Hold lifted
               {% elif e.kind == EventKind.DISPOSED %}Disposed of ({{ e.method }})
+              {% elif e.kind == EventKind.UNDONE %}Undone: still here, at {{ rules.location(e.location).label if rules.location(e.location) else e.location }}
               {% else %}Returned to the customer{% endif %}</td>
             <td>{{ e.by }}</td><td>{{ e.reason or "" }}</td></tr>
         {% endfor %}
@@ -71,16 +72,39 @@
         <label>Count <input type="number" name="count" min="1" max="999" class="narrow" placeholder="{{ c.current_count }}"></label>
         <label>Why <input name="reason" maxlength="500" size="24" required placeholder="what was wrong"></label>
       {% endcall %}
+      {% if needed %}
+        <p class="flash flash--warning">This bottle is needed: {{ needed|join("; ") }}. If it is gone all the same, record it:
+          a reason is asked for and a nonconformity is raised.</p>
+      {% endif %}
       {% if c.held %}
         {% call act("release", "Lift hold") %}<label>Why <input name="reason" maxlength="500" size="24" required></label>{% endcall %}
+        {% call act("dispose", "Record it as gone despite the hold", true) %}
+          <input type="hidden" name="despite_hold" value="1">
+          <label>How <select name="method">{% for m in rules.disposal_methods %}<option>{{ m }}</option>{% endfor %}</select></label>
+          <label>What happened <input name="reason" maxlength="500" size="28" required placeholder="e.g. put out with the waste by mistake"></label>
+          <span class="hint">A supervisor or quality. Raises a nonconformity.</span>
+        {% endcall %}
       {% else %}
         {% call act("hold", "Hold") %}<label>For <input name="reason" maxlength="500" size="28" required placeholder="e.g. complaint, open nonconformity"></label>{% endcall %}
         {% call act("dispose", "Dispose", true) %}
           <label>How <select name="method">{% for m in rules.disposal_methods %}<option>{{ m }}</option>{% endfor %}</select></label>
-          <label>Why <input name="reason" maxlength="500" size="24"{% if today < c.retention_due %} required placeholder="kept until {{ c.retention_due }}"{% else %} placeholder="optional"{% endif %}></label>
+          <label>Why <input name="reason" maxlength="500" size="24"{% if needed %} required placeholder="it was needed: what happened"{% elif today < c.retention_due %} required placeholder="kept until {{ c.retention_due }}"{% else %} placeholder="optional"{% endif %}></label>
         {% endcall %}
         {% call act("return", "Return to customer") %}<label>Note <input name="reason" maxlength="500" size="24" placeholder="optional"></label>{% endcall %}
       {% endif %}
+    </section>
+  {% elif undo_until %}
+    <section aria-labelledby="undo-heading">
+      <h2 id="undo-heading">Still here?</h2>
+      <form method="post" action="{{ url_for('samples_action', container_id=c.id, action='undo') }}" class="action-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+        <strong>Undo: it is still here</strong>
+        <label>Where <select name="location">{% for l in rules.locations %}<option value="{{ l.code }}">{{ l.label }}</option>{% endfor %}</select></label>
+        <label>How it was found <input name="reason" maxlength="500" size="28" required placeholder="e.g. on shelf A, never collected"></label>
+        <button type="submit" class="btn">Undo</button>
+        <span class="hint">If it was recorded as {{ "disposed of" if c.outcome.name == "DISPOSED" else "returned" }} by mistake.
+          A supervisor or quality, until {{ undo_until.astimezone(zone).strftime("%Y-%m-%d %H:%M") }}; both stay in its history.</span>
+      </form>
     </section>
   {% endif %}
 {% endblock %}

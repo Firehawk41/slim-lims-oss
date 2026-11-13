@@ -9,7 +9,8 @@
     <a href="{{ url_for('results_home') }}">All batches</a>
   </div>
   <p class="muted">{{ view.prep_method }} · {{ view.samples|length }} sample{{ "" if view.samples|length == 1 else "s" }}:
-    {% for s in view.samples %}{{ s }}{{ ", " if not loop.last }}{% endfor %}</p>
+    {% for s in view.samples %}<a href="{{ url_for('request_detail', tr_number=s.tr_number) }}#trail-heading">{{ s }}</a>{{ ", " if not loop.last }}{% endfor %}
+    {% if in_prep_book %} · <a href="{{ url_for('prep_batch', code=view.code) }}">its prep batch</a>{% else %} · registered by an instrument file, not the prep book{% endif %}</p>
 
   {% macro csrf() %}<input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">{% endmacro %}
   {% macro solo_box(ticked=false) %}
@@ -48,7 +49,8 @@
         <ul>
           {% for w in g.warnings %}
             <li><span class="qc-level qc-level--{{ w.level }}">{{ w.level }}</span> {{ w.code }} ({{ w.tool }}) — {{ w.message }}
-              <span class="muted">{{ w.at.astimezone(zone).strftime("%Y-%m-%d %H:%M") }}</span></li>
+              <span class="muted">{{ w.at.astimezone(zone).strftime("%Y-%m-%d %H:%M") }}{% if g.counts[w.code] > 1 %}
+                · raised {{ g.counts[w.code] }} times since {{ g.first[w.code].astimezone(zone).strftime("%Y-%m-%d %H:%M") }}{% endif %}</span></li>
           {% endfor %}
         </ul>
       {% endfor %}

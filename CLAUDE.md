@@ -73,6 +73,16 @@ pytest -q -p no:warnings                 # TEST_DATABASE_URL=postgresql+psycopg2
 ruff check . && ruff format --check .
 ```
 
+**Bumping a pin** (D-117; review T-4), in this order:
+1. Merge the module's PR with a **merge commit, never a squash**: the pin names the branch's commit, which must
+   stay on the module's `main`.
+2. Set the new commit in every file that pins it (`pyproject.toml`; the CI workflow and `render.yaml` where they
+   name the module): `tests/test_pins.py` checks they agree.
+3. Run the module's own tests, then the host's full suite against it (`pip install -e ../<module>` or the pin).
+   A new module migration needs nothing more: `cli migrate`, the seed and `upgrade_lab` run every module's.
+4. Merge the host PR on green; the deploy upgrades every claimed lab (D-115).
+5. Re-sign the validation pack (`/quality/validation`): a bump makes its signature stale (D-137).
+
 `docker compose up --build`: Postgres 16 + a one-shot seed + the app with personas. **Render**
 (`render.yaml`): a lab per visitor (`DEMO_LABS`, D-102): public is emptied once (`cli empty-public --yes
 --if-needed`), the shared lab is `DATABASE_SCHEMA=lab_shared`, each visitor's first persona claims a
@@ -92,7 +102,7 @@ slim_lims/
 ├── models.py        # User (full_name, job_title: how they sign), TR tables, tr_versions (D-104), invoices + payments (D-119),
 │                    #   report_pdfs, report_deliveries, display_modes, quote_requests (+ events), quote_pdfs,
 │                    #   quote_deliveries, tr_quotes, reference_changes, account_events, account_messages,
-│                    #   spec_proposals, spec_decisions, qc_acknowledgements (all append-only), user_capabilities, report_files,
+│                    #   spec_proposals, spec_decisions, qc_acknowledgements, capability_events (all append-only), user_capabilities, report_files,
 │                    #   user_mfa, mfa_recovery_codes, password_resets, lab_sections (+ lab_section_analyses),
 │                    #   display_links
 ├── repositories.py  # TRSubmissionRepository: the only TR writer; gapless numbers; versions / as_of (D-104)
@@ -140,6 +150,7 @@ slim_lims/
 ├── reports.py       # issued reports: engine_renderer / plain_renderer, report_files; signing (D-122), the PDF (D-123)
 ├── delivery.py      # sending an issued report: report_deliveries, the outbox (/outbox; not transmitted, D-124)
 ├── board.py         # the lab board (spec §13)
+├── trail.py         # the request page's lab trail: sample × analysis from bottles to report (review L-6)
 ├── today.py, today_routes.py  # the day's board (D-138): what is due today per section; sections, screen links,
 │                    #   the names switch; /today, /today/setup, /display/{token} (no login, read-only)
 ├── about.py         # the landing page's facts (/about; its words: templates/about/_copy.html, Jamie's)
@@ -233,7 +244,10 @@ scripts/seed_demo.py; tests/ (SQLite per test, or Postgres via TEST_DATABASE_URL
 - Lab review 2026-11-12 (`docs/REVIEW_2026-11-12_lab.md`): a prep correction keeps the samples its batch
   already held, whatever became of their request (slim-prep P-29, L-2); a blocking bottle refuses a file
   that puts the sample on a batch, as it refuses the prep book (`results.blocked_samples`, L-3); a refused
-  review or release shows the batch page again with the form as posted (L-4). L-6…L-12 await Jamie.
+  review or release shows the batch page again with the form as posted (L-4); an amended report line says
+  what it replaces, from which issue and why, only when it changed since the latest issue (`results.amendments`,
+  L-8); a QC acknowledgement offers "Raise an NC from it" and the panel collapses repeated flags (L-11). L-6,
+  L-7, L-9, L-10, L-12 await Jamie. The request page has a lab trail (`trail.lab_trail`, L-6).
 - Quality review 2026-11-13 (`docs/REVIEW_2026-11-13_quality.md`): a site with no spec limits of its own for a
   chemical is judged by its group's, as slim-domain says (`results.limits_owner`; evaluation and approval, Q-1);
   whoever proposed or decided a spec change is involved in §7.8 for internal audits (Q-2); the vertical audit
@@ -242,3 +256,13 @@ scripts/seed_demo.py; tests/ (SQLite per test, or Postgres via TEST_DATABASE_URL
   day the request was received (`invoices.priced_on`); the invoice page shows what priced each line and when
   the quote the request named priced none (A-1); an amended report to an invoiced request says the invoice
   is unchanged (A-2). A-3…A-5 await Jamie.
+- IT review 2026-11-13 (`docs/REVIEW_2026-11-13_it.md`): the login throttle counts the address the lab's own
+  proxy appended to `X-Forwarded-For` (`TRUSTED_PROXY_HOPS`: 1 on Render, 0 without a proxy), never one the
+  client wrote (T-1); every capability grant and removal is kept (`capability_events`, T-3); `CLAUDE.md` has the pin
+  bump list (T-4); the demo says how long a lab is kept (T-5). T-2, T-6 await Jamie.
+- Cross-department pass 2026-11-13 (`docs/REVIEW_2026-11-13_cross.md`): a quote is never withdrawn from a day
+  already past (X-1); a PT sample's request is closed as no charge, never invoiced (`invoices.close_no_charge`,
+  `tr_invoices.no_charge_reason`, the board's *No charge* column; X-3); an open NC can hold the bottles of the
+  results it touched (X-4). A bottle that is needed (held, an open complaint, a rerun requested) is disposed of
+  only with a reason, and that raises an NC; a held one is recorded as gone despite the hold (slim-samples
+  S-13); a disposal or return recorded by mistake is undone from the bottle's page (S-12; X-2).

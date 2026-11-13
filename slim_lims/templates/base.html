@@ -59,7 +59,8 @@
   <main class="page">
     {% if current_user and current_user.is_persona %}
       <div class="flash flash--info" role="status">Demo sandbox, fictional data: you are acting as
-        {{ current_user.initials or current_user.email }} (asserted, not logged in).</div>
+        {{ current_user.initials or current_user.email }} (asserted, not logged in).{% if request.app.state.labs and request.session.get("lab") %}
+        Your lab is kept for {{ request.app.state.labs.kept_for }} after your last click.{% endif %}</div>
     {% endif %}
     {% for category, message in flashes %}
       <div class="flash flash--{{ category }}" role="status">{{ message }}</div>

@@ -235,7 +235,9 @@ def test_a_quote_is_withdrawn_early_with_a_reason_and_then_prices_nothing(
         data={"from": early, "reason": "x", "csrf_token": csrf},
         follow_redirects=True,
     )
-    assert "takes effect on" in refused.text
+    assert (
+        "requests received under it keep its prices" in refused.text
+    )  # before today, before it starts (X-1)
     done = client.post(
         f"/quotes/{q.id}/withdraw",
         data={"from": TODAY.isoformat(), "reason": "prices revised", "csrf_token": csrf},
@@ -380,3 +382,30 @@ def test_f1_prices_typed_without_analyses_are_refused_never_dropped(db):
     stray = form(lines=[*form().lines, qs.LineIn(prices={FIVE: ("80", "")})])
     with pytest.raises(qs.QuoteRefused, match="Line 2: choose the analyses these prices are for"):
         qs.build(stray, reference, "JM")
+
+
+def test_x1_a_withdrawal_never_reaches_back_over_requests_received(client, db, staff_user):
+    """Review X-1: requests are priced by the quotes in force the day they were received (A-1), so neither a
+    withdrawal nor a Replace may stop a quote from a day already past."""
+    old = a_quote(db, start=TODAY - timedelta(days=30))
+    db.commit()
+    login(client, "staff@lab.example")
+    csrf = csrf_from(client.get(f"/quotes/{old.id}").text)
+    back = (TODAY - timedelta(days=10)).isoformat()
+    refused = client.post(
+        f"/quotes/{old.id}/withdraw",
+        data={"from": back, "reason": "x", "csrf_token": csrf},
+        follow_redirects=True,
+    )
+    assert "requests received under it keep its prices" in refused.text
+    db.rollback()
+    assert qs.quote(db, old.id).withdrawn_from is None
+    db.rollback()
+    page = client.get(f"/quotes/new?replaces={old.id}")
+    made = client.post(  # the new quote typed as starting ten days ago
+        "/quotes", data=fields(replaces=str(old.id), effective=back, csrf_token=csrf_from(page.text)),
+        follow_redirects=True,
+    )  # fmt: skip
+    assert f"{qs.number(old.id)} is withdrawn from {TODAY:%d %b %Y}" in made.text
+    db.rollback()
+    assert qs.quote(db, old.id).withdrawn_from == TODAY

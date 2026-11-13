@@ -418,6 +418,41 @@ def test_a_supervisor_grants_user_admin_to_an_analyst_within_limits(app, lab):  
         assert analyst.get("/admin/users").status_code == 403
 
 
+def test_t3_every_grant_and_removal_is_kept(app, lab):
+    """Review T-3: giving and taking back a capability each leaves a row that stays; the current set follows;
+    a change that changes nothing leaves nothing; the Users page lists them."""
+    from sqlalchemy import text
+    from sqlalchemy.exc import DBAPIError
+
+    from slim_lims.models import CapabilityEventRow
+
+    an = lab.scalars(select(User.id).where(User.initials == "AN")).one()
+    lab.rollback()
+    with TestClient(app) as sup:
+        login(sup, "staff@lab.example")
+        for grant in ("1", "1", "0"):  # the second grant changes nothing
+            data = {"csrf_token": _users_form(sup), "capability": "manage_users", "grant": grant}
+            sup.post(f"/admin/users/{an}/capabilities", data=data)
+        page = sup.get("/admin/users").text
+    assert "Grants" in page and "revoked" in page and "granted" in page
+    events = [
+        (e.capability, e.kind, e.by)
+        for e in lab.scalars(
+            select(CapabilityEventRow).where(CapabilityEventRow.user_id == an).order_by(CapabilityEventRow.id)
+        )
+    ]
+    assert events == [
+        ("manage_users", "granted", "staff@lab.example"),
+        ("manage_users", "revoked", "staff@lab.example"),
+    ]
+    assert lab.get(UserCapability, (an, "manage_users")) is None
+    lab.rollback()
+    with pytest.raises(DBAPIError):  # append-only
+        lab.execute(text("DELETE FROM capability_events"))
+        lab.flush()
+    lab.rollback()
+
+
 def test_staff_initials_are_unique(client, lab):
     login(client, "staff@lab.example")
     form = {
@@ -655,15 +690,22 @@ def test_a_corrected_result_makes_an_amended_report(app, lab):
         an.post("/api/results/batches/PB-1/re-evaluate", json={})
         rv.post("/api/results/batches/PB-1/review", json={})
         rv.post(f"{SAMPLE_1}/release", json={})
+
+        def line_of(sample):
+            lines = rv.get("/api/results/reports/TR00001").json()["lines"]
+            return next(li for li in lines if li["sample"] == sample)
+
+        # Review L-8: the next issue says what it replaces, from which issue and why; the rest nothing.
+        coming = line_of("TR00001-01")
+        assert coming["version"] == 2 and coming["amended"].startswith("Amended: replaces ")
+        assert f"(report issue {first['issue_id']}): wrong dilution" in coming["amended"]
+        assert line_of("TR00001-02")["amended"] == ""
         amended = rv.post("/api/results/reports/TR00001/issue").json()
         assert amended["amended"] and amended["amends"] == first["issue_id"]
         assert amended["status"] is None and tr_status(rv) == TRStatus.COMPLETE_REPORT  # forward only
-        line = next(
-            li
-            for li in rv.get("/api/results/reports/TR00001").json()["lines"]
-            if li["sample"] == "TR00001-01"
-        )
-        assert line["amended"] and line["version"] == 2
+        assert line_of("TR00001-01")["amended"] == ""  # once that issue is out, nothing more to say
+        again = rv.post("/api/results/reports/TR00001/issue")  # the same results: no new issue
+        assert again.status_code == 409 and "nothing has changed" in again.json()["detail"]
 
 
 def test_nothing_released_or_unknown_tr(app, lab):

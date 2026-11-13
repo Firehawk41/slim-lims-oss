@@ -36,6 +36,10 @@ services:
         value: "3.11.15"
       - key: APP_ENV
         value: production
+      # Render's proxy appends the client's address to X-Forwarded-For: the login throttle reads that one,
+      # never what the client wrote (review T-1).
+      - key: TRUSTED_PROXY_HOPS
+        value: "1"
       - key: SECRET_KEY
         generateValue: true
       - key: DATABASE_URL

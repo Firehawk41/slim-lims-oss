@@ -299,6 +299,44 @@ Tally and themes are updated now and then at the bottom.
 |---|---|---|
 | J | "Review the IT department per the plan." | `REVIEW_2026-11-13_it.md`. Nothing fixed. |
 | F | Bug T-1: the login throttle's per-address limit takes the leftmost `X-Forwarded-For` entry (uvicorn with every proxy trusted), which the client writes: it can be dodged, or aimed at someone else's address. For decision T-2…T-6: an admin page, capability grants as events, a pin bump list, the demo lab's hour said up front, backups with the VPS. | Raised with Jamie. |
+| J | "Fix T-1." | |
+| C✓ | The login throttle takes the `X-Forwarded-For` entry the lab's own proxy appended (`TRUSTED_PROXY_HOPS`, 1 on Render), never one the client wrote. Guard runs behind uvicorn's proxy middleware as Render does. | Check the hop count on Render once. |
+
+## 2026-11-13: cross-department pass
+
+| Kind | What | Notes |
+|---|---|---|
+| J | "Do the cross-department pass per the plan." | `REVIEW_2026-11-13_cross.md`. Before Jamie's walkthrough, which the plan puts first. Nothing fixed. |
+| F | Bugs X-1, X-2: a quote withdrawal may be dated in the past, and since A-1 that re-prices requests already received; a bottle can be disposed of while its request has an open complaint or a rerun is requested. For decision X-3 (a PT request is invoiced to the scheme), X-4. | Raised with Jamie. |
+| J | "Fix x1 but for x2, what if someone accidentally disposes of a bottle? Fix x3-4, too." | X-2 held for Jamie's answer. |
+| C✓ | X-1: no withdrawal or Replace reaches back before the lab's today. X-3: a PT request is closed as no charge (a fact, to invoiced; migration 0019), never invoiced. X-4: an open NC's "Hold their bottles". Each with its guard test. | Host only. |
+| C→J | X-2: a disposal is final in slim-samples (S-05), so an accidental one can't be undone. Recommend X-2's refusal (for a bottle that is evidence) plus an "undo a disposal" event in slim-samples for a wrong click. | For Jamie. |
+| J | "What if a bottle was supposed to be held and someone accidentally disposed of it irl … if someone 'disposed' of the bottle in software but not irl, then that's a problem. There needs to be an undo button to reflect reality." | Jamie corrected the frame: the record must follow reality. |
+| C✓ | X-2 rebuilt: a needed bottle (held, open complaint, rerun requested) may be disposed of only with a reason, and that raises an NC; a held one is recorded as gone despite the hold (slim-samples S-13); "Undo: it is still here" within the lab's days (S-12). slim-samples pinned at `88f25b8`. | Guards in both repos. |
+
+## 2026-11-13: review items T-4 and T-5
+
+| Kind | What | Notes |
+|---|---|---|
+| J | "Do T-4 and T-5." | |
+| C✓ | T-4: "Bumping a pin" in `CLAUDE.md`, five steps, merge commit first. T-5: how long a demo lab is kept, from its setting, on the personas page and in the demo banner. | |
+| F | T-5 was partly wrong: the personas page already said "cleared after an hour idle". Corrected in the IT review. | |
+
+## 2026-11-13: review items L-8 and L-11
+
+| Kind | What | Notes |
+|---|---|---|
+| J | "Do L-8 and L-11." | |
+| C✓ | L-8: an amended report line says what it replaces, from which issue and why, only when it changed since the latest issue; an issue with the same results is refused; "not sent" on the latest issue. L-11: "Raise an NC from it" under a QC acknowledgement in the audit; repeated flags collapsed with a count. | Host only; slim-data's D-20 record rule unchanged. |
+| F | Old tests changed with L-8: "Amended" on the preview of an already amended request now shows nothing (nothing left to amend); the amendment is checked in the issued report instead. | |
+
+## 2026-11-13: review items T-3 and L-6
+
+| Kind | What | Notes |
+|---|---|---|
+| J | "Do T-3 and L-6." | |
+| C✓ | T-3: `capability_events`, the append-only history of every grant and removal (migration 0020, with the grants on file backfilled), written with the current set in one transaction; a Grants list on the Users page. L-6: the request page's lab trail, sample × analysis from bottles to report and retention; the batch pages link each other. | The current set stays in `user_capabilities` (recommended "derived from the events"; kept simpler). |
+| F | The test database now migrates slim-prep too (the request page reads it), as the app always does. | |
 
 ## Themes so far
 - **Domain facts are Jamie's, and they overrule Claude's defaults:** DF < 1, MDL averaging, standards as

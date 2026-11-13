@@ -143,7 +143,9 @@ def test_a_visitor_sees_the_history(engine, reference, seeded):
         client.post("/demo/continue-as", data={"csrf_token": token, "user_id": rob})
         assert "PB-00009" in client.get("/results").text
         report = client.get(f"/results/reports/{seeded['amended']}").text
-        assert "Amended" in report and "(amends" in report
+        assert "(amends" in report  # the issues; the next issue would amend nothing (review L-8)
+        issued = client.get(f"/requests/{seeded['amended']}/reports").text
+        assert "Amended: replaces" in issued  # the amended issue says what it replaced
 
 
 def test_every_scenario_replays_and_cli_verify_says_so(engine, seeded, monkeypatch, capsys):

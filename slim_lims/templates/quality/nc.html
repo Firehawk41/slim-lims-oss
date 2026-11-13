@@ -42,6 +42,13 @@
       <p class="hint">"Amend report" is done in Results as a correction of that result; this records the decision.</p>
       <button type="submit" class="btn btn--primary">Record the assessment</button>
     </form>
+    {% if touched %}
+    <form method="post" action="{{ url_for('quality_nc_hold_bottles', nc_id=nc.id) }}" class="action-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+      <button type="submit" class="btn btn--secondary">Hold their bottles</button>
+      <span class="hint">Every bottle still in the lab that served these results goes on hold, this NC as the reason, so none is disposed of while it is open.</span>
+    </form>
+    {% endif %}
     {% else %}
       <ul>{% for r in touched %}<li>{{ r.sample }} {{ r.analyte.code }} v{{ r.version }}: {{ r.value }} {{ r.unit or "" }} (reports {{ r.reports|join(", ") or "—" }})</li>{% else %}<li class="muted">None.</li>{% endfor %}</ul>
       <p class="muted">A quality manager records the assessment.</p>

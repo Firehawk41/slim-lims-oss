@@ -277,6 +277,7 @@ def test_the_audit_shows_a_release_over_qc_trend_flags(visitor, db):  # D-144
     db.commit()
     page = visitor.get(f"/quality/audit/{issue}").text
     assert "Released over QC trend flags" in page and "CCV re-run in limits" in page and "WG_1_3S" in page
+    assert "Raise an NC from it" in page and "qc_ack%3A" in page and "source=2" in page  # review L-11
 
 
 def test_q3_an_amended_reports_audit_shows_only_its_own_acknowledgement(monkeypatch):
@@ -304,3 +305,61 @@ def test_q3_an_amended_reports_audit_shows_only_its_own_acknowledgement(monkeypa
     assert quality_module._acknowledgements_of(None, line, later) == []
     first = SimpleNamespace(sample="TR00001-01", analyte=SimpleNamespace(analysis_id=5), version=1)
     assert quality_module._acknowledgements_of(None, first, t1 + timedelta(hours=1)) == [ack]
+
+
+def test_x4_an_ncs_touched_results_bottles_go_on_hold(visitor, db, issued, monkeypatch):
+    """Review X-4: from an open NC, every bottle still in the lab that served a result its window touched
+    goes on hold with the NC as the reason; a bottle serving another analysis, or already gone, is left."""
+    from types import SimpleNamespace
+
+    from slim_quality.domain.nonconformity import NcSource
+    from slim_quality.service import quality as q
+    from slim_samples.domain.containers import ContainerIn, SampleInfo
+    from slim_samples.service import custody
+
+    from slim_lims import quality_routes
+    from slim_lims.quality_records import SEED_QUALITY_ACTOR
+    from slim_lims.samples import SEED_SAMPLES_ACTOR, publish_demo_samples
+    from tests.test_demo_scenarios import TEN
+
+    tr = issued["clean_pass"]
+    sample = f"{tr}-01"
+
+    class Lookup:
+        def sample(self, sample_id):
+            return SampleInfo(
+                sample=sample_id, analyses=frozenset({"10_elements_icpms", "5_anions"}), customer="1"
+            )
+
+    rules = publish_demo_samples(db)
+    metals = ContainerIn(
+        container_type="pfa", location="receiving", analyses=frozenset({"10_elements_icpms"})
+    )
+    anions = ContainerIn(container_type="hdpe", location="receiving", analyses=frozenset({"5_anions"}))
+    for_metals, for_anions = custody.receive(
+        db, Lookup(), sample, [metals, anions], actor=SEED_SAMPLES_ACTOR, rules=rules,
+        received_on=__import__("datetime").date(2026, 10, 9),
+    )  # fmt: skip
+    nc = q.raise_nc(db, "Cone wear", "check", SEED_QUALITY_ACTOR, NcSource.MANUAL, "x", None, None, None)
+    db.commit()
+    touched = [
+        SimpleNamespace(
+            sample=sample, analyte=SimpleNamespace(analysis_id=TEN, code="Fe"), version=1, latest_version=1,
+            value="0.12", unit="ppb", batch_code="PB-00001", runs=(), reports=(),
+            released_by=SimpleNamespace(display="Sue"), released_at=datetime(2026, 10, 10, tzinfo=UTC),
+        )
+    ]  # fmt: skip
+    monkeypatch.setattr(quality_routes, "touched", lambda db, nc: touched)
+    token = as_persona(visitor, db, "quinn@demo.example")
+    done = visitor.post(
+        f"/quality/ncs/{nc.id}/hold-bottles", data={"csrf_token": token}, follow_redirects=True
+    )
+    assert "1 bottle(s) put on hold" in done.text
+    db.rollback()
+    held = {c.id: c for c in custody.containers_of(db, sample)}
+    assert held[for_metals.id].held and held[for_metals.id].hold_reason.startswith(nc.number)
+    assert not held[for_anions.id].held
+    again = visitor.post(
+        f"/quality/ncs/{nc.id}/hold-bottles", data={"csrf_token": token}, follow_redirects=True
+    )
+    assert "No bottle to hold." in again.text  # already held

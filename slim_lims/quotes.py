@@ -258,11 +258,17 @@ def build(form: QuoteForm, reference: ReferenceData, by: str) -> slim_invoicing.
 
 
 def withdraw(
-    session: Session, q: slim_invoicing.Quote, from_day: date, reason: str, user: User
+    session: Session, q: slim_invoicing.Quote, from_day: date, reason: str, user: User, today: date
 ) -> slim_invoicing.Quote:
-    """Withdraws a quote before its expiry, in V5 (a row added): it prices nothing from `from_day`."""
+    """Withdraws a quote before its expiry, in V5 (a row added): it prices nothing from `from_day`. Never
+    from before the lab's `today`: a request is priced by the quotes in force the day it was received (A-1),
+    so a withdrawal reaching back would re-price requests already received under it (review X-1)."""
     if not reason.strip():
         raise QuoteRefused(["Say why the quote is withdrawn."])
+    if from_day < today:
+        raise QuoteRefused(
+            [f"Withdraw it from {today:%d %b %Y} or later: requests received under it keep its prices."]
+        )
     try:
         return slim_invoicing.withdraw_quote(
             session, q.id, from_day, user.initials or user.email, reason.strip()[:2000]
@@ -272,11 +278,12 @@ def withdraw(
 
 
 def save(
-    session: Session, form: QuoteForm, reference: ReferenceData, user: User
+    session: Session, form: QuoteForm, reference: ReferenceData, user: User, today: date
 ) -> tuple[slim_invoicing.Quote, date | None]:
     """Stores the quote in V5; answers the request it came from, if any; withdraws the quote it replaces
-    from the day the new one takes effect (or the old one's start, if later). Returns the new quote and the
-    day the old one stops pricing (None: nothing replaced, or the old one had already stopped). Flushes."""
+    from the day the new one takes effect (or the old one's start, or the lab's today, if later: X-1).
+    Returns the new quote and the day the old one stops pricing (None: nothing replaced, or the old one
+    had already stopped). Flushes."""
     request = None
     if form.request_id is not None:
         request = session.get(QuoteRequestRow, form.request_id)
@@ -293,9 +300,9 @@ def save(
         session.flush()
     stops = None
     if replaced is not None and replaced.withdrawn_from is None:
-        day = max(saved.effective_date, replaced.effective_date)
+        day = max(saved.effective_date, replaced.effective_date, today)
         if day <= replaced.expire_date:
-            withdraw(session, replaced, day, f"replaced by {number(saved.id)}", user)
+            withdraw(session, replaced, day, f"replaced by {number(saved.id)}", user, today)
             stops = day
     return saved, stops
 

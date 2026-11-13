@@ -95,6 +95,27 @@
     </section>
   {% endfor %}
 
+  {% if trail %}
+    <section class="form-section" aria-labelledby="trail-heading">
+      <h2 id="trail-heading">Lab trail</h2>
+      <p class="hint">Each sample and analysis from its bottles to its report: where it has got to, and the page for each step.</p>
+      <div class="table-wrap"><table class="table">
+        <thead><tr><th scope="col">Sample</th><th scope="col">Analysis</th><th scope="col">Bottles</th><th scope="col">Prep</th>
+          <th scope="col">Results and runs</th><th scope="col">Results</th><th scope="col">Reports</th><th scope="col">Kept until</th></tr></thead>
+        <tbody>{% for t in trail %}
+          <tr><td>{{ t.position }}</td><td>{{ t.analysis }}</td>
+            <td>{% for title, fate in t.bottles %}<div>{{ title }}{% if fate %} <span class="muted">({{ fate }})</span>{% endif %}</div>{% else %}<span class="muted">none logged</span>{% endfor %}</td>
+            <td>{% for code in t.prep %}<a href="{{ url_for('prep_batch', code=code) }}">{{ code }}</a>{{ ", " if not loop.last }}{% else %}<span class="muted">—</span>{% endfor %}</td>
+            <td>{% for code in t.results %}<a href="{{ url_for('results_batch', code=code) }}">{{ code }}</a>{{ ", " if not loop.last }}{% else %}<span class="muted">—</span>{% endfor %}
+              {% if t.runs %}<div class="muted">runs {{ t.runs|join(", ") }}</div>{% endif %}</td>
+            <td>{{ t.state }}{% if t.released %} <span class="muted">{{ t.released.date() }}</span>{% endif %}</td>
+            <td>{% for i in t.reports %}<a href="{{ url_for('issued_reports', tr_number=s.tr_number) }}#issue-{{ i }}">{{ i }}</a>{{ ", " if not loop.last }}{% else %}<span class="muted">—</span>{% endfor %}</td>
+            <td>{{ t.keep_until or "" }}</td></tr>
+        {% endfor %}</tbody>
+      </table></div>
+    </section>
+  {% endif %}
+
   {% if current_user.is_staff and s.status == TRStatus.SUBMITTED and not viewing %}
     <section class="form-section">
       <h2>Next step</h2>

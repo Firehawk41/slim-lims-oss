@@ -152,3 +152,21 @@ def test_l1_the_flagged_batch_asks_wherever_the_release_is_made(app, lab, monkey
             page = rv.get(f"/results/batches/{code}").text
             assert 'name="qc_ack"' in page and "ICP-MS 1 · Fe CCV: WG_1_3S" in page
         assert rv.post(f"{SAMPLE_1}/release", json={}).status_code == 409
+
+
+def test_l11_a_code_raised_again_and_again_is_one_line_with_its_count():
+    """Review L-11: on the panel, each chart's code once, its latest, with how many times and since when."""
+    from datetime import timedelta
+
+    def w(code, hours, severity=Severity.WARN):
+        at = AT + timedelta(hours=hours)
+        return qc_warnings.Warning(
+            "ICP-MS 1", "Fe", "ICP-MS 1 · Fe CCV", "icpms1-fe", "westgard", code, severity, code, at
+        )  # fmt: skip
+
+    (group,) = qc_warnings.by_series(
+        {"Fe": [w("WG_1_2S", 0), w("WG_1_2S", 5), w("WG_1_3S", 2, Severity.ACTION), w("WG_1_2S", 9)]}
+    )
+    assert [x.code for x in group.warnings] == ["WG_1_3S", "WG_1_2S"]  # worst first, each once
+    assert group.warnings[1].at == AT + timedelta(hours=9)  # the latest
+    assert group.counts == {"WG_1_2S": 3, "WG_1_3S": 1} and group.first["WG_1_2S"] == AT

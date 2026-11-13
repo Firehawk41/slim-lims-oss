@@ -115,6 +115,15 @@ class Labs:
         self._lock = threading.Lock()
         self._filling = threading.Lock()
 
+    @property
+    def kept_for(self) -> str:
+        """How long a lab is kept after its visitor's last click, in words (the pages say so, review T-5)."""
+        minutes = int(self.idle.total_seconds() // 60)
+        if minutes % 60 == 0:
+            hours = minutes // 60
+            return "an hour" if hours == 1 else f"{hours} hours"
+        return f"{minutes} minutes"
+
     # ------------------------------------------------------------ setup
 
     def check(self) -> None:

@@ -19,6 +19,7 @@ from slim_data.persistence import migrate  # noqa: E402
 from slim_data.persistence.results import issues_for_tr  # noqa: E402
 from slim_data.service.views import ReportLineView, ReportView, report_view  # noqa: E402
 from slim_invoicing.persistence import migrate as invoicing_migrate  # noqa: E402
+from slim_quality.persistence import migrate as quality_migrate  # noqa: E402
 from slim_samples.persistence import migrate as samples_migrate  # noqa: E402
 
 from slim_lims import reports  # noqa: E402
@@ -50,6 +51,7 @@ def issued(tmp_path_factory):
         migrate.upgrade(connection)
         invoicing_migrate.upgrade(connection)
         samples_migrate.upgrade(connection)  # the report reads the bottles' conditions
+        quality_migrate.upgrade(connection)  # invoicing asks whether a request is a PT sample (X-3)
     with make_session_factory(engine)() as session:
         sync_analysis_catalog(engine, session)
         session.commit()
@@ -116,7 +118,8 @@ def test_the_assay_report_and_its_amendment(issued):
     first, amended = files["amended"]
     assert '<td class="c4 value">69.74</td>' in first and "(amended)" not in first
     assert '<td class="c4 value">69.55</td>' in amended and "Results report TR00008 (amended)" in amended
-    assert "Amended: corrects a result reported before" in amended
+    assert "Amended: replaces 69.74" in amended  # the value it replaces, the issue and why (review L-8)
+    assert "(report issue " in amended
 
 
 def test_half_delta_is_noted_beside_the_spec_and_explained():

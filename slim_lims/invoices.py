@@ -108,6 +108,10 @@ def mark_sent(
     submission = service.get(tr_number, user)
     if submission.status is not TRStatus.COMPLETE_REPORT:
         raise Conflict(f"{tr_number} is {submission.status.label.lower()}: invoice a complete report")
+    if pt_round_of(session, tr_number) is not None:
+        raise Conflict(
+            f"{tr_number} is a proficiency testing sample: close it as no charge, never invoice it"
+        )
     try:
         slim_invoicing.invoice(
             session,
@@ -123,6 +127,46 @@ def mark_sent(
     row = TRInvoiceRow(
         submission_id=submission.id, sent_on=service.lab_today(), sent_by=user.initials or user.email
     )
+    session.add(row)
+    session.flush()
+    return row
+
+
+def pt_round_of(session: Session, tr_number: str):
+    """The PT round (slim-quality, D-128) a request is the sample of, or None (review X-3)."""
+    from slim_quality.persistence import store
+
+    found = store.list_pt_rounds(session, tr_number=tr_number)
+    return found[0] if found else None
+
+
+def pt_requests(session: Session) -> set[str]:
+    """The TR numbers PT rounds name: one read for the board."""
+    from slim_quality.persistence import store
+
+    return {r.tr_number for r in store.list_pt_rounds(session)}
+
+
+def close_no_charge(session: Session, service: SubmissionService, tr_number: str, user: User) -> TRInvoiceRow:
+    """Closes a complete PT request without an invoice (review X-3): the lab pays the scheme, never bills it.
+    It moves to invoiced, as an invoice would (D-99: a fact, recorded), with the reason on the row. Staff
+    only; refused for a request no PT round names."""
+    if not user.is_staff:
+        raise Forbidden("only lab staff close requests")
+    submission = service.get(tr_number, user)
+    pt_round = pt_round_of(session, tr_number)
+    if pt_round is None:
+        raise Conflict(f"{tr_number} is no PT sample: invoice it")
+    if submission.status is not TRStatus.COMPLETE_REPORT:
+        raise Conflict(f"{tr_number} is {submission.status.label.lower()}: close a complete report")
+    reason = f"proficiency testing: {pt_round.scheme} {pt_round.round_code}"
+    service.change_status(
+        tr_number, StatusChangeIn(to_status=TRStatus.INVOICED, note=f"no charge ({reason})"), user, fact=True
+    )
+    row = TRInvoiceRow(
+        submission_id=submission.id, sent_on=service.lab_today(), sent_by=user.initials or user.email,
+        no_charge_reason=reason,
+    )  # fmt: skip
     session.add(row)
     session.flush()
     return row
