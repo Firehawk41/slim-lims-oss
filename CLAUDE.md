@@ -242,3 +242,6 @@ scripts/seed_demo.py; tests/ (SQLite per test, or Postgres via TEST_DATABASE_URL
   day the request was received (`invoices.priced_on`); the invoice page shows what priced each line and when
   the quote the request named priced none (A-1); an amended report to an invoiced request says the invoice
   is unchanged (A-2). A-3…A-5 await Jamie.
+- IT review 2026-11-13 (`docs/REVIEW_2026-11-13_it.md`): the login throttle counts the address the lab's own
+  proxy appended to `X-Forwarded-For` (`TRUSTED_PROXY_HOPS`: 1 on Render, 0 without a proxy), never one the
+  client wrote (T-1). T-2…T-6 await Jamie.

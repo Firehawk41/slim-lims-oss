@@ -172,3 +172,49 @@ def test_a_successful_login_clears_the_accounts_failures(client, staff_user):
     assert login(client, "staff@lab.example").status_code == 303
     client.post("/logout", data={"csrf_token": csrf_from(client.get("/").text)})
     assert login(client, "staff@lab.example", "wrong password").status_code == 401  # counting afresh
+
+
+def _try(client, email: str, headers: dict):
+    """A failed login, as the proxy passes it on (its X-Forwarded-For)."""
+    token = csrf_from(client.get("/login", headers=headers).text)
+    data = {"email": email, "password": "wrong password", "csrf_token": token, "next": "/"}
+    return client.post("/login", data=data, headers=headers, follow_redirects=False)
+
+
+def test_t1_a_forged_forwarded_for_neither_dodges_nor_frames_the_login_limit(engine):
+    """Review T-1: behind one proxy (Render), the throttle counts the address the proxy appended. A client
+    that writes a new X-Forwarded-For each try is still held after 20 failures; the address it wrote, a
+    bystander's, is never locked."""
+    from fastapi.testclient import TestClient
+    from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
+
+    from slim_lims.main import create_app
+    from tests.conftest import demo_reference, make_settings
+
+    app = create_app(
+        make_settings(str(engine.url), trusted_proxy_hops=1), engine=engine, reference=demo_reference()
+    )
+    served = ProxyHeadersMiddleware(app, trusted_hosts="*")  # as Render runs it: --forwarded-allow-ips='*'
+    with TestClient(served) as attacker, TestClient(served) as bystander:
+        for n in range(20):  # a new forged address each time; the proxy appends the real one
+            forged = {"X-Forwarded-For": f"198.51.100.{n}, 203.0.113.9"}
+            assert _try(attacker, f"user{n}@example.com", forged).status_code == 401
+        held = _try(attacker, "user99@example.com", {"X-Forwarded-For": "198.51.100.200, 203.0.113.9"})
+        assert held.status_code == 429
+        framed = _try(bystander, "user98@example.com", {"X-Forwarded-For": "198.51.100.1"})
+        assert framed.status_code == 401  # the forged address isn't held
+
+
+def test_t1_the_address_is_the_proxys_entry():
+    from types import SimpleNamespace
+
+    from slim_lims.security import client_address
+
+    def request(header):
+        return SimpleNamespace(client=SimpleNamespace(host="10.0.0.1"), headers={"x-forwarded-for": header})
+
+    assert client_address(request("1.1.1.1, 2.2.2.2"), 0) == "10.0.0.1"  # no proxy: the peer
+    assert client_address(request("1.1.1.1, 2.2.2.2"), 1) == "2.2.2.2"
+    assert client_address(request("1.1.1.1, 2.2.2.2, 3.3.3.3"), 2) == "2.2.2.2"
+    assert client_address(request("2.2.2.2"), 2) == "2.2.2.2"  # fewer than the hops: the leftmost
+    assert client_address(request(""), 1) == "10.0.0.1"

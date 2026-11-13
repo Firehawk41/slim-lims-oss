@@ -15,6 +15,19 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 # ---------------------------------------------------------------- login attempts
 
 
+def client_address(request, trusted_proxy_hops: int) -> str:
+    """Who is logging in, for the throttle (review T-1). Behind `trusted_proxy_hops` proxies, the
+    `X-Forwarded-For` entry that many from the right: the one the lab's own proxy appended. The entries left
+    of it are whatever the client sent, so they never count. With no proxy, the socket's peer."""
+    peer = request.client.host if request.client else "unknown"
+    if trusted_proxy_hops <= 0:
+        return peer
+    entries = [e.strip() for e in request.headers.get("x-forwarded-for", "").split(",") if e.strip()]
+    if not entries:
+        return peer
+    return entries[-trusted_proxy_hops] if len(entries) >= trusted_proxy_hops else entries[0]
+
+
 class LoginThrottle:
     """Failed logins counted per account and per client address (review A4). Past the limit within the
     window, a login is refused without checking the password until the oldest failure ages out.

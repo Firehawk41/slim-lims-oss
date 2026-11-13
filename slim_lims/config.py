@@ -34,6 +34,9 @@ class Settings:
     quote_expiry_warning_days: int = 30
     # Supervisors and quality managers must set up MFA (D-142); off only in tests that aren't about it.
     require_mfa: bool = True
+    # The proxies in front of the app that append to X-Forwarded-For (Render: 1). The login throttle takes
+    # the address the nearest of them appended, never one the client wrote (review T-1). 0: the socket's peer.
+    trusted_proxy_hops: int = 0
 
     @property
     def is_production(self) -> bool:
@@ -95,4 +98,5 @@ def load_settings() -> Settings:
         oss_report_engine_dir=os.environ.get("SLIM_REPORT_ENGINE_OSS_DIR") or None,
         quote_expiry_warning_days=int(os.environ.get("QUOTE_EXPIRY_WARNING_DAYS", 30)),
         require_mfa=_bool(os.environ.get("REQUIRE_MFA"), True),
+        trusted_proxy_hops=max(0, int(os.environ.get("TRUSTED_PROXY_HOPS", 0))),
     )

@@ -299,6 +299,8 @@ Tally and themes are updated now and then at the bottom.
 |---|---|---|
 | J | "Review the IT department per the plan." | `REVIEW_2026-11-13_it.md`. Nothing fixed. |
 | F | Bug T-1: the login throttle's per-address limit takes the leftmost `X-Forwarded-For` entry (uvicorn with every proxy trusted), which the client writes: it can be dodged, or aimed at someone else's address. For decision T-2…T-6: an admin page, capability grants as events, a pin bump list, the demo lab's hour said up front, backups with the VPS. | Raised with Jamie. |
+| J | "Fix T-1." | |
+| C✓ | The login throttle takes the `X-Forwarded-For` entry the lab's own proxy appended (`TRUSTED_PROXY_HOPS`, 1 on Render), never one the client wrote. Guard runs behind uvicorn's proxy middleware as Render does. | Check the hop count on Render once. |
 
 ## Themes so far
 - **Domain facts are Jamie's, and they overrule Claude's defaults:** DF < 1, MDL averaging, standards as
