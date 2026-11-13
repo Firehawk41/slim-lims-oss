@@ -107,6 +107,13 @@ class Labs:
         self.upgrade = upgrade  # brings a claimed lab up to the code now running (D-115)
         self.spares, self.cap, self.idle, self.clock = spares, cap, idle, clock
         self.background = background  # False: spares are made only by calling refill (tests)
+        self.base = make_engine(self.url, poolclass=NullPool)
+        self._factories: dict[str, sessionmaker[Session]] = {}
+        self._engines: dict[str, Engine] = {}
+        self._references: dict = {}  # schema -> its ReferenceCache (D-141)
+        self._seen: dict[str, datetime] = {}
+        self._lock = threading.Lock()
+        self._filling = threading.Lock()
 
     @property
     def kept_for(self) -> str:
@@ -116,13 +123,6 @@ class Labs:
             hours = minutes // 60
             return "an hour" if hours == 1 else f"{hours} hours"
         return f"{minutes} minutes"
-        self.base = make_engine(self.url, poolclass=NullPool)
-        self._factories: dict[str, sessionmaker[Session]] = {}
-        self._engines: dict[str, Engine] = {}
-        self._references: dict = {}  # schema -> its ReferenceCache (D-141)
-        self._seen: dict[str, datetime] = {}
-        self._lock = threading.Lock()
-        self._filling = threading.Lock()
 
     # ------------------------------------------------------------ setup
 
