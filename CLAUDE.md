@@ -243,7 +243,10 @@ scripts/seed_demo.py; tests/ (SQLite per test, or Postgres via TEST_DATABASE_URL
 - Lab review 2026-11-12 (`docs/REVIEW_2026-11-12_lab.md`): a prep correction keeps the samples its batch
   already held, whatever became of their request (slim-prep P-29, L-2); a blocking bottle refuses a file
   that puts the sample on a batch, as it refuses the prep book (`results.blocked_samples`, L-3); a refused
-  review or release shows the batch page again with the form as posted (L-4). L-6…L-12 await Jamie.
+  review or release shows the batch page again with the form as posted (L-4); an amended report line says
+  what it replaces, from which issue and why, only when it changed since the latest issue (`results.amendments`,
+  L-8); a QC acknowledgement offers "Raise an NC from it" and the panel collapses repeated flags (L-11). L-6,
+  L-7, L-9, L-10, L-12 await Jamie.
 - Quality review 2026-11-13 (`docs/REVIEW_2026-11-13_quality.md`): a site with no spec limits of its own for a
   chemical is judged by its group's, as slim-domain says (`results.limits_owner`; evaluation and approval, Q-1);
   whoever proposed or decided a spec change is involved in §7.8 for internal audits (Q-2); the vertical audit

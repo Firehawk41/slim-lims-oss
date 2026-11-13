@@ -10,7 +10,7 @@ D-132). Only releasing a sample + analysis with an ACTION-severity flag asks for
 frozen copy of the flags as shown (`qc_acknowledgements`, append-only).
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 
 from slim_data.domain.enums import ResultStatus
@@ -117,8 +117,10 @@ def batch_warnings(
 class SeriesWarnings:
     label: str
     slug: str
-    warnings: list  # one per flag, worst first
+    warnings: list  # the latest flag of each code, worst first (review L-11: repeats collapsed)
     analytes: list  # the batch's analytes it bears on
+    counts: dict = field(default_factory=dict)  # code -> how many times it was raised in the window
+    first: dict = field(default_factory=dict)  # code -> when it was first raised there
 
     @property
     def level(self) -> str:
@@ -126,7 +128,8 @@ class SeriesWarnings:
 
 
 def by_series(warnings: dict[str, list]) -> list[SeriesWarnings]:
-    """The panel's view: each chart once (an internal standard's flags bear on every analyte), worst first."""
+    """The panel's view: each chart once (an internal standard's flags bear on every analyte), worst first;
+    a code raised again and again on a chart is one line, its latest, with how often (review L-11)."""
     flags: dict[str, dict] = {}
     analytes: dict[str, set] = {}
     labels: dict[str, str] = {}
@@ -135,12 +138,17 @@ def by_series(warnings: dict[str, list]) -> list[SeriesWarnings]:
             flags.setdefault(w.slug, {})[(w.code, w.at)] = w
             analytes.setdefault(w.slug, set()).add(analyte)
             labels[w.slug] = w.series
-    out = [
-        SeriesWarnings(
-            labels[s], s, sorted(f.values(), key=lambda w: (-int(w.severity), w.at)), sorted(analytes[s])
-        )
-        for s, f in flags.items()
-    ]
+    out = []
+    for s, f in flags.items():
+        latest: dict[str, Warning] = {}
+        counts: dict[str, int] = {}
+        first: dict[str, datetime] = {}
+        for w in sorted(f.values(), key=lambda w: w.at):
+            latest[w.code] = w
+            counts[w.code] = counts.get(w.code, 0) + 1
+            first.setdefault(w.code, w.at)
+        shown = sorted(latest.values(), key=lambda w: (-int(w.severity), w.at))
+        out.append(SeriesWarnings(labels[s], s, shown, sorted(analytes[s]), counts, first))
     return sorted(out, key=lambda g: (-int(g.warnings[0].severity), g.label))
 
 

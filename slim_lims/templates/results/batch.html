@@ -48,7 +48,8 @@
         <ul>
           {% for w in g.warnings %}
             <li><span class="qc-level qc-level--{{ w.level }}">{{ w.level }}</span> {{ w.code }} ({{ w.tool }}) — {{ w.message }}
-              <span class="muted">{{ w.at.astimezone(zone).strftime("%Y-%m-%d %H:%M") }}</span></li>
+              <span class="muted">{{ w.at.astimezone(zone).strftime("%Y-%m-%d %H:%M") }}{% if g.counts[w.code] > 1 %}
+                · raised {{ g.counts[w.code] }} times since {{ g.first[w.code].astimezone(zone).strftime("%Y-%m-%d %H:%M") }}{% endif %}</span></li>
           {% endfor %}
         </ul>
       {% endfor %}

@@ -655,15 +655,22 @@ def test_a_corrected_result_makes_an_amended_report(app, lab):
         an.post("/api/results/batches/PB-1/re-evaluate", json={})
         rv.post("/api/results/batches/PB-1/review", json={})
         rv.post(f"{SAMPLE_1}/release", json={})
+
+        def line_of(sample):
+            lines = rv.get("/api/results/reports/TR00001").json()["lines"]
+            return next(li for li in lines if li["sample"] == sample)
+
+        # Review L-8: the next issue says what it replaces, from which issue and why; the rest nothing.
+        coming = line_of("TR00001-01")
+        assert coming["version"] == 2 and coming["amended"].startswith("Amended: replaces ")
+        assert f"(report issue {first['issue_id']}): wrong dilution" in coming["amended"]
+        assert line_of("TR00001-02")["amended"] == ""
         amended = rv.post("/api/results/reports/TR00001/issue").json()
         assert amended["amended"] and amended["amends"] == first["issue_id"]
         assert amended["status"] is None and tr_status(rv) == TRStatus.COMPLETE_REPORT  # forward only
-        line = next(
-            li
-            for li in rv.get("/api/results/reports/TR00001").json()["lines"]
-            if li["sample"] == "TR00001-01"
-        )
-        assert line["amended"] and line["version"] == 2
+        assert line_of("TR00001-01")["amended"] == ""  # once that issue is out, nothing more to say
+        again = rv.post("/api/results/reports/TR00001/issue")  # the same results: no new issue
+        assert again.status_code == 409 and "nothing has changed" in again.json()["detail"]
 
 
 def test_nothing_released_or_unknown_tr(app, lab):

@@ -77,6 +77,9 @@
     {% for a in line.qc_acks %}
       <p><strong>Released over QC trend flags</strong> by {{ a.by }}, {{ a.at.date() }}: {{ a.note }}</p>
       <ul>{% for f in a.flags %}<li>{{ f.severity }} {{ f.code }} ({{ f.tool }}) on {{ f.series }}: {{ f.message }}</li>{% endfor %}</ul>
+      {% set first = a.flags[0] if a.flags else {} %}
+      <p><a class="btn btn--secondary btn--small" href="{{ url_for('quality_ncs') }}?{{ {'title': 'Released over QC flags: ' ~ a.sample ~ ' (' ~ (a.flags|map(attribute='code')|join(', ')) ~ ')', 'description': a.note ~ '\n\n' ~ (a.flags|map(attribute='message')|join('; ')), 'source': 2, 'ref': 'qc_ack:' ~ a.id, 'instrument': first.get('instrument', ''), 'analyte': line.result.analyte.code}|urlencode }}">Raise an NC from it</a>
+        <span class="hint">The reason was given at release; quality decides whether the trend is a nonconformity.</span></p>
     {% endfor %}
   </section>
   {% endfor %}

@@ -24,7 +24,7 @@
             <td>{{ line.sample }}</td><td>{{ analysis.name if analysis else line.analysis_id }}</td>
             <td>{{ line.analyte }}</td><td>{{ line.text }}</td><td>{{ line.unit or "" }}</td>
             <td>{{ line.mdl or "" }}</td><td>{{ line.uncertainty or "" }}</td><td>{{ line.recovery or "" }}</td>
-            <td>{{ (line.notes + line.shown_flags)|join("; ") }}{% if line.amended %}{{ "; " if line.notes or line.shown_flags }}Amended{% endif %}</td>
+            <td>{{ (line.notes + line.shown_flags)|join("; ") }}{% if line.amended %}{{ "; " if line.notes or line.shown_flags }}{{ line.amended }}{% endif %}</td>
           </tr>
         {% endfor %}
       </tbody>
@@ -51,7 +51,7 @@
         <thead><tr><th scope="col">Issue</th><th scope="col">Results</th><th scope="col">Signed by</th><th scope="col">At</th><th scope="col">sha256</th><th scope="col">PDF</th><th scope="col">Sent</th></tr></thead>
         <tbody>
           {% for i in r.issues %}
-            <tr><td>{{ i.id }}{% if i.amends %} (amends {{ i.amends }}){% endif %}{% if not i.latest %} <span class="muted">superseded</span>{% endif %}</td><td>{{ i.lines }}</td>
+            <tr><td>{{ i.id }}{% if i.amends %} (amends {{ i.amends }}){% endif %}{% if not i.latest %} <span class="muted">superseded</span>{% elif not i.sent %} <span class="badge badge--submitted">not sent</span>{% endif %}</td><td>{{ i.lines }}</td>
               <td>{{ i.by }}</td><td>{{ (i.at or "")[:16].replace("T", " ") }}</td><td><code>{{ i.sha256[:12] }}…</code></td>
               <td>{% if i.pdf %}<a href="{{ url_for('report_pdf', tr_number=r.tr_number, issue_id=i.id) }}">PDF</a>{% else %}—{% endif %}</td>
               <td>

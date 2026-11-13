@@ -118,7 +118,8 @@ def test_the_assay_report_and_its_amendment(issued):
     first, amended = files["amended"]
     assert '<td class="c4 value">69.74</td>' in first and "(amended)" not in first
     assert '<td class="c4 value">69.55</td>' in amended and "Results report TR00008 (amended)" in amended
-    assert "Amended: corrects a result reported before" in amended
+    assert "Amended: replaces 69.74" in amended  # the value it replaces, the issue and why (review L-8)
+    assert "(report issue " in amended
 
 
 def test_half_delta_is_noted_beside_the_spec_and_explained():

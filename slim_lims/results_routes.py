@@ -55,6 +55,7 @@ from slim_lims.results import (
     StaffDirectory,
     act_on_result,
     actor_for,
+    amendments,
     blocked_samples,
     import_analyses,
     import_and_evaluate,
@@ -208,6 +209,9 @@ def _report(db: Session, service, tr_number: str, user, renderer, reference, tod
     submission = service.get(tr_number, user)
     view = report_view(db, tr_number)
     document = report_document(view)
+    changed = {(str(s), a.code): text for (s, a), text in amendments(db, tr_number, view).items()}
+    for line in document["lines"]:  # what the next issue would say of it (review L-8), not "ever amended"
+        line["amended"] = changed.get((line["sample"], line["analyte"]), "")
     html = renderer(db, submission, view, reference) if view.lines else None
     sign_problem = None
     if not capabilities.can(db, user, capabilities.SIGNATORY):

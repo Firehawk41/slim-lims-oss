@@ -322,6 +322,14 @@ Tally and themes are updated now and then at the bottom.
 | C✓ | T-4: "Bumping a pin" in `CLAUDE.md`, five steps, merge commit first. T-5: how long a demo lab is kept, from its setting, on the personas page and in the demo banner. | |
 | F | T-5 was partly wrong: the personas page already said "cleared after an hour idle". Corrected in the IT review. | |
 
+## 2026-11-13: review items L-8 and L-11
+
+| Kind | What | Notes |
+|---|---|---|
+| J | "Do L-8 and L-11." | |
+| C✓ | L-8: an amended report line says what it replaces, from which issue and why, only when it changed since the latest issue; an issue with the same results is refused; "not sent" on the latest issue. L-11: "Raise an NC from it" under a QC acknowledgement in the audit; repeated flags collapsed with a count. | Host only; slim-data's D-20 record rule unchanged. |
+| F | Old tests changed with L-8: "Amended" on the preview of an already amended request now shows nothing (nothing left to amend); the amendment is checked in the issued report instead. | |
+
 ## Themes so far
 - **Domain facts are Jamie's, and they overrule Claude's defaults:** DF < 1, MDL averaging, standards as
   recipes, spike placement. Claude's "cautious" engineering defaults were wrong more than once where

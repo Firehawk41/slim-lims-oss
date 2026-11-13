@@ -455,6 +455,31 @@ def issued_documents(session: Session, tr_number: str) -> list[dict]:
     return out
 
 
+def amendments(session: Session, tr_number: str, view: ReportView) -> dict[tuple, str]:
+    """(sample, analyte) -> what the report says of a line whose result changed since the latest issue:
+    the value it replaces, that issue, and the correction's reason (ISO 17025 §7.8.8; review L-8). A line
+    the latest issue didn't show, or showed at the same version, is not amended on this report."""
+    from slim_data.persistence.results import load_result
+    from slim_data.service.views import value_text
+
+    issues = issues_for_tr(session, tr_number) if session is not None else []
+    if not issues:
+        return {}
+    last = issues[-1]
+    shown = {(li.sample, li.analyte): li.version for li in last.lines}
+    out = {}
+    for line in view.lines:
+        before = shown.get((line.sample, line.analyte))
+        if before is None or before >= line.version:
+            continue
+        result = load_result(session, line.sample, line.analyte)
+        old, new = result.versions[before - 1], result.versions[line.version - 1]
+        unit = f" {old.reported.unit}" if old.reported is not None and old.reported.unit else ""
+        text = f"Amended: replaces {value_text(old)}{unit} (report issue {last.id})"
+        out[(line.sample, line.analyte)] = text + (f": {new.reason}" if new.reason else "")
+    return out
+
+
 def report_complete(view: ReportView, submission) -> bool:
     """Every analysis ordered on every sample has results, all released (D-71). Analyses slim-data
     never gets readings for keep a TR partial; staff close it with the status form."""
@@ -482,7 +507,10 @@ def issue_report(
     previous = issues_for_tr(session, tr_number)
     if previous:  # the same report signed again (another day, another signatory) is no new issue
         last = reports.stored(session, previous[-1].file_sha256)
-        if last is not None and reports.unsigned(last) == body:
+        same_results = {(li.sample, li.analyte, li.version) for li in previous[-1].lines} == {
+            (line.sample, line.analyte, line.version) for line in view.lines
+        }  # its amendment notes aren't printed again, so the pages differ (review L-8)
+        if same_results or (last is not None and reports.unsigned(last) == body):
             raise NothingToIssue(f"nothing has changed since report issue {previous[-1].id}")
     digest = reports.store(session, tr_number, reports.sign(body, signature))
     amends = previous[-1].id if previous and any(line.amended for line in view.lines) else None

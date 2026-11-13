@@ -277,6 +277,7 @@ def test_the_audit_shows_a_release_over_qc_trend_flags(visitor, db):  # D-144
     db.commit()
     page = visitor.get(f"/quality/audit/{issue}").text
     assert "Released over QC trend flags" in page and "CCV re-run in limits" in page and "WG_1_3S" in page
+    assert "Raise an NC from it" in page and "qc_ack%3A" in page and "source=2" in page  # review L-11
 
 
 def test_q3_an_amended_reports_audit_shows_only_its_own_acknowledgement(monkeypatch):

@@ -149,11 +149,12 @@ def test_s5b_the_screen_sends_with_csrf_and_says_it_was_not_transmitted(app, lab
     with staff_api(app, "RV") as rv:
         issued = _issue(rv)
         page = rv.get("/results/reports/TR00001").text
-        assert "Send to customer" in page
+        assert "Send to customer" in page and ">not sent</span>" in page  # review L-8
         done = rv.post(
             f"/results/reports/TR00001/issues/{issued['issue_id']}/send", data={"csrf_token": csrf_from(page)}
         )
         assert "in the outbox" in done.text and "not transmitted" in done.text and "Send again" in done.text
+        assert ">not sent</span>" not in done.text
 
 
 def test_s6_pdfs_and_deliveries_are_append_only(app, lab, db):
