@@ -274,6 +274,14 @@ Tally and themes are updated now and then at the bottom.
 | J | "Yes, move it into the module." (2026-11-13) | |
 | C✓ | L-2 moved into slim-prep as P-29: a correction, a move to new rules and a correction's send check only samples new to the batch; the host's `AlreadyHeld` is gone and slim-prep is pinned at `6ee244c`. | slim-prep `test_p29_…`; host `test_l2_…` unchanged. |
 
+## 2026-11-13: department review, Quality
+
+| Kind | What | Notes |
+|---|---|---|
+| J | "Yes, open both PRs and merge on green." | slim-prep-oss #6 (P-29), slim-lims-oss #37 (Lab review and L-1…L-4): merged. |
+| J | "Review the Quality department per the plan." | `REVIEW_2026-11-13_quality.md`. Nothing fixed. |
+| F | Bugs Q-1…Q-3: a group's spec limits never judge a result (the host reads the exact customer, slim-domain falls back to the group); a spec proposer or approver can audit §7.8; an amended report's audit shows an earlier version's QC acknowledgement. For decision Q-4…Q-10. | Raised with Jamie. |
+
 ## Themes so far
 - **Domain facts are Jamie's, and they overrule Claude's defaults:** DF < 1, MDL averaging, standards as
   recipes, spike placement. Claude's "cautious" engineering defaults were wrong more than once where
