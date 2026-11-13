@@ -190,3 +190,20 @@ def test_s8_user_managers_set_the_name_a_person_signs_with(app, lab, db):
         rv.post(f"/admin/users/{an_id}/name", data={"csrf_token": csrf_from(rv.get("/").text)})
     an = db.get(User, an_id)
     assert (an.full_name, an.job_title) == ("Ana Lyst", "Chemist")
+
+
+def test_a2_an_amended_report_after_the_invoice_says_the_invoice_is_unchanged():
+    """Review A-2: the amended report's message to an invoiced request's customer says the invoice stands;
+    a first report, or an amendment before invoicing, says nothing about it."""
+    from types import SimpleNamespace
+
+    from slim_lims.delivery import message_for
+    from slim_lims.domain import TRStatus
+
+    def tr(status):
+        return SimpleNamespace(tr_number="TR00007", status=status, results_to=("a@x.example",), results_cc=())
+
+    unchanged = "Your invoice for this request is unchanged."
+    assert unchanged in message_for(tr(TRStatus.INVOICED), 3, 2, "Sue Example").body
+    assert unchanged not in message_for(tr(TRStatus.COMPLETE_REPORT), 3, 2, "Sue Example").body
+    assert unchanged not in message_for(tr(TRStatus.INVOICED), 2, None, "Sue Example").body

@@ -14,15 +14,21 @@
 
   <table class="table">
     <thead><tr><th scope="col">Item</th><th scope="col">Samples</th><th scope="col">Quantity</th>
-      <th scope="col">Rate</th><th scope="col">Amount</th></tr></thead>
+      <th scope="col">Rate</th><th scope="col">Priced by</th><th scope="col">Amount</th></tr></thead>
     <tbody>
       {% for li in order.line_items %}
+        {% set q = priced.lines[loop.index0] %}
         <tr><td>{{ li.item }}</td><td>{{ li.samples|join(", ") }}</td><td>{{ li.quantity }}</td>
-          <td>${{ "%.2f"|format(li.rate) }}</td><td>${{ "%.2f"|format(li.total) }}</td></tr>
+          <td>${{ "%.2f"|format(li.rate) }}</td>
+          <td>{% if q is none %}<span class="muted">unknown</span>{% elif q.is_default %}Price list{% else %}<a href="{{ url_for('quote_detail', quote_id=q.id) }}">{{ number(q.id) }}</a>{% endif %}</td>
+          <td>${{ "%.2f"|format(li.total) }}</td></tr>
       {% endfor %}
     </tbody>
-    <tfoot><tr><th scope="row" colspan="4">Total</th><td><strong>${{ "%.2f"|format(order.total) }}</strong></td></tr></tfoot>
+    <tfoot><tr><th scope="row" colspan="5">Total</th><td><strong>${{ "%.2f"|format(order.total) }}</strong></td></tr></tfoot>
   </table>
+  <p class="hint">Priced by the quotes in force on the day the request was received ({{ order.date_received }}).
+    {% if priced.named and not priced.named_priced %}<strong>The request named {{ number(priced.named) }}, which priced no line</strong>:
+    it wasn't in force that day, or another valid price was lower.{% endif %}</p>
   <p class="hint">Only what was reported is billed, each analysis once. Bulk prices count every sample on a line,
     and you pay whichever is cheaper, a bundle or its parts.</p>
 {% endblock %}

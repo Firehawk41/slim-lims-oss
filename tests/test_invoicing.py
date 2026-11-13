@@ -163,3 +163,50 @@ def test_r4_a_payment_is_a_row_added_and_invoices_are_append_only(db, seeded):
         with pytest.raises(DBAPIError, match="append-only"):
             db.execute(text(statement))
         db.rollback()
+
+
+def test_a1_a_request_is_priced_by_the_quotes_in_force_when_it_was_received(db, seeded, reference):
+    """Review A-1: invoiced long after receipt, when every quote has expired, the request is still priced
+    by the quotes in force the day it was received; the page says what priced each line, and when the quote
+    the request named priced none."""
+    from datetime import UTC, datetime, timedelta
+
+    later = datetime.now(UTC) + timedelta(days=5 * 365)  # every demo quote has expired by then
+    service = SubmissionService(TRSubmissionRepository(db), reference, clock=lambda: later)
+    tr = seeded["amended"]
+    received = service.get(tr, sue(db)).receipt.date_received
+    invoices.mark_sent(db, service, tr, sue(db), reference)
+    order = slim_invoicing.sales_order_for(db, tr)
+    assert order.total > Decimal(0) and order.date_received == received
+    priced = invoices.priced_by(db, order, None)
+    assert priced.lines and all(q is not None and q.valid_on(received) for q in priced.lines)
+    assert not any(q.valid_on(later.date()) for q in priced.lines)
+    assert invoices.priced_by(db, order, priced.lines[0].id).named_priced
+    other = next(
+        q.id for q in invoices.price_lists(db, reference) if q.id not in {p.id for p in priced.lines}
+    )
+    assert not invoices.priced_by(db, order, other).named_priced
+
+
+def test_a1_the_invoice_page_says_what_priced_it(engine, db, seeded, reference):
+    from slim_lims import quotes
+    from slim_lims.main import create_app
+
+    service = SubmissionService(TRSubmissionRepository(db), reference)
+    tr = seeded["clean_pass"]  # invoiced by the seed; customer A's own quote priced it
+    order = slim_invoicing.sales_order_for(db, tr)
+    own = invoices.priced_by(db, order, None).lines[0]
+    default = next(q for q in invoices.price_lists(db, reference) if q.is_default)
+    quotes.name_on_tr(db, service.get(tr, sue(db)).id, default.id)  # named, but its own quote priced it
+    staff = str(sue(db).id)
+    db.commit()
+    app = create_app(
+        make_settings(str(engine.url), demo_personas=True), engine=engine, reference=reference, specs=specs,
+        report_renderer=plain_renderer,
+    )  # fmt: skip
+    with TestClient(app) as client:
+        token = client.get("/demo/personas").text.split('name="csrf_token" value="')[1].split('"')[0]
+        client.post("/demo/continue-as", data={"csrf_token": token, "user_id": staff})
+        page = client.get(f"/requests/{tr}/invoice").text
+    assert "Priced by" in page and quotes.number(own.id) in page
+    assert f"The request named {quotes.number(default.id)}, which priced no line" in page

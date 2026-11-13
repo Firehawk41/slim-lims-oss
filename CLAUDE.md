@@ -238,3 +238,7 @@ scripts/seed_demo.py; tests/ (SQLite per test, or Postgres via TEST_DATABASE_URL
   chemical is judged by its group's, as slim-domain says (`results.limits_owner`; evaluation and approval, Q-1);
   whoever proposed or decided a spec change is involved in §7.8 for internal audits (Q-2); the vertical audit
   shows a QC acknowledgement under the version whose release it was made at (Q-3). Q-4…Q-10 await Jamie.
+- Admin review 2026-11-13 (`docs/REVIEW_2026-11-13_admin.md`): an invoice is priced by the quotes in force the
+  day the request was received (`invoices.priced_on`); the invoice page shows what priced each line and when
+  the quote the request named priced none (A-1); an amended report to an invoiced request says the invoice
+  is unchanged (A-2). A-3…A-5 await Jamie.

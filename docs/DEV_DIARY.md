@@ -290,6 +290,8 @@ Tally and themes are updated now and then at the bottom.
 |---|---|---|
 | J | "Review the Admin department per the plan." | `REVIEW_2026-11-13_admin.md`. Nothing fixed. |
 | F | No confirmed bug; the plan's A1…A7 refuted. For decision A-1…A-5, first A-1: an invoice is priced on the day it is sent, so a request submitted under a quote that expires or is replaced before the report is complete is billed at the invoicing day's price, and nothing says so. | Raised with Jamie. |
+| J | "Build A1 and 2." | |
+| C✓ | A-1: an invoice is priced by the quotes in force the day the request was received; the invoice page says what priced each line and when the named quote priced none. A-2: an amended report to an invoiced request says the invoice is unchanged. | Host only; V5 unchanged. |
 
 ## Themes so far
 - **Domain facts are Jamie's, and they overrule Claude's defaults:** DF < 1, MDL averaging, standards as
