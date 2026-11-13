@@ -573,6 +573,21 @@ class AccountEventRow(Base):
     at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
 
+class CapabilityEventRow(Base):
+    """A capability granted to or taken back from someone (D-100; review T-3): who, by whom, when. The
+    current set stays in `user_capabilities` (written in the same transaction); this is its history, so
+    who could sign or approve on a given day is known on any database. Append-only."""
+
+    __tablename__ = "capability_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(Uuid, index=True)  # no FK: kept if the user row goes
+    capability: Mapped[str] = mapped_column(String(50))
+    kind: Mapped[str] = mapped_column(String(10))  # "granted" | "revoked"
+    by: Mapped[str] = mapped_column(String(254))
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
 class AccountMessageRow(Base):
     """A message to a user about their account (a reset link), kept in the outbox, not transmitted (D-124).
     Append-only."""
@@ -665,6 +680,7 @@ for _table in (
     ReferenceChangeRow.__table__,
     AccountEventRow.__table__,
     AccountMessageRow.__table__,
+    CapabilityEventRow.__table__,
     SpecProposalRow.__table__,
     SpecDecisionRow.__table__,
     QcAcknowledgementRow.__table__,

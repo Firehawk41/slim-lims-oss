@@ -5,6 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 from slim_data.persistence import migrate as slim_data_migrate
 from slim_invoicing.persistence import migrate as invoicing_migrate
+from slim_prep.persistence import migrate as prep_migrate
 from slim_quality.persistence import migrate as quality_migrate
 from slim_samples.persistence import migrate as samples_migrate
 
@@ -55,6 +56,8 @@ def engine(tmp_path):
         quality_migrate.upgrade(connection)
         samples_migrate.downgrade(connection)  # and slim-samples' (S-07)
         samples_migrate.upgrade(connection)
+        prep_migrate.downgrade(connection)  # and slim-prep's: the request page's lab trail reads it (L-6)
+        prep_migrate.upgrade(connection)
     yield engine
     engine.dispose()
 

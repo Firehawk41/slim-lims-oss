@@ -484,3 +484,22 @@ def test_l3_a_file_cant_register_a_batch_for_a_blocked_sample(client, prep):
     )  # fmt: skip
     prep.commit()
     assert upload(client, csv(analyst="JM")).status_code == 201  # the lab acted: nothing blocks
+
+
+def test_l6_a_sample_is_followed_from_its_request_page_and_the_batches_link_each_other(client, prep):
+    """Review L-6: the request page's lab trail shows each sample × analysis's prep batch, results batch and
+    runs and where its results stand; the prep and results batch pages link each other and the request."""
+    login(client, "staff@lab.example")
+    token = csrf_from(client.get("/prep").text)
+    _standards(client, token)
+    client.post("/prep/batches", data=_grid(token, client, _staff_id(prep)))
+    client.post("/prep/batches/PREP-0001/send", data={"csrf_token": token})
+    login_api(client, "staff@lab.example")
+    assert upload(client, _readings()).status_code == 201
+
+    page = client.get("/requests/TR00001").text
+    assert "Lab trail" in page and "/prep/batches/PREP-0001" in page and "/results/batches/PREP-0001" in page
+    assert "runs RUN-P1" in page and "in review" in page and "none logged" in page  # no bottles in this test
+    assert "/results/batches/PREP-0001" in client.get("/prep/batches/PREP-0001").text
+    results = client.get("/results/batches/PREP-0001").text
+    assert "its prep batch" in results and "/requests/TR00001#trail-heading" in results

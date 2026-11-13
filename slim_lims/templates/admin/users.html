@@ -105,4 +105,20 @@
       <button type="submit" class="btn btn--primary">Add user</button>
     </form>
   </section>
+
+  <section class="form-section" aria-labelledby="grants-heading">
+    <h2 id="grants-heading">Grants</h2>
+    <p class="hint">Every capability given or taken back, newest first: who could sign, approve or manage users on any day.
+      Kept for good (append-only).</p>
+    {% if grant_history %}
+      <table class="table">
+        <thead><tr><th scope="col">When</th><th scope="col">Who</th><th scope="col">Capability</th><th scope="col"></th><th scope="col">By</th></tr></thead>
+        <tbody>{% for e in grant_history %}
+          <tr><td>{{ e.at.strftime("%Y-%m-%d %H:%M") }}</td><td>{{ emails.get(e.user_id, e.user_id) }}</td>
+            <td>{{ capabilities[e.capability].split(":")[0] if e.capability in capabilities else e.capability }}</td>
+            <td>{{ e.kind }}</td><td>{{ e.by }}</td></tr>
+        {% endfor %}</tbody>
+      </table>
+    {% else %}<p class="muted">None yet.</p>{% endif %}
+  </section>
 {% endblock %}

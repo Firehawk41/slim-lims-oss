@@ -47,6 +47,7 @@ from slim_lims.samples import (
 from slim_lims.schemas import CheckInIn, ChemicalMatchIn, StatusChangeIn
 from slim_lims.security import csrf_protect, hash_password
 from slim_lims.services import FACT_STATUSES, Conflict, Forbidden, NotFound, SubmissionRejected
+from slim_lims.trail import lab_trail
 from slim_lims.web import flash, render
 
 router = APIRouter(dependencies=[Depends(csrf_protect)])
@@ -308,6 +309,7 @@ def request_detail(
             "chemicals": reference.chemical_choices() if user.is_staff else [],
             "TRStatus": TRStatus,
             "bottles": _bottles_of(db, reference, submission) if user.is_staff else None,
+            "trail": lab_trail(db, reference, submission) if user.is_staff else None,  # review L-6
             "quote_id": quotes.named_by(db, submission.id),
         },
     )
@@ -610,6 +612,8 @@ def admin_users(request: Request, user: RequireStaff, db: DB, reference: Referen
             "all_lab_roles": LAB_ROLES,
             "capabilities": capabilities.CAPABILITIES,
             "grants": grants,
+            "grant_history": capabilities.history(db)[:100],  # review T-3
+            "emails": {u.id: u.email for u in users},
             "role_defaults": capabilities.ROLE_DEFAULTS,
             "may_grant": {c: capabilities.may_grant(user, c) for c in capabilities.CAPABILITIES},
             "outranks": {u.id: capabilities.outranks(u, user) for u in users},
@@ -788,11 +792,7 @@ def set_capability(
     if error:
         flash(request, error, "error")
         return _back_to_users(request, db, user)
-    row = db.get(UserCapability, (target.id, capability))
-    if grant == "1" and row is None:
-        db.add(UserCapability(user_id=target.id, capability=capability, granted_by=user.id))
-    elif grant != "1" and row is not None:
-        db.delete(row)
+    capabilities.record_change(db, target, capability, grant == "1", user.email)  # with its history (T-3)
     db.commit()
     verb = "may now" if grant == "1" else "may no longer"
     flash(request, f"{target.email} {verb}: {capabilities.CAPABILITIES[capability].split(':')[0].lower()}.")

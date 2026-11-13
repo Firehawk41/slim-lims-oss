@@ -330,6 +330,14 @@ Tally and themes are updated now and then at the bottom.
 | C✓ | L-8: an amended report line says what it replaces, from which issue and why, only when it changed since the latest issue; an issue with the same results is refused; "not sent" on the latest issue. L-11: "Raise an NC from it" under a QC acknowledgement in the audit; repeated flags collapsed with a count. | Host only; slim-data's D-20 record rule unchanged. |
 | F | Old tests changed with L-8: "Amended" on the preview of an already amended request now shows nothing (nothing left to amend); the amendment is checked in the issued report instead. | |
 
+## 2026-11-13: review items T-3 and L-6
+
+| Kind | What | Notes |
+|---|---|---|
+| J | "Do T-3 and L-6." | |
+| C✓ | T-3: `capability_events`, the append-only history of every grant and removal (migration 0020, with the grants on file backfilled), written with the current set in one transaction; a Grants list on the Users page. L-6: the request page's lab trail, sample × analysis from bottles to report and retention; the batch pages link each other. | The current set stays in `user_capabilities` (recommended "derived from the events"; kept simpler). |
+| F | The test database now migrates slim-prep too (the request page reads it), as the app always does. | |
+
 ## Themes so far
 - **Domain facts are Jamie's, and they overrule Claude's defaults:** DF < 1, MDL averaging, standards as
   recipes, spike placement. Claude's "cautious" engineering defaults were wrong more than once where

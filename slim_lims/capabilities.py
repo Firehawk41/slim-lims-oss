@@ -37,6 +37,33 @@ GRANTED_BY_USER_MANAGERS = frozenset({QUALITY, QUALITY_MANAGER})
 PERSONA_GRANTABLE = frozenset({QUALITY, QUALITY_MANAGER, SIGNATORY, LAB_DISPLAYS, PRICING, REFERENCE_DATA})
 
 
+def record_change(db: Session, user: User, capability: str, granted: bool, by: str) -> None:
+    """Writes the grant or its removal and its history row together (D-100; review T-3). Flushes."""
+    from slim_lims.models import CapabilityEventRow
+
+    row = db.get(UserCapability, (user.id, capability))
+    if granted and row is None:
+        by_id = db.scalar(select(User.id).where(User.email == by))
+        db.add(UserCapability(user_id=user.id, capability=capability, granted_by=by_id or user.id))
+    elif not granted and row is not None:
+        db.delete(row)
+    else:
+        return  # nothing changes, nothing is recorded
+    db.add(
+        CapabilityEventRow(
+            user_id=user.id, capability=capability, kind="granted" if granted else "revoked", by=by
+        )
+    )
+    db.flush()
+
+
+def history(db: Session) -> list:
+    """Every grant and removal, newest first (review T-3)."""
+    from slim_lims.models import CapabilityEventRow
+
+    return list(db.scalars(select(CapabilityEventRow).order_by(CapabilityEventRow.id.desc())))
+
+
 def granted(db: Session, user: User) -> frozenset[str]:
     rows = db.scalars(select(UserCapability.capability).where(UserCapability.user_id == user.id))
     return frozenset(rows)

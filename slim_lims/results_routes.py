@@ -425,6 +425,17 @@ def results_batch(request: Request, code: str, user: RequireStaff, db: DB, refer
     return _batch_page(request, db, reference, code)
 
 
+def _in_prep_book(db: Session, code: str) -> bool:
+    from slim_prep.persistence import books
+    from slim_prep.persistence._rows import NotFound as PrepNotFound
+
+    try:
+        books.get_batch(db, code)
+    except PrepNotFound:
+        return False
+    return True
+
+
 def _batch_page(
     request: Request, db: Session, reference: ReferenceData, code: str, typed=None, status: int = 200
 ):
@@ -468,6 +479,7 @@ def _batch_page(
             "actions": ResultAction,
             "categories": _categories(db),
             "typed": typed or {},
+            "in_prep_book": _in_prep_book(db, code),  # review L-6: the two batch pages link each other
         },
         status,
     )

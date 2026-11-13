@@ -83,7 +83,7 @@ def _notes(
             if not line.shown_flags:  # in spec, but within half delta of a limit
                 texts.append("close to the customer's specification")
             texts.append(f"half delta {line.half_delta}")
-        if (line.sample, line.analyte) in (amended or {}):
+        if amended and (line.sample, line.analyte) in amended:
             texts.append(amended[(line.sample, line.analyte)])
         if texts:
             analysis = reference.analysis(line.analyte.analysis_id)

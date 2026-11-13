@@ -418,6 +418,41 @@ def test_a_supervisor_grants_user_admin_to_an_analyst_within_limits(app, lab):  
         assert analyst.get("/admin/users").status_code == 403
 
 
+def test_t3_every_grant_and_removal_is_kept(app, lab):
+    """Review T-3: giving and taking back a capability each leaves a row that stays; the current set follows;
+    a change that changes nothing leaves nothing; the Users page lists them."""
+    from sqlalchemy import text
+    from sqlalchemy.exc import DBAPIError
+
+    from slim_lims.models import CapabilityEventRow
+
+    an = lab.scalars(select(User.id).where(User.initials == "AN")).one()
+    lab.rollback()
+    with TestClient(app) as sup:
+        login(sup, "staff@lab.example")
+        for grant in ("1", "1", "0"):  # the second grant changes nothing
+            data = {"csrf_token": _users_form(sup), "capability": "manage_users", "grant": grant}
+            sup.post(f"/admin/users/{an}/capabilities", data=data)
+        page = sup.get("/admin/users").text
+    assert "Grants" in page and "revoked" in page and "granted" in page
+    events = [
+        (e.capability, e.kind, e.by)
+        for e in lab.scalars(
+            select(CapabilityEventRow).where(CapabilityEventRow.user_id == an).order_by(CapabilityEventRow.id)
+        )
+    ]
+    assert events == [
+        ("manage_users", "granted", "staff@lab.example"),
+        ("manage_users", "revoked", "staff@lab.example"),
+    ]
+    assert lab.get(UserCapability, (an, "manage_users")) is None
+    lab.rollback()
+    with pytest.raises(DBAPIError):  # append-only
+        lab.execute(text("DELETE FROM capability_events"))
+        lab.flush()
+    lab.rollback()
+
+
 def test_staff_initials_are_unique(client, lab):
     login(client, "staff@lab.example")
     form = {
