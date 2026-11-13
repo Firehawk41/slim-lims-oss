@@ -234,3 +234,7 @@ scripts/seed_demo.py; tests/ (SQLite per test, or Postgres via TEST_DATABASE_URL
   already held, whatever became of their request (slim-prep P-29, L-2); a blocking bottle refuses a file
   that puts the sample on a batch, as it refuses the prep book (`results.blocked_samples`, L-3); a refused
   review or release shows the batch page again with the form as posted (L-4). L-6…L-12 await Jamie.
+- Quality review 2026-11-13 (`docs/REVIEW_2026-11-13_quality.md`): a site with no spec limits of its own for a
+  chemical is judged by its group's, as slim-domain says (`results.limits_owner`; evaluation and approval, Q-1);
+  whoever proposed or decided a spec change is involved in §7.8 for internal audits (Q-2); the vertical audit
+  shows a QC acknowledgement under the version whose release it was made at (Q-3). Q-4…Q-10 await Jamie.

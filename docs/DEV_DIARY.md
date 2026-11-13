@@ -281,6 +281,8 @@ Tally and themes are updated now and then at the bottom.
 | J | "Yes, open both PRs and merge on green." | slim-prep-oss #6 (P-29), slim-lims-oss #37 (Lab review and L-1…L-4): merged. |
 | J | "Review the Quality department per the plan." | `REVIEW_2026-11-13_quality.md`. Nothing fixed. |
 | F | Bugs Q-1…Q-3: a group's spec limits never judge a result (the host reads the exact customer, slim-domain falls back to the group); a spec proposer or approver can audit §7.8; an amended report's audit shows an earlier version's QC acknowledgement. For decision Q-4…Q-10. | Raised with Jamie. |
+| J | "Fix Q-1 through Q-3." | |
+| C✓ | Q-1: spec limits follow slim-domain's owner rule (a site's own, else its group's) in evaluation and in approval; Q-2: spec proposers and approvers are involved in §7.8; Q-3: a line's QC acknowledgements are its own version's release's. Each with its guard test. | Host only; Q-3 corrected an older test that relied on the bug. |
 
 ## Themes so far
 - **Domain facts are Jamie's, and they overrule Claude's defaults:** DF < 1, MDL averaging, standards as

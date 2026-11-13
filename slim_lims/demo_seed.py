@@ -152,7 +152,7 @@ def seed_demo(
             seed_demo_quote_request(session, reference)  # D-139: the queue isn't empty
             session.commit()
             if scenarios:
-                specs = SpecReader(slim_engine)
+                specs = SpecReader(slim_engine, reference)
                 report.scenarios = seed_scenarios(session, reference, specs, clock.now())
                 session.commit()
                 report.prepped = seed_prep_scenario(session, reference, specs, clock.now())

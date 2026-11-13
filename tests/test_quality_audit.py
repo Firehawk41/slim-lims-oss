@@ -255,8 +255,8 @@ def test_q7_cli_verify_catches_a_nonconformity_written_around_the_rules(
 
 
 def test_the_audit_shows_a_release_over_qc_trend_flags(visitor, db):  # D-144
-    from datetime import UTC, datetime
-
+    from slim_data.domain.enums import EventKind
+    from slim_data.persistence.results import load_result
     from slim_data.service.audit import report_audit
 
     from slim_lims.models import QcAcknowledgementRow
@@ -264,10 +264,12 @@ def test_the_audit_shows_a_release_over_qc_trend_flags(visitor, db):  # D-144
     continue_as(visitor, db, "uma@demo.example")
     issue = first_issue(visitor)
     line = report_audit(db, int(issue)).lines[0]
+    released = load_result(db, line.sample, line.analyte).events
+    at = next(e.at for e in released if e.kind == EventKind.RELEASED and e.version == line.version)  # Q-3
     db.add(
         QcAcknowledgementRow(
             sample=str(line.sample), analysis_id=line.analyte.analysis_id, note="CCV re-run in limits",
-            by="rob@demo.example", at=datetime(2000, 1, 1, tzinfo=UTC),
+            by="rob@demo.example", at=at,
             flags=[{"severity": "action", "code": "WG_1_3S", "tool": "westgard", "series": "ICP-MS 1 · Fe",
                     "message": "beyond 3 SD", "instrument": "ICP-MS 1", "at": "2000-01-01T00:00:00+00:00"}],
         )
@@ -275,3 +277,30 @@ def test_the_audit_shows_a_release_over_qc_trend_flags(visitor, db):  # D-144
     db.commit()
     page = visitor.get(f"/quality/audit/{issue}").text
     assert "Released over QC trend flags" in page and "CCV re-run in limits" in page and "WG_1_3S" in page
+
+
+def test_q3_an_amended_reports_audit_shows_only_its_own_acknowledgement(monkeypatch):
+    """Review Q-3: v1 released over an ACTION flag with a reason, corrected, v2 released clean: the amended
+    report's line (v2) shows no acknowledgement; the first report's line (v1) shows its own."""
+    from datetime import UTC, datetime, timedelta
+    from types import SimpleNamespace
+
+    from slim_data.domain.enums import EventKind
+
+    from slim_lims import qc_warnings
+    from slim_lims import quality as quality_module
+
+    t1 = datetime(2026, 10, 10, 9, 0, tzinfo=UTC)
+    t2 = t1 + timedelta(days=3)
+    released = [
+        SimpleNamespace(kind=EventKind.RELEASED, version=1, at=t1),
+        SimpleNamespace(kind=EventKind.RELEASED, version=2, at=t2),
+    ]
+    ack = SimpleNamespace(at=(t1 - timedelta(seconds=1)).replace(tzinfo=None), note="CCV re-run in limits")
+    monkeypatch.setattr(quality_module, "load_result", lambda db, s, a: SimpleNamespace(events=released))
+    monkeypatch.setattr(qc_warnings, "acknowledgements", lambda db, s, a=None: [ack])
+    line = SimpleNamespace(sample="TR00001-01", analyte=SimpleNamespace(analysis_id=5), version=2)
+    later = t2 + timedelta(hours=1)
+    assert quality_module._acknowledgements_of(None, line, later) == []
+    first = SimpleNamespace(sample="TR00001-01", analyte=SimpleNamespace(analysis_id=5), version=1)
+    assert quality_module._acknowledgements_of(None, first, t1 + timedelta(hours=1)) == [ack]

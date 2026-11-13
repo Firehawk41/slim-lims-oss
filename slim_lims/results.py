@@ -111,20 +111,52 @@ class TrSampleTables:
         return self._found[ref]
 
 
+def owns_limits(conn, customer_id: int, chemical_id: int, location: str) -> bool:
+    """Whether a customer has limits of its own (specification or warning limit) for this chemical, at
+    no site or at this site: then its own apply, else its group's (slim-domain's `limits_owner`)."""
+    s = t.specifications
+    found = conn.execute(
+        select(s.c.customer_id)
+        .where(
+            s.c.customer_id == customer_id,
+            s.c.chemical_id == chemical_id,
+            s.c.location.in_({"", location or ""}),
+        )
+        .limit(1)
+    ).first()
+    return found is not None
+
+
+def limits_owner(conn, customer_id: int, chemical_id: int, location: str, parent: int | None) -> int:
+    """Whose limits judge this customer's samples of this chemical: its own if it has any, else its
+    group's, `parent` (review Q-1; the rule is slim-domain's `SpecificationService.limits_owner`)."""
+    if parent is None or owns_limits(conn, customer_id, chemical_id, location):
+        return customer_id
+    return parent
+
+
 class SpecReader:
     """Spec limits (element -> upper limit) from SLIM's `specifications`, as slim-domain's
-    `SpecificationService.get_specs` gives them: kind "specification", exact location."""
+    `SpecificationService.get_specs` gives them (kind "specification", exact location), for the
+    customer whose limits apply: the sample's customer, or its group when it has none of its own (Q-1)."""
 
-    def __init__(self, slim_engine: Engine) -> None:
-        self._engine = slim_engine
+    def __init__(self, slim_engine: Engine, reference: ReferenceData | None = None) -> None:
+        """`reference`: where a customer's group comes from (its `parent_customer_id`); without it, a
+        customer's own limits only."""
+        self._engine, self._reference = slim_engine, reference
+
+    def _parent(self, customer_id: int) -> int | None:
+        customer = self._reference.customer(customer_id) if self._reference is not None else None
+        return getattr(customer, "parent_customer_id", None)
 
     def __call__(self, customer_id: int, chemical_id: int, location: str) -> Mapping[str, float]:
         s = t.specifications
         with self._engine.connect() as conn:
+            owner = limits_owner(conn, customer_id, chemical_id, location, self._parent(customer_id))
             rows = conn.execute(
                 select(s.c.element_symbol, s.c.value).where(
                     s.c.kind == "specification",
-                    s.c.customer_id == customer_id,
+                    s.c.customer_id == owner,
                     s.c.chemical_id == chemical_id,
                     s.c.location == (location or ""),
                 )

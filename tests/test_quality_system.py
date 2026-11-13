@@ -275,3 +275,23 @@ def test_the_5c_pages_need_a_quality_capability(visitor, db):
         "/quality/validation.json",
     ):
         assert visitor.get(path).status_code == 403, path
+
+
+def test_q2_a_spec_approver_doesnt_audit_reporting(db, issued, reference):  # noqa: F811
+    """Review Q-2: spec limits decide the report's statements of conformity (§7.8.6): whoever proposed or
+    decided a change in the year is involved in 7.8, and in no lab clause besides."""
+    from slim_lims.models import SpecDecisionRow, SpecProposalRow
+
+    uma, sue = persona(db, "uma@demo.example"), persona(db, "sue@demo.example")
+    proposal = SpecProposalRow(
+        customer_id=2, chemical_id=2, location="", kind="specification", unit="ppb", before={},
+        after={"Fe": "0.3"}, reason="rev. C", proposed_by=uma.email, proposed_by_id=str(uma.id),
+    )  # fmt: skip
+    db.add(proposal)
+    db.flush()
+    db.add(SpecDecisionRow(proposal_id=proposal.id, outcome="approved", by=sue.email))
+    db.commit()
+    involved = involved_in_clause(db, reference, CLOCK, "7.8", TODAY)
+    assert {str(uma.id), str(sue.id)} <= involved
+    assert str(uma.id) not in involved_in_clause(db, reference, CLOCK, "7.2", TODAY)
+    assert involved_in_clause(db, reference, CLOCK, "7.8", TODAY + timedelta(days=400)) == frozenset()

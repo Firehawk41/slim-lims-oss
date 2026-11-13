@@ -92,7 +92,7 @@ def create_app(
     app.state.reference = reference
     app.state.slim_engine = slim_engine  # where slim-domain writes reference data (D-141)
     # SLIM spec limits for slim-data: (customer_id, chemical_id, location) -> {element: limit}.
-    app.state.specs = specs or SpecReader(slim_engine)
+    app.state.specs = specs or SpecReader(slim_engine, reference)  # a site without limits: its group's (Q-1)
     app.state.report_renderer = report_renderer or engine_renderer  # spec §13, slim-data D-79
     app.state.login_throttle = LoginThrottle()
     app.state.lab_clock = LabClock(ZoneInfo(settings.lab_timezone))
