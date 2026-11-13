@@ -293,6 +293,13 @@ Tally and themes are updated now and then at the bottom.
 | J | "Build A1 and 2." | |
 | C✓ | A-1: an invoice is priced by the quotes in force the day the request was received; the invoice page says what priced each line and when the named quote priced none. A-2: an amended report to an invoiced request says the invoice is unchanged. | Host only; V5 unchanged. |
 
+## 2026-11-13: department review, IT
+
+| Kind | What | Notes |
+|---|---|---|
+| J | "Review the IT department per the plan." | `REVIEW_2026-11-13_it.md`. Nothing fixed. |
+| F | Bug T-1: the login throttle's per-address limit takes the leftmost `X-Forwarded-For` entry (uvicorn with every proxy trusted), which the client writes: it can be dodged, or aimed at someone else's address. For decision T-2…T-6: an admin page, capability grants as events, a pin bump list, the demo lab's hour said up front, backups with the VPS. | Raised with Jamie. |
+
 ## Themes so far
 - **Domain facts are Jamie's, and they overrule Claude's defaults:** DF < 1, MDL averaging, standards as
   recipes, spike placement. Claude's "cautious" engineering defaults were wrong more than once where
