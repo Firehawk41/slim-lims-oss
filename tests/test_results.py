@@ -846,3 +846,18 @@ def test_a_cancelled_tr_takes_no_decisions_or_releases(app, lab):
             json={"reason_category": "MDL taken from the method validation"},
         )
         assert accept.status_code == 409 and "cancelled" in accept.json()["detail"]
+
+
+def test_l4_a_refused_release_keeps_what_was_typed(app, lab):
+    """Review L-4: a refused review or release shows the batch page again with the form as posted."""
+    with staff_api(app, "AN") as an:
+        upload(an, csv())
+        token = csrf_from(an.get("/results/batches/PB-1").text)
+        typed = {"csrf_token": token, "note": "checked against the run log", "solo": "true"}
+        refused = an.post("/results/batches/PB-1/review", data=typed)  # an analyst can't review
+        assert refused.status_code == 409 and "Nothing was reviewed" in refused.text
+        assert 'value="checked against the run log"' in refused.text and "checked>" in refused.text
+        form = {"csrf_token": token, "sample": "TR00001-01", "analysis_id": TEN, "note": "spike looks right"}
+        refused = an.post("/results/batches/PB-1/release", data=form)  # nothing reviewed yet
+        assert refused.status_code == 409 and "Nothing was released" in refused.text
+        assert refused.text.count('value="spike looks right"') == 1  # in its own form, not sample 2's

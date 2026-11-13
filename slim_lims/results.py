@@ -19,7 +19,7 @@ rebuilds it exactly. The TR moves to partial or complete report in the same tran
 """
 
 import json
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from datetime import date
 from enum import StrEnum
 from functools import cache
@@ -34,6 +34,7 @@ from slim_data.domain.results import ReportLine
 from slim_data.domain.values import AnalyteRef, SampleRef
 from slim_data.domain.workflow import WorkflowError
 from slim_data.persistence import migrate
+from slim_data.persistence.observations import get_batch
 from slim_data.persistence.results import issues_for_tr, results_for_tr
 from slim_data.persistence.rulesets import ruleset_for
 from slim_data.pipeline.generic_csv import GenericCsv
@@ -262,6 +263,30 @@ def import_and_evaluate(
     codes = sorted({row.prep_batch for row in rows})
     trs = tuple(sorted({row.sample.tr_number for row in rows if row.sample is not None}))
     return receipt, {code: evaluate_batch(session, code, actor, lookup) for code in codes}, trs
+
+
+def blocked_samples(
+    session: Session, reference: ReferenceData, codes: Iterable[str], held_before: Mapping[str, Iterable]
+) -> list[str]:
+    """Why a file may not put these samples on these batches: a bottle that serves the batch's analysis
+    carries a blocking condition and is still in the lab (slim-samples S-04). The prep book refuses such
+    a batch (`prep.refuse_blocked`); a file that registers its own batch, or adds a sample to one, must
+    not get round it (review L-3). `held_before`: batch code -> the samples it held before the import;
+    readings for a sample its batch already held still import (that work was done before the lab knew)."""
+    from slim_samples.service import custody
+
+    analysis_codes = {a.id: a.code for a in reference.catalog_analyses()}
+    problems = []
+    for code in codes:
+        batch = get_batch(session, code)
+        analysis = analysis_codes.get(batch.analysis_id)
+        already = set(held_before.get(code, ()))
+        for sample in batch.samples:
+            if sample in already:
+                continue
+            for flag in custody.blocked_for(session, str(sample)).get(analysis, ()):
+                problems.append(f"{sample}: {flag.text} blocks {analysis} until the lab acts")
+    return problems
 
 
 def start_work(service, tr_numbers, user: User) -> list[str]:

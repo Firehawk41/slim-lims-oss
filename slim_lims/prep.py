@@ -184,7 +184,9 @@ def send(session: Session, code: str, user: User, reference: ReferenceData, spec
     """Sends the batch to slim-data (first time) or its correction (after), then re-evaluates the batch
     there if it has readings. Raises slim-prep's PrepRefused / NotFound, or LookupError."""
     batch = books.get_batch(session, code).item
-    refuse_blocked(session, batch)
+    first = sent_version(session, code) is None
+    if first:  # a correction is not new work: the batch already took its samples (review L-2, P-29)
+        refuse_blocked(session, batch)
     analysis = next((a for a in reference.catalog_analyses() if a.code == batch.analysis), None)
     if analysis is None or batch.analysis not in PREP_ANALYSES:
         raise LookupError(f"analysis {batch.analysis!r} can't take prep batches here")
@@ -196,9 +198,9 @@ def send(session: Session, code: str, user: User, reference: ReferenceData, spec
     }
     actor = actor_for(user)
     # slim-prep checks every sample against its TR again: a cancelled one takes no new work (D-99, P-23)
-    samples = TrSamples(session, reference)
+    samples = TrSamples(session, reference)  # a correction asks only about samples new to it (P-29)
     args = (session, code, actor, samples, analysis.id, analytes, PREP_ANALYSES[batch.analysis])
-    if sent_version(session, code) is None:
+    if first:
         send_to_results(*args)
         changed = None
     else:

@@ -13,8 +13,11 @@ frozen copy of the flags as shown (`qc_acknowledgements`, append-only).
 from dataclasses import dataclass
 from datetime import datetime
 
+from slim_data.domain.enums import ResultStatus
+from slim_data.domain.results import Result
 from slim_data.domain.values import SampleRef
 from slim_data.persistence.observations import batch_readings, get_batch, get_run
+from slim_data.persistence.results import results_for_tr, version_batches
 from slim_data.service.views import batches, samples_by_batch
 from slim_quality.domain.enums import Severity
 from slim_quality.service import quality as q
@@ -51,10 +54,12 @@ class Warning:
 
 
 class Charts:
-    """slim-quality's charts, drawn once per request however many runs and analytes ask."""
+    """What a request reads once, however many runs, analytes and releases ask: slim-quality's charts,
+    each batch's runs, and which batches hold a sample for an analysis."""
 
     def __init__(self, db: Session) -> None:
-        self._db, self._found = db, None
+        self._db, self._found, self._held = db, None, None
+        self._runs: dict[str, list] = {}
 
     def get(self):
         if self._found is None:
@@ -62,6 +67,20 @@ class Charts:
 
             self._found = q.charts(self._db, SlimDataQc(self._db))
         return self._found
+
+    def runs(self, code: str) -> list:
+        if code not in self._runs:
+            self._runs[code] = _runs(self._db, code)
+        return self._runs[code]
+
+    def batches_holding(self, sample: SampleRef, analysis_id: int) -> list[str]:
+        if self._held is None:
+            members = samples_by_batch(self._db)
+            self._held = {}
+            for b in batches(self._db):
+                for s in members.get(b.code, ()):
+                    self._held.setdefault((s, b.analysis_id), []).append(b.code)
+        return self._held.get((sample, analysis_id), [])
 
 
 def _runs(db: Session, code: str) -> list:
@@ -74,7 +93,7 @@ def batch_warnings(
 ) -> dict[str, list]:
     """analyte code -> its warnings across the batch's runs, worst first; analytes with none are left out."""
     charts = charts or Charts(db)
-    runs = _runs(db, code)
+    runs = charts.runs(code)
     if not runs or not analytes:
         return {}
     found = charts.get()
@@ -129,25 +148,50 @@ def worst(warnings: list) -> Severity | None:
     return max((w.severity for w in warnings), default=None)
 
 
-def for_release(db: Session, sample: SampleRef, analysis_id: int, charts: Charts | None = None) -> list:
-    """The warnings bearing on one sample + analysis: its batch's runs, its own analytes."""
-    from slim_data.persistence.results import results_for_tr
+def _ready(result: Result) -> bool:
+    """What a release would take now: reviewed, its verdict dealt with, nothing asked of it."""
+    return (
+        result.status == ResultStatus.REVIEWED
+        and result.is_cleared
+        and not result.rerun_requested
+        and not result.correction_started
+    )
 
-    analytes = {
-        r.analyte.code
-        for r in results_for_tr(db, sample.tr_number)
-        if r.sample == sample and r.analyte.analysis_id == analysis_id
-    }
-    members = samples_by_batch(db)
-    codes = [
-        b.code for b in batches(db) if b.analysis_id == analysis_id and sample in members.get(b.code, ())
-    ]
+
+def for_release(
+    db: Session,
+    sample: SampleRef,
+    analysis_id: int,
+    charts: Charts | None = None,
+    results: list[Result] | None = None,
+) -> list:
+    """The warnings bearing on releasing one sample + analysis now: for each result the release would
+    take, the runs of the batch its current version was made from. An older batch a rerun replaced, and
+    analytes already released or still waiting, bear on nothing (review L-1). The batch page and the
+    release both ask here, so the form asks for a reason exactly when the release would.
+    `results`: the request's, when the caller has read them."""
     charts = charts or Charts(db)
+    if results is None:
+        results = results_for_tr(db, sample.tr_number)
+    held = charts.batches_holding(sample, analysis_id)
+    by_batch: dict[str, set[str]] = {}
+    for r in results:
+        if r.sample != sample or r.analyte.analysis_id != analysis_id or not _ready(r):
+            continue
+        code = held[0] if len(held) == 1 else version_batches(db, r.sample, r.analyte).get(r.current.version)
+        if code is not None:
+            by_batch.setdefault(code, set()).add(r.analyte.code)
     found: list = []
-    for code in codes:
+    for code, analytes in sorted(by_batch.items()):
         for ws in batch_warnings(db, code, analytes, charts).values():
             found += ws
     return found
+
+
+def action_flags(warnings: list) -> list:
+    """The ACTION-severity ones, each chart's code once: what a release must answer for."""
+    seen = {(w.slug, w.code): w for w in warnings if w.severity == Severity.ACTION}
+    return list(seen.values())
 
 
 class AcknowledgementNeeded(ValueError):
