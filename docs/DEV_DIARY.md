@@ -338,6 +338,14 @@ Tally and themes are updated now and then at the bottom.
 | C✓ | T-3: `capability_events`, the append-only history of every grant and removal (migration 0020, with the grants on file backfilled), written with the current set in one transaction; a Grants list on the Users page. L-6: the request page's lab trail, sample × analysis from bottles to report and retention; the batch pages link each other. | The current set stays in `user_capabilities` (recommended "derived from the events"; kept simpler). |
 | F | The test database now migrates slim-prep too (the request page reads it), as the app always does. | |
 
+## 2026-11-17: the Render demo was down
+
+| Kind | What | Notes |
+|---|---|---|
+| J | "It's not loading, can you check render?" | Render API key added on a card. |
+| F | Every deploy since at least 12 November failed: the start command's seed planned the demo audit programme (D-135) with Uma as auditor of 7.7, but Render's shared lab already held her PT records from late October, so slim-quality refused it (§8.8.2) and the start-up exited. The migrations had already run, so the previous build couldn't start either ("Can't locate revision"). Fresh databases (CI, local) seed the programme first and never hit it. | Fixed: the seed takes an independent auditor or leaves the clause unplanned; guard `test_quality_records.py::test_render_a_lab_seeded_before_the_audit_programme_still_gets_one`. |
+| F | Render's free database `slim-lims-db` expires on 2026-11-24. | Raised with Jamie. |
+
 ## Themes so far
 - **Domain facts are Jamie's, and they overrule Claude's defaults:** DF < 1, MDL averaging, standards as
   recipes, spike placement. Claude's "cautious" engineering defaults were wrong more than once where

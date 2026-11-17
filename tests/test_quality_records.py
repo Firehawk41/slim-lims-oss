@@ -360,3 +360,20 @@ def test_profile_changes_carry_the_equipment_settings_and_keep_the_fixed_z_limit
     assert candidate.policy(9).fixed is not None  # the PT z-score's limits are kept, not reset
     assert candidate.equipment.effect(1).name == "BLOCK" and candidate.pt.questionable == 2.5
     assert token
+
+
+def test_render_a_lab_seeded_before_the_audit_programme_still_gets_one(db, records):
+    """Render's shared lab got its quality records (Uma keeps the PT rounds, clause 7.7) weeks before the
+    audit programme seed existed (D-135). That seed then planned Uma to audit 7.7, was refused (§8.8.2) and
+    took the whole start-up with it. It now plans an auditor who had no hand in the clause, or leaves it."""
+    from slim_quality.service import internal_audits as ia
+
+    from slim_lims.quality_system import seed_demo_quality_system
+
+    uma = str(persona(db, "uma@demo.example").id)
+    assert uma in ia.record_keepers(db, "7.7", TODAY)  # her PT records: she can't audit 7.7
+    assert seed_demo_quality_system(db, TODAY) > 0  # no longer refused
+    db.commit()
+    audits = store.list_internal_audits(db)
+    assert all(not (a.clause == "7.7" and a.auditor.id == uma) for a in audits)
+    assert any(a.clause == "7.7" for a in audits) and seed_demo_quality_system(db, TODAY) == 0

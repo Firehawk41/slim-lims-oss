@@ -15,6 +15,7 @@ from datetime import UTC, date, timedelta
 from importlib import metadata
 
 from slim_data.engine.registry import default_registry
+from slim_quality.domain.base import NotAllowed
 from slim_quality.domain.clauses import CLAUSES, clause_order
 from slim_quality.domain.competence import Act, Person
 from slim_quality.domain.internal_audits import (
@@ -291,9 +292,18 @@ def seed_demo_quality_system(session: Session, today: date) -> int:
         ),
     )
 
-    def plan(clause: str, day: date, auditor: Person, area: str = "") -> InternalAudit:
-        audit = InternalAudit(clause=clause, area=area, planned_for=day, auditor=auditor, planned_by=manager)
-        return internal_audits.plan(session, audit)  # seeded before anyone acts: nobody is involved yet
+    def plan(clause: str, day: date, auditor: Person, area: str = "") -> InternalAudit | None:
+        """The audit with `auditor`, or the other demo auditor when they had a hand in the clause (a lab
+        seeded before this programme existed already holds their records, D-135); None when neither is
+        independent: that clause is left unplanned rather than the whole seed refused."""
+        for who in dict.fromkeys((auditor, uma, sue_p)):
+            audit = InternalAudit(clause=clause, area=area, planned_for=day, auditor=who, planned_by=manager)
+            try:
+                with session.begin_nested():
+                    return internal_audits.plan(session, audit)
+            except NotAllowed:
+                continue
+        return None
 
     year_start = date(today.year, 1, 1)
     reporting = plan("7.8", max(year_start, today - timedelta(days=25)), uma, "issued reports")
@@ -316,17 +326,18 @@ def seed_demo_quality_system(session: Session, today: date) -> int:
             evidence="No amendment in the sample; the procedure covers it",
         ),
     )
-    internal_audits.add_entry(
-        session,
-        reporting.id,
-        AuditEntry(
-            kind=AuditEntryKind.CONDUCTED,
-            on=max(year_start, today - timedelta(days=20)),
-            lines=lines,
-            note="Reporting broadly in order; one finding on decision rules.",
-            by=officer,
-        ),
-    )
+    if reporting is not None:
+        internal_audits.add_entry(
+            session,
+            reporting.id,
+            AuditEntry(
+                kind=AuditEntryKind.CONDUCTED,
+                on=max(year_start, today - timedelta(days=20)),
+                lines=lines,
+                note="Reporting broadly in order; one finding on decision rules.",
+                by=officer,
+            ),
+        )
     plan("6.4", max(year_start, today - timedelta(days=10)), uma, "balances and pipettes")
     # The year before: most clauses audited and conforming, 4.2 longer ago than the profile allows, and a few
     # never audited, so readiness shows a lab part-way through its cycle rather than a wall of red.
@@ -334,6 +345,8 @@ def seed_demo_quality_system(session: Session, today: date) -> int:
     for n, clause in enumerate(earlier):
         day = today - timedelta(days=380 if clause == "4.2" else 330 - n * 10)
         audit = plan(clause, day, sue_p if clause == "8.5" else uma)
+        if audit is None:
+            continue
         line = ChecklistLine(
             clause=clause, checked="Walked through against the procedure", outcome=LineOutcome.CONFORMING
         )
