@@ -55,3 +55,53 @@ jobs:
           "slim-domain @ git+https://github.com/Firehawk41/slim-domain-oss@cca95013df73f44a520d72f7edd3ca03b1fa1a51"
           "slim-report-engine @ git+https://github.com/Firehawk41/slim-report-engine-oss@d9546ea5fe051bd5a7ea117aa47ceef7c52ced21"
       - run: pytest -q
+
+  # A Render deploy replayed on a database that has lived (the outage of 2026-11-17): the previous main is
+  # built and started as render.yaml says, three visitors claim labs, then this commit is built and started
+  # over the same database. Its /health must answer, the visitors' labs must still open and a new one too.
+  deploy:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: replay
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg2://postgres:postgres@localhost:5432/replay
+      SECRET_KEY: ci-replay-secret-key-not-a-real-one
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: The previous main
+        run: |
+          if [ "${{ github.event_name }}" = pull_request ]; then old=${{ github.event.pull_request.base.sha }}
+          elif [ "${{ github.ref }}" = refs/heads/main ]; then old=HEAD^1
+          else old=origin/main; fi
+          git worktree add --detach "$RUNNER_TEMP/old" "$old"
+          git -C "$RUNNER_TEMP/old" log --oneline -1
+      - run: sudo apt-get install -y -q libpango-1.0-0 libpangoft2-1.0-0  # WeasyPrint, as on Render
+      - run: python -m venv "$RUNNER_TEMP/old-venv" && python -m venv "$RUNNER_TEMP/new-venv"
+      - run: python scripts/replay_deploy.py build "$RUNNER_TEMP/old" --python "$RUNNER_TEMP/old-venv/bin/python"
+      - run: python scripts/replay_deploy.py build . --python "$RUNNER_TEMP/new-venv/bin/python"
+      - name: Deploy the previous main; visitors claim labs
+        # Retries: the previous main's own faults aren't under test here, only what this commit does to its data.
+        run: |
+          python scripts/replay_deploy.py serve "$RUNNER_TEMP/old" --python "$RUNNER_TEMP/old-venv/bin/python"
+          python scripts/replay_deploy.py visit http://127.0.0.1:8000 --jars "$RUNNER_TEMP/jars" --visitors 3 --retries 3
+          python scripts/replay_deploy.py stop
+      - name: Deploy this commit over it
+        run: |
+          python scripts/replay_deploy.py serve . --python "$RUNNER_TEMP/new-venv/bin/python"
+          python scripts/replay_deploy.py revisit http://127.0.0.1:8000 --jars "$RUNNER_TEMP/jars"
+          python scripts/replay_deploy.py stop
+      - name: The start-up logs
+        if: always()
+        run: tail -n 80 "$RUNNER_TEMP"/serve-*.log 2>/dev/null | grep -v weasyprint || true

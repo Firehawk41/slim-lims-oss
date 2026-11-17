@@ -88,7 +88,11 @@ ruff check . && ruff format --check .
 --if-needed`), the shared lab is `DATABASE_SCHEMA=lab_shared`, each visitor's first persona claims a
 seeded schema of their own; a restart (a deploy) drops the spares and upgrades every claimed lab (D-115).
 The service is `slim-lims-oss`, the database `slim-lims-db` (renaming it makes
-Render create a second; the free plan allows one). CI: {SQLite, Postgres 16} × {3.11, 3.12}.
+Render create a second; the free plan allows one; it expires 2026-11-24). CI: {SQLite, Postgres 16} × {3.11,
+3.12}, and `deploy`: a Render deploy replayed over the previous main's database with claimed labs
+(`scripts/replay_deploy.py`). **The demo seed meets lived-in databases:** a step added later runs after the
+others' data exists (`tests/test_seed_lived_in.py`: add a new one-time step to its list); a failing demo step
+is logged and left out, never stops the start-up (migrations and the audit log still do).
 
 ## File map
 
@@ -160,7 +164,7 @@ slim_lims/
 ├── audit.py         # slim-domain's audit log (Postgres; per lab schema)
 ├── cli.py           # migrate, verify, create-staff, create-customer-user, sync-*, empty-public
 └── migrations/      # Alembic, app tables only
-scripts/seed_demo.py; tests/ (SQLite per test, or Postgres via TEST_DATABASE_URL)
+scripts/seed_demo.py, scripts/replay_deploy.py (CI's deploy replay); tests/ (SQLite per test, or Postgres via TEST_DATABASE_URL)
 ```
 
 ## Architecture rules

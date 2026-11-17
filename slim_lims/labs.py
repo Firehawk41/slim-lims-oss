@@ -114,6 +114,9 @@ class Labs:
         self._seen: dict[str, datetime] = {}
         self._lock = threading.Lock()
         self._filling = threading.Lock()
+        # Alembic keeps its context in module globals: two seeds or upgrades at once in one process (a
+        # visitor's claim and the spare filler, right after a deploy) corrupt each other. One at a time.
+        self._seeding = threading.RLock()
 
     @property
     def kept_for(self) -> str:
@@ -151,7 +154,8 @@ class Labs:
                 self.drop(schema)
             elif self.upgrade is not None:
                 try:
-                    self.upgrade(with_schema(self.url, schema))
+                    with self._seeding:
+                        self.upgrade(with_schema(self.url, schema))
                 except Exception:
                     log.exception("demo labs: %s didn't upgrade; dropped", schema)
                     self.drop(schema)
@@ -160,7 +164,19 @@ class Labs:
     # ------------------------------------------------------------ a visitor's lab
 
     def claim(self) -> str:
-        """A lab of the visitor's own: a spare if one is ready, else one seeded now."""
+        """A lab of the visitor's own: a spare if one is ready, else one seeded now. A claim that finds
+        none waits for a spare being seeded and takes it, rather than seeding beside it."""
+        schema = self._take_ready()
+        if schema is None:
+            with self._seeding:
+                schema = self._take_ready()
+                if schema is None:
+                    self.sweep(room_for=1)
+                    schema = self._make(CLAIMED)
+        self.refill_in_background()
+        return schema
+
+    def _take_ready(self) -> str | None:
         now = self.clock()
         with self.base.begin() as conn:
             schema = conn.scalars(
@@ -174,10 +190,6 @@ class Labs:
                 conn.execute(
                     update(demo_labs).where(demo_labs.c.schema == schema).values(state=CLAIMED, last_seen=now)
                 )
-        if schema is None:
-            self.sweep(room_for=1)
-            schema = self._make(CLAIMED)
-        self.refill_in_background()
         return schema
 
     def enter(self, schema: str) -> sessionmaker[Session] | None:
@@ -286,17 +298,18 @@ class Labs:
                 demo_labs.insert().values(schema=schema, state=PREPARING, created_at=now, last_seen=now)
             )
             conn.execute(text(f'CREATE SCHEMA "{schema}"'))
-        try:
-            self.seed(with_schema(self.url, schema))
-        except BaseException:
-            self.drop(schema)
-            raise
-        with self.base.begin() as conn:
-            conn.execute(
-                update(demo_labs)
-                .where(demo_labs.c.schema == schema)
-                .values(state=state, last_seen=self.clock())
-            )
+        with self._seeding:  # held until it is marked ready: a waiting claim then finds it
+            try:
+                self.seed(with_schema(self.url, schema))
+            except BaseException:
+                self.drop(schema)
+                raise
+            with self.base.begin() as conn:
+                conn.execute(
+                    update(demo_labs)
+                    .where(demo_labs.c.schema == schema)
+                    .values(state=state, last_seen=self.clock())
+                )
         return schema
 
     def _factory(self, schema: str) -> sessionmaker[Session]:
