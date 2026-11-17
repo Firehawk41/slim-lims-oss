@@ -1,0 +1,16 @@
+name: Keep the demo awake
+
+# Render's free plan sleeps after 15 idle minutes; waking takes a minute, which a recruiter shouldn't wait.
+# One always-on service fits the free plan's 750 hours a month. GitHub may run this late, and stops a
+# schedule after 60 days without a commit to the repo.
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - run: curl -fsS --retry 5 --retry-delay 20 --retry-all-errors --max-time 120 https://slim-lims-oss.onrender.com/health

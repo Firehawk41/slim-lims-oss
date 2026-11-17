@@ -270,6 +270,9 @@ def demo_personas_page(request: Request, db: Annotated[Session, Depends(get_db)]
     return render(request, "demo_personas.html", {"personas": persona_choices(db)})
 
 
+SHARED_LAB_KEY = "shared_lab"  # a visitor put in the shared lab because no lab of their own was ready
+
+
 @router.post("/demo/continue-as", name="continue_as")
 def continue_as(request: Request, db: Annotated[Session, Depends(get_db)], user_id: Annotated[str, Form()]):
     if not request.app.state.settings.demo_personas:
@@ -282,13 +285,19 @@ def continue_as(request: Request, db: Annotated[Session, Depends(get_db)], user_
         raise HTTPException(status_code=404, detail="No such persona.")
     labs = request.app.state.labs
     lab = request.session.get(LAB_SESSION_KEY)
-    if labs is not None and lab is None:  # their first persona: a lab of their own (D-102)
-        lab = labs.claim()
-        with labs.enter(lab)() as lab_db:
-            persona = lab_db.scalars(select(User).where(User.email == persona.email)).one()
+    shared = False
+    if labs is not None and lab is None:  # their first persona: a lab of their own (D-102), if one is ready
+        lab = labs.take_spare()
+        if lab is None:
+            shared = True  # none ready: the shared lab now, their own at a later persona choice
+        else:
+            with labs.enter(lab)() as lab_db:
+                persona = lab_db.scalars(select(User).where(User.email == persona.email)).one()
     request.session.clear()  # like a login: new session, new CSRF token
     if lab is not None:
         request.session[LAB_SESSION_KEY] = lab
+    elif shared:
+        request.session[SHARED_LAB_KEY] = True
     _sign_in(request, persona)
     return RedirectResponse("/", status_code=303)
 

@@ -54,6 +54,9 @@ services:
         value: "true"
       - key: DEMO_LABS
         value: "true"
+      # Labs seeded ahead (about 9 MB each; the cap is 25): a visitor's first persona takes one at once.
+      - key: DEMO_LAB_SPARES
+        value: "4"
       - key: DATABASE_SCHEMA
         value: lab_shared
       - key: SLIM_REPORT_ENGINE_OSS_DIR

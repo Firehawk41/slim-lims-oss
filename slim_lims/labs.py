@@ -193,6 +193,13 @@ class Labs:
         self.refill_in_background()
         return schema
 
+    def take_spare(self) -> str | None:
+        """A ready spare for the visitor, or None at once (they use the shared lab meanwhile): a visitor never
+        waits for a lab to be seeded (Jamie, 2026-11-17: "not something that keeps a recruiter waiting")."""
+        schema = self._take_ready()
+        self.refill_in_background()
+        return schema
+
     def _take_ready(self) -> str | None:
         now = self.clock()
         with self.base.begin() as conn:

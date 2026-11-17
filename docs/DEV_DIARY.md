@@ -357,6 +357,9 @@ Tally and themes are updated now and then at the bottom.
 | J | "Picking a persona isn't working." | |
 | F | Render's free plan sleeps when idle; each wake-up is a restart, which dropped every spare lab. A lab takes ~62 s to seed there, one at a time, so each persona click with no spare ready queued a minute's seed; the page said nothing, so clicking again queued more (9 seeds for 2 choices; 3½ min measured). | Fixed: spares outlive a restart of the same commit (`demo_labs.seeded_by`, `RENDER_GIT_COMMIT`); the persona buttons send once and say "Preparing your lab…" (`static/js/submit_once.js`); the spare filler starts no new spare while a claim waits. Guards: `test_labs.py::test_spares_outlive_a_restart_of_the_same_code_only`, `…::test_a_waiting_visitor_goes_before_the_spares_still_to_make`. |
 
+| J | "We need to rethink the strategy then. This is supposed to be a demo, not something that keeps a recruiter waiting for 3 min." Claude proposed four free steps, and a paid plan as the alternative. Jamie: "do the four free steps." | |
+| C | A visitor never waits for a seed: no spare ready, the shared lab at once, said so on every page, their own lab at a later persona choice (`Labs.take_spare`); 4 spares on Render (`DEMO_LAB_SPARES`; a lab is about 9 MB, the cap 25); `keepalive.yml` pings `/health` every 10 min so the free service doesn't sleep. Guard: `test_labs.py::test_with_no_lab_ready_a_visitor_goes_to_the_shared_lab_at_once`. | |
+
 ## Themes so far
 - **Domain facts are Jamie's, and they overrule Claude's defaults:** DF < 1, MDL averaging, standards as
   recipes, spike placement. Claude's "cautious" engineering defaults were wrong more than once where

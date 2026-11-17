@@ -29,6 +29,7 @@ class Settings:
     # A lab per visitor (slim-data D-102): Postgres only, with demo personas. DATABASE_SCHEMA is the
     # shared lab (password logins, the CLI); SLIM_REPORT_ENGINE_OSS_DIR has the demo seed's data.
     demo_labs: bool = False
+    demo_lab_spares: int = 2  # labs seeded ahead, so a visitor's first persona needn't wait (Render: 4)
     oss_report_engine_dir: str | None = None
     # Quotes expiring within this many days are listed as expiring soon (D-139).
     quote_expiry_warning_days: int = 30
@@ -95,6 +96,7 @@ def load_settings() -> Settings:
         lims_api_token=lims_api_token,
         demo_personas=_bool(os.environ.get("DEMO_PERSONAS"), False),
         demo_labs=_bool(os.environ.get("DEMO_LABS"), False),
+        demo_lab_spares=max(0, int(os.environ.get("DEMO_LAB_SPARES", 2))),
         oss_report_engine_dir=os.environ.get("SLIM_REPORT_ENGINE_OSS_DIR") or None,
         quote_expiry_warning_days=int(os.environ.get("QUOTE_EXPIRY_WARNING_DAYS", 30)),
         require_mfa=_bool(os.environ.get("REQUIRE_MFA"), True),

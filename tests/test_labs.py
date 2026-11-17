@@ -266,6 +266,8 @@ def _lab_of(labs, user_id: str) -> str:
 
 def test_each_visitor_gets_a_seeded_lab_of_their_own(demo):
     shared, labs = demo
+    labs.spares = 2
+    labs.refill()  # seeded ahead: a persona takes one at once
     with _visitor(demo) as one, _visitor(demo) as two:
         assert _continue_as(one).status_code == 303 and _continue_as(two).status_code == 303
         board = one.get("/")
@@ -282,8 +284,34 @@ def test_each_visitor_gets_a_seeded_lab_of_their_own(demo):
         one.post("/demo/fresh-lab", data={"csrf_token": csrf_from(one.get("/demo/personas").text)})
         assert lab_one not in _schemas(labs.url)
         assert one.get("/", follow_redirects=False).status_code == 303  # signed out with it
+        labs.refill()
         _continue_as(one)
         assert _lab_of(labs, one.get("/api/me").json()["id"]) not in {lab_one, lab_two, "lab_shared"}
+    labs.spares = 0
+
+
+def test_with_no_lab_ready_a_visitor_goes_to_the_shared_lab_at_once(demo):
+    """Jamie, 2026-11-17: a recruiter mustn't wait for a lab to be seeded. No spare ready: the shared lab,
+    said so on every page; a later persona choice gives a lab of their own once one is ready."""
+    shared, labs = demo
+    labs.start()  # no spares left from other tests (a restart drops them)
+    seeded = []
+    labs.seed, real_seed = (lambda lab_url: seeded.append(lab_url)), labs.seed
+    try:
+        with _visitor(demo) as visitor:
+            assert _continue_as(visitor).status_code == 303
+            assert seeded == []  # nothing seeded while they waited
+            board = visitor.get("/")
+            assert board.status_code == 200 and "You are in the shared lab" in board.text
+            assert _lab_of(labs, visitor.get("/api/me").json()["id"]) == "lab_shared"
+            labs.seed = real_seed
+            labs.spares = 1
+            labs.refill()
+            _continue_as(visitor, "Rob (reviewer)")
+            assert _lab_of(labs, visitor.get("/api/me").json()["id"]) not in {"lab_shared"}
+            assert "You are in the shared lab" not in visitor.get("/").text
+    finally:
+        labs.seed, labs.spares = real_seed, 0
 
 
 def test_a_lab_is_audited_and_public_stays_empty(demo):

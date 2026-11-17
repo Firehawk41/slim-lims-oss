@@ -55,6 +55,7 @@ def _labs(settings: Settings) -> Labs:
         seed=lambda url: seed_demo(url, oss_dir=oss_dir, lab_timezone=settings.lab_timezone),
         upgrade=lambda url: upgrade_lab(url, settings.lab_timezone),
         version=os.environ.get("RENDER_GIT_COMMIT") or None,  # spares survive Render's idle sleep
+        spares=settings.demo_lab_spares,
     )
     labs.check()
     labs.start()
