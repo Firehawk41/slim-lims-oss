@@ -51,6 +51,7 @@ demo_labs = Table(
     Column("state", String(10), nullable=False),
     Column("created_at", DateTime(timezone=True), nullable=False),
     Column("last_seen", DateTime(timezone=True), nullable=False),
+    Column("seeded_by", String(64)),  # the code that seeded it: a spare outlives a restart of the same code
 )
 
 
@@ -101,8 +102,12 @@ class Labs:
         idle: timedelta = timedelta(hours=1),
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
         background: bool = True,
+        version: str | None = None,
     ):
+        """`version` names the code (Render: the deployed commit). Spares it seeded are kept through a
+        restart of the same version (the free plan sleeps when idle); without one, a restart drops them."""
         self.url = without_schema(url)
+        self.version = version
         self.seed = seed
         self.upgrade = upgrade  # brings a claimed lab up to the code now running (D-115)
         self.spares, self.cap, self.idle, self.clock = spares, cap, idle, clock
@@ -117,6 +122,7 @@ class Labs:
         # Alembic keeps its context in module globals: two seeds or upgrades at once in one process (a
         # visitor's claim and the spare filler, right after a deploy) corrupt each other. One at a time.
         self._seeding = threading.RLock()
+        self._claims_waiting = 0  # the filler gives way to these (the RLock isn't fair: 3½ min on Render)
 
     @property
     def kept_for(self) -> str:
@@ -134,6 +140,8 @@ class Labs:
         with self.base.begin() as conn:
             conn.execute(text("CREATE EXTENSION IF NOT EXISTS citext SCHEMA public"))
         registry.create_all(self.base)
+        with self.base.begin() as conn:  # a table made before the column (2026-11-17)
+            conn.execute(text("ALTER TABLE public.demo_labs ADD COLUMN IF NOT EXISTS seeded_by varchar(64)"))
         left = sorted(set(inspect(self.base).get_table_names(schema="public")) - {demo_labs.name})
         if left:
             raise RuntimeError(
@@ -144,12 +152,14 @@ class Labs:
 
     def start(self) -> None:
         """After a restart, which may be a deploy with new migrations (D-115; app review 2026-10-30b L1):
-        drops labs left half-seeded and every spare (seeded by the code that ran before; refilled from the
-        current seed), brings each claimed lab up to date with `upgrade` (dropping one that won't: its
-        visitor starts afresh), then fills the spares in the background."""
+        drops labs left half-seeded and every spare seeded by other code (refilled from the current seed),
+        brings each claimed lab up to date with `upgrade` (dropping one that won't: its visitor starts
+        afresh), then fills the spares in the background."""
         with self.base.begin() as conn:
-            rows = conn.execute(select(demo_labs.c.schema, demo_labs.c.state)).all()
-        for schema, state in rows:
+            rows = conn.execute(select(demo_labs.c.schema, demo_labs.c.state, demo_labs.c.seeded_by)).all()
+        for schema, state, seeded_by in rows:
+            if state == READY and self.version and seeded_by == self.version:
+                continue  # the same code woke up: its spares are as good as new ones
             if state in (PREPARING, READY):
                 self.drop(schema)
             elif self.upgrade is not None:
@@ -165,14 +175,21 @@ class Labs:
 
     def claim(self) -> str:
         """A lab of the visitor's own: a spare if one is ready, else one seeded now. A claim that finds
-        none waits for a spare being seeded and takes it, rather than seeding beside it."""
+        none waits for a spare being seeded and takes it, rather than seeding beside it; the filler starts no
+        other spare while a claim waits."""
         schema = self._take_ready()
         if schema is None:
-            with self._seeding:
-                schema = self._take_ready()
-                if schema is None:
-                    self.sweep(room_for=1)
-                    schema = self._make(CLAIMED)
+            with self._lock:
+                self._claims_waiting += 1
+            try:
+                with self._seeding:
+                    schema = self._take_ready()
+                    if schema is None:
+                        self.sweep(room_for=1)
+                        schema = self._make(CLAIMED)
+            finally:
+                with self._lock:
+                    self._claims_waiting -= 1
         self.refill_in_background()
         return schema
 
@@ -271,6 +288,9 @@ class Labs:
                 waiting = sum(1 for s in rows if s in (READY, PREPARING))
                 if waiting >= self.spares or len(rows) >= self.cap:
                     return made
+                with self._lock:
+                    if self._claims_waiting:  # a visitor first; their claim refills afterwards
+                        return made
                 self._make(READY)
                 made += 1
         finally:
@@ -295,7 +315,9 @@ class Labs:
         now = self.clock()
         with self.base.begin() as conn:
             conn.execute(
-                demo_labs.insert().values(schema=schema, state=PREPARING, created_at=now, last_seen=now)
+                demo_labs.insert().values(
+                    schema=schema, state=PREPARING, created_at=now, last_seen=now, seeded_by=self.version
+                )
             )
             conn.execute(text(f'CREATE SCHEMA "{schema}"'))
         with self._seeding:  # held until it is marked ready: a waiting claim then finds it

@@ -350,6 +350,13 @@ Tally and themes are updated now and then at the bottom.
 | C | (1) CI's `deploy` job: the previous main is built and started from its `render.yaml`, three visitors claim labs, then this commit is built and started over it (`scripts/replay_deploy.py`); `/health`, the visitors' labs and a new visitor must answer. `test_seed_lived_in.py` seeds with each one-time step left out, then the full seed: it fails on the outage's code. (2) A demo step that fails is logged with its traceback, rolled back and left out (`SeedReport.skipped`, a warning from `seed_demo.py`); migrations and the audit log stay fatal. | |
 | F | The replay found two more: Alembic's logging config switched off every logger already made, so the seed's errors, and uvicorn's after any lab upgrade, were never logged on Render (`disable_existing_loggers=False`); and the first visitor after a deploy got a 500, their lab seeded while the spare filler seeded another (Alembic's globals; `KeyError: 'config'`). | Fixed: one seed at a time per process, and a claim that waits takes the new spare; guard `test_labs.py::test_a_claim_right_after_a_restart_never_seeds_beside_the_spare_filler`. |
 
+## 2026-11-17 (later): choosing a persona hung
+
+| Kind | What | Notes |
+|---|---|---|
+| J | "Picking a persona isn't working." | |
+| F | Render's free plan sleeps when idle; each wake-up is a restart, which dropped every spare lab. A lab takes ~62 s to seed there, one at a time, so each persona click with no spare ready queued a minute's seed; the page said nothing, so clicking again queued more (9 seeds for 2 choices; 3½ min measured). | Fixed: spares outlive a restart of the same commit (`demo_labs.seeded_by`, `RENDER_GIT_COMMIT`); the persona buttons send once and say "Preparing your lab…" (`static/js/submit_once.js`); the spare filler starts no new spare while a claim waits. Guards: `test_labs.py::test_spares_outlive_a_restart_of_the_same_code_only`, `…::test_a_waiting_visitor_goes_before_the_spares_still_to_make`. |
+
 ## Themes so far
 - **Domain facts are Jamie's, and they overrule Claude's defaults:** DF < 1, MDL averaging, standards as
   recipes, spike placement. Claude's "cautious" engineering defaults were wrong more than once where

@@ -121,6 +121,52 @@ def test_a_claim_right_after_a_restart_never_seeds_beside_the_spare_filler(url):
         labs.drop(schema)
 
 
+def test_a_waiting_visitor_goes_before_the_spares_still_to_make(url):
+    """Render, 2026-11-17: after a wake-up the filler re-took the seeding lock for spare after spare while a
+    visitor's claim waited (3½ minutes). The claim now waits for the seed in progress only."""
+    import threading
+    import time
+
+    started = threading.Event()
+
+    def slow_seed(lab_url):
+        started.set()
+        time.sleep(0.6)
+        _stand_in_seed(lab_url)
+
+    labs = Labs(url, slow_seed, spares=4, cap=10, background=False)
+    labs.check()
+    filler = threading.Thread(target=labs.refill)
+    filler.start()
+    started.wait(5)
+    t0 = time.monotonic()
+    mine = labs.claim()
+    waited = time.monotonic() - t0
+    filler.join()
+    assert waited < 1.0, f"waited {waited:.1f}s: behind more than the seed in progress"
+    assert labs.enter(mine) is not None
+    for schema in _schemas(url):
+        labs.drop(schema)
+
+
+def test_spares_outlive_a_restart_of_the_same_code_only(url):
+    """Render's free plan sleeps when idle; each wake-up dropped the spares, so the first visitor waited for
+    a lab to be seeded (a minute there), behind any other clicks. Same commit: the spares stay."""
+    labs = Labs(url, _stand_in_seed, spares=2, background=False, version="abc123")
+    labs.check()
+    labs.refill()
+    spares = _schemas(url)
+    assert len(spares) == 2
+
+    Labs(url, _stand_in_seed, spares=2, background=False, version="abc123").start()  # woke up
+    assert _schemas(url) == spares
+    Labs(url, _stand_in_seed, spares=2, background=False, version="def456").start()  # a deploy
+    assert _schemas(url) == set()
+    labs.refill()
+    Labs(url, _stand_in_seed, spares=2, background=False).start()  # no version known: as before
+    assert _schemas(url) == set()
+
+
 def test_l1_a_restart_rebuilds_spares_and_upgrades_claimed_labs(url):
     """App review 2026-10-30b L1 (D-115): spares and claimed labs outlived a deploy with the schema they
     were seeded with, so a visitor could claim a lab without a new module's tables."""
