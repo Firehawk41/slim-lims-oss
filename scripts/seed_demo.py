@@ -102,6 +102,8 @@ def main(argv: list[str] | None = None) -> int:
         print("Demo scenarios: " + ", ".join(f"{name} {tr}" for name, tr in report.scenarios.items()))
     elif not args.no_scenarios:
         print("Demo scenarios: results exist already -- left untouched.")
+    if report.skipped:  # logged with their tracebacks above; the start-up goes on (Render outage 2026-11-17)
+        print(f"WARNING: demo seed steps left out: {', '.join(report.skipped)}.", file=sys.stderr)
     return 0
 
 

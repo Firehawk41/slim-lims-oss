@@ -17,6 +17,7 @@ Steps, in order:
 """
 
 import importlib.util
+import logging
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -72,6 +73,25 @@ class SeedReport:
     bottles: int = 0
     qc_runs: int = 0
     records: dict = field(default_factory=dict)
+    skipped: list[str] = field(default_factory=list)  # demo steps that failed and were left out
+
+
+log = logging.getLogger(__name__)
+
+
+def _demo_step(session, skipped: list[str], name: str, step, default=None):
+    """One demo-content step, committed on its own. A failure is logged and the step left out, never the
+    start-up stopped: demo data is optional, the site is not (Render outage 2026-11-17). Migrations and
+    the audit log are not demo steps: without them the app can't run, so they stay fatal."""
+    try:
+        result = step()
+        session.commit()
+        return result
+    except Exception:
+        session.rollback()
+        log.exception("demo seed: %s failed and was left out", name)
+        skipped.append(name)
+        return default
 
 
 def load_oss_demo(oss_dir: Path):
@@ -107,7 +127,9 @@ def seed_demo(
     oss_dir: Path = DEFAULT_OSS_DIR,
     lab_timezone: str = "America/Chicago",
     scenarios: bool = True,
+    leave_out: frozenset[str] = frozenset(),
 ) -> SeedReport:
+    """``leave_out`` names demo steps not to run: the tests seed a database as an older seed left it."""
     report = SeedReport()
     slim_url = slim_database_url or database_url
     ensure_schema(database_url)  # a lab's schema (D-102); nothing otherwise
@@ -141,30 +163,48 @@ def seed_demo(
         clock = LabClock(ZoneInfo(lab_timezone))  # the demo's dates are the lab's (review A8)
         with make_session_factory(portal_engine)() as session:
             reference = load_reference(slim_engine, portal_engine)
-            report.analyses = publish_demo_rules(session, reference)
-            publish_demo_prep(session, reference, clock.today())
-            publish_demo_samples(session)
-            report.personas = sync_personas(session)
-            seed_demo_register(session, clock.today(), DEMO_INSTRUMENTS, DEMO_RULES)  # D-125, D-127
-            seed_demo_authorisations(session, clock.today())  # D-132: before anyone acts
-            seed_demo_quality_system(session, clock.today())  # D-134, D-135: before anyone acts
-            seed_demo_sections(session, reference)  # D-138: the day's board
-            seed_demo_quote_request(session, reference)  # D-139: the queue isn't empty
-            session.commit()
+            today, now = clock.today(), clock.now()
+
+            def step(name, fn, default=None):
+                if name in leave_out:
+                    return default
+                return _demo_step(session, report.skipped, name, fn, default)
+
+            report.analyses = step("results rules", lambda: publish_demo_rules(session, reference), {}) or {}
+            step("prep rules", lambda: publish_demo_prep(session, reference, today))
+            step("bottle rules", lambda: publish_demo_samples(session))
+            report.personas = step("personas", lambda: sync_personas(session), 0) or 0
+            step(
+                "equipment register", lambda: seed_demo_register(session, today, DEMO_INSTRUMENTS, DEMO_RULES)
+            )
+            step(
+                "authorisations", lambda: seed_demo_authorisations(session, today)
+            )  # D-132: before anyone acts
+            step("risks and audits", lambda: seed_demo_quality_system(session, today))  # D-134, D-135
+            step("the day's board", lambda: seed_demo_sections(session, reference))  # D-138
+            step("a quote request", lambda: seed_demo_quote_request(session, reference))  # D-139
             if scenarios:
                 specs = SpecReader(slim_engine, reference)
-                report.scenarios = seed_scenarios(session, reference, specs, clock.now())
-                session.commit()
-                report.prepped = seed_prep_scenario(session, reference, specs, clock.now())
-                session.commit()
-                report.bottles = seed_demo_bottles(session, reference, clock.today())
-                session.commit()
-                report.qc_runs = seed_quality_history(session, reference, specs, clock.now())
-                seed_demo_nonconformity(session, clock.now())
-                session.commit()
+                report.scenarios = (
+                    step("scenarios", lambda: seed_scenarios(session, reference, specs, now), {}) or {}
+                )
+                report.prepped = step(
+                    "prep scenario", lambda: seed_prep_scenario(session, reference, specs, now)
+                )
+                report.bottles = step("bottles", lambda: seed_demo_bottles(session, reference, today), 0) or 0
+                report.qc_runs = (
+                    step("QC history", lambda: seed_quality_history(session, reference, specs, now), 0) or 0
+                )
+                step("a nonconformity", lambda: seed_demo_nonconformity(session, now))
                 issued = report.scenarios.get("clean_pass")
-                report.records = seed_quality_records(session, reference, specs, clock.now(), issued)
-                session.commit()
+                report.records = (
+                    step(
+                        "quality records",
+                        lambda: seed_quality_records(session, reference, specs, now, issued),
+                        {},
+                    )
+                    or {}
+                )
     finally:
         portal_engine.dispose()
         slim_engine.dispose()
@@ -189,11 +229,25 @@ def upgrade_lab(database_url: str, lab_timezone: str = "America/Chicago") -> Non
         migrate_invoicing(engine)
         install_audit_log(engine)
         with make_session_factory(engine)() as session:
-            today = LabClock(ZoneInfo(lab_timezone)).today()
-            seed_demo_register(session, today, DEMO_INSTRUMENTS, DEMO_RULES)
-            seed_demo_authorisations(session, today)  # D-132: a lab from before the register gets it
-            seed_demo_quality_system(session, today)  # D-134, D-135: likewise the risks and audits
-            seed_demo_sections(session, load_reference(engine, engine))  # D-138: likewise the sections
-            session.commit()
+            today, skipped = LabClock(ZoneInfo(lab_timezone)).today(), []
+            # A lab from before each of these gets it; a failure leaves it out, never drops the lab.
+            _demo_step(
+                session,
+                skipped,
+                "equipment register",
+                lambda: seed_demo_register(session, today, DEMO_INSTRUMENTS, DEMO_RULES),
+            )
+            _demo_step(
+                session, skipped, "authorisations", lambda: seed_demo_authorisations(session, today)
+            )  # D-132
+            _demo_step(
+                session, skipped, "risks and audits", lambda: seed_demo_quality_system(session, today)
+            )  # D-134
+            _demo_step(
+                session,
+                skipped,
+                "the day's board",
+                lambda: seed_demo_sections(session, load_reference(engine, engine)),
+            )
     finally:
         engine.dispose()

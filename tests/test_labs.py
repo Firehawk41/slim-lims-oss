@@ -83,6 +83,44 @@ def test_spares_claims_idle_labs_and_the_cap(url):
         labs.drop(schema)
 
 
+def test_a_claim_right_after_a_restart_never_seeds_beside_the_spare_filler(url):
+    """The 2026-11-17 replay: the first visitor after a deploy claimed (seeding a lab) while the filler seeded
+    a spare; Alembic's globals made both fail. Seeds run one at a time, and the claim takes the new spare."""
+    import threading
+    import time
+
+    running, overlaps, started = [0], [], threading.Event()
+    guard = threading.Lock()
+
+    by_claim = []
+
+    def slow_seed(lab_url):
+        if threading.current_thread() is threading.main_thread():
+            by_claim.append(lab_url)
+        with guard:
+            running[0] += 1
+            if running[0] > 1:
+                overlaps.append(lab_url)
+        started.set()
+        time.sleep(0.5)
+        _stand_in_seed(lab_url)
+        with guard:
+            running[0] -= 1
+
+    labs = Labs(url, slow_seed, spares=1, cap=5, background=False)
+    labs.check()
+    filler = threading.Thread(target=labs.refill)
+    filler.start()
+    started.wait(5)  # the filler is seeding a spare
+    mine = labs.claim()  # no spare ready yet
+    filler.join()
+    assert overlaps == []
+    assert by_claim == []  # the claim waited and took the filler's spare (it then made the next one)
+    assert labs.enter(mine) is not None
+    for schema in _schemas(url):
+        labs.drop(schema)
+
+
 def test_l1_a_restart_rebuilds_spares_and_upgrades_claimed_labs(url):
     """App review 2026-10-30b L1 (D-115): spares and claimed labs outlived a deploy with the schema they
     were seeded with, so a visitor could claim a lab without a new module's tables."""
