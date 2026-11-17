@@ -1,5 +1,6 @@
 """FastAPI application factory. Run with: uvicorn --factory slim_lims.main:create_app"""
 
+import os
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -53,6 +54,8 @@ def _labs(settings: Settings) -> Labs:
         settings.database_url,
         seed=lambda url: seed_demo(url, oss_dir=oss_dir, lab_timezone=settings.lab_timezone),
         upgrade=lambda url: upgrade_lab(url, settings.lab_timezone),
+        version=os.environ.get("RENDER_GIT_COMMIT") or None,  # spares survive Render's idle sleep
+        spares=settings.demo_lab_spares,
     )
     labs.check()
     labs.start()

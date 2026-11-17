@@ -14,7 +14,8 @@
     <p class="muted">No personas are set up (run the demo seed).</p>
   {% endif %}
   {% if request.app.state.labs %}
-    <p>This lab is yours alone: nobody else sees what you do here. It is kept for
+    <p>Your first persona opens a lab of your own (if none is free yet, the shared lab until you choose
+      again): nobody else sees what you do there. It is kept for
       {{ request.app.state.labs.kept_for }} after your last click (sooner if the demo is full: the least
       recently used goes first), then cleared; choosing a persona again gives you a fresh one.</p>
     {% if request.session.get("lab") %}

@@ -86,7 +86,11 @@ ruff check . && ruff format --check .
 `docker compose up --build`: Postgres 16 + a one-shot seed + the app with personas. **Render**
 (`render.yaml`): a lab per visitor (`DEMO_LABS`, D-102): public is emptied once (`cli empty-public --yes
 --if-needed`), the shared lab is `DATABASE_SCHEMA=lab_shared`, each visitor's first persona claims a
-seeded schema of their own; a restart (a deploy) drops the spares and upgrades every claimed lab (D-115).
+seeded schema of their own; a deploy drops the spares and upgrades every claimed lab (D-115); a restart of the same commit (the free
+plan sleeps when idle) keeps them (`demo_labs.seeded_by`). Labs are seeded one at a time (Alembic's globals),
+a waiting visitor first. A visitor never waits for a seed: with no spare ready, a persona opens the shared lab
+(the banner says so) and a later choice their own (`Labs.take_spare`); Render keeps 4 spares (`DEMO_LAB_SPARES`)
+and `.github/workflows/keepalive.yml` stops the free service sleeping.
 The service is `slim-lims-oss`, the database `slim-lims-db` (renaming it makes
 Render create a second; the free plan allows one; it expires 2026-11-24). CI: {SQLite, Postgres 16} × {3.11,
 3.12}, and `deploy`: a Render deploy replayed over the previous main's database with claimed labs

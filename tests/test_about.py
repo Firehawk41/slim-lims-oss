@@ -36,14 +36,16 @@ def test_without_personas_the_landing_page_offers_no_way_in_but_the_login(client
 
 def test_the_landing_page_starts_a_persona_in_one_click(demo_client):
     page = demo_client.get("/about").text
-    forms = re.findall(r'<form method="post" action="[^"]*/demo/continue-as">(.*?)</form>', page, re.S)
+    forms = re.findall(r'<form method="post" action="[^"]*/demo/continue-as"[^>]*>(.*?)</form>', page, re.S)
     assert len(forms) == 6  # Casey, Ana, Rob, Sue, Quinn and Uma (quality, D-109)
     assert all('name="csrf_token" value="' in form and 'name="user_id"' in form for form in forms)
 
 
 def test_the_landing_page_keeps_the_csp_and_shows_the_diagram(demo_client):
     page = demo_client.get("/about").text
-    assert "<script" not in page and " style=" not in page  # no inline script or style (CSP)
+    scripts = re.findall(r"<script([^>]*)>(.*?)</script>", page, re.S)
+    assert all('src="' in attrs and not body.strip() for attrs, body in scripts)  # no inline script (CSP)
+    assert " style=" not in page
     assert f"YourLab running SlimLIMS v{__version__}" in page
     assert '<svg class="arch"' in page and "SlimLIMS architecture by department" in page
 
